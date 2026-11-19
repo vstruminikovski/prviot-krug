@@ -178,7 +178,7 @@ export class Sim {
     if (this.stuckT > 2.5) this.rewind();
   }
   /** Put the car back on the last safe spot about `back` seconds ago (falls back to the oldest one). */
-  rewind(back = 6) {
+  rewind(back = 6, msg = 'Возилото се заглави — вратено малку назад.') {
     const p = this.player; this.stuckT = 0;
     const bodies = this.bodiesNow();
     const ok = (s: { x: number; y: number; h: number }) => p.penetration(s, this.world, bodies) === 0;
@@ -188,7 +188,7 @@ export class Sim {
     p.x = spot.x; p.y = spot.y; p.h = spot.h; p.vx = 0; p.vy = 0; p.r = 0;
     this.safe = this.safe.filter((s) => s.t <= spot.t);
     this.rewound = true;
-    this.say('Возилото се заглави — вратено малку назад.', 2);
+    this.say(msg, 2);
     return true;
   }
 

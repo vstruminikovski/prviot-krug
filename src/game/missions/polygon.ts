@@ -69,6 +69,25 @@ export class PolygonMission implements Mission {
 
   get active(): Ex | undefined { return this.ex[this.cur]; }
 
+  /** Часови: the exercise a repeat offer refers to (set when a mistake offers a retry). */
+  private retryIdx: number | null = null;
+  /** the last exercise failed with a repeat offer pending — finish only once the player declines */
+  private holdDone = false;
+  /** Repeat the exercise the mistake happened in — not the next one, even if the drive already moved on. */
+  retry(sim: Sim) {
+    const idx = this.retryIdx ?? (this.active && this.active.status !== 'toStart' ? this.cur : this.lastIdx());
+    this.retryIdx = null; this.holdDone = false; this.done = false;
+    const e = this.ex[idx]; if (!e) return;
+    if (this.cur !== idx && this.active && this.active.status === 'toStart') this.active.status = 'pending';
+    this.cur = idx;
+    Object.assign(e, { detail: '', pts: 0, stopT: 0, maxGear: 0, segments: 0, lastDir: 0, stoppedOnHill: false, pbUsed: false, stalls: 0, reversed: false, t0: undefined, t1: undefined });
+    this.placeAtStart(sim);
+    sim.say(`Повторно: ${e.howTo}`, 2);
+  }
+  /** The player declined the repeat: go on (or end the drive if that was the last exercise). */
+  skipRetry() { this.retryIdx = null; if (this.holdDone) { this.holdDone = false; this.done = true; } }
+  private lastIdx() { let i = Math.min(this.cur, this.ex.length) - 1; while (i > 0 && this.ex[i].status === 'disabled') i--; return Math.max(0, i); }
+
   /** Practice helper: put the car at the start of the current exercise (recorded as assistance). */
   placeAtStart(sim: Sim) {
     const e = this.active; if (!e) return;
@@ -87,6 +106,7 @@ export class PolygonMission implements Mission {
     const official = e.official;
     const inc = sim.incident(key, { layer, severity: ruleId.endsWith('E') || ruleId.match(/1\.(1E|2B|4A|4D|4Gj|5B|5Gj|6A|6G)$/) ? 'serious' : 'significant', ruleIds: [ruleId], text, exam: official ? [ruleId] : [] }, 0.5);
     if (inc && official) e.pts += inc.exam?.reduce((a, x) => a + x.points, 0) ?? 0;
+    if (inc?.cls && (MATRIX_CONFIG.lessonRetry as string[]).includes(inc.cls.action)) this.retryIdx = this.ex.indexOf(e);
     if (sim.config.mode === 'exam' && sim.ledger.examTotal('Образец бр. 1') > MATRIX_CONFIG.examThreshold.polygon && !sim.failed) {
       sim.failed = sim.ledger.incidents[sim.ledger.incidents.length - 1];
       sim.say('Над 50 негативни поени — првиот практичен дел не е положен (чл. 36).', 3);
@@ -102,7 +122,7 @@ export class PolygonMission implements Mission {
     // next exercise
     do { this.cur++; } while (this.cur < this.ex.length && this.ex[this.cur].status === 'disabled');
     const n = this.active;
-    if (!n) { this.done = true; return; }
+    if (!n) { if (!ok && this.retryIdx === this.ex.indexOf(e) && sim.config.mode !== 'exam') this.holdDone = true; else this.done = true; return; }
     n.status = 'toStart';
     sim.say(`Следна вежба: ${n.title}. Возете до означениот почеток.`, 1);
   }

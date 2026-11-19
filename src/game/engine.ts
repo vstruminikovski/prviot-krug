@@ -76,12 +76,12 @@ export class GameEngine {
   private retryCard: HudState['retry'] = null;
   retryExercise() {
     const sim = this.sim; if (!sim) return;
-    if (sim.config.env === 'polygon') { (sim.mission as PolygonMission).placeAtStart(sim); this.input.parkingBrake = true; }
-    else sim.rewind(MATRIX_CONFIG.cityRetryRewind);
+    if (sim.config.env === 'polygon') { (sim.mission as PolygonMission).retry(sim); this.input.parkingBrake = true; }
+    else sim.rewind(MATRIX_CONFIG.cityRetryRewind, 'Вратено пред ситуацијата — пробај повторно.'); sim.rewound = false;
     this.view.resetInterp(); this.view.resetShot();
     this.retryCard = null; this.paused = false; this.input.clear(); this.emitHud();
   }
-  continueLesson() { this.retryCard = null; this.paused = false; this.input.clear(); this.emitHud(); }
+  continueLesson() { if (this.sim?.config.env === 'polygon') (this.sim.mission as PolygonMission).skipRetry(); this.retryCard = null; this.paused = false; this.input.clear(); this.emitHud(); }
   /** per-frame UI hooks (minimap) — driven by the game loop, not their own timers */
   frameHooks = new Set<(dt: number) => void>();
   // ---- positive feedback (presentation only — scoring is unchanged)
@@ -255,7 +255,7 @@ export class GameEngine {
       case 'hazards': p.hazards = !p.hazards; break;
       case 'parkingBrake': this.input.parkingBrake = !this.input.parkingBrake; this.audio.ratchet(); break;
       case 'engine': msg = p.requestEngine(); break;
-      case 'reset': if (sim.config.env === 'polygon') { (sim.mission as PolygonMission).placeAtStart(sim); this.input.parkingBrake = true; } else if (sim.rewind(3)) { this.view.resetInterp(); this.view.resetShot(); } else msg = 'Нема безбедно место за враќање.'; break;
+      case 'reset': if (sim.config.env === 'polygon') { (sim.mission as PolygonMission).retry(sim); this.input.parkingBrake = true; } else if (sim.rewind(3)) { this.view.resetInterp(); this.view.resetShot(); } else msg = 'Нема безбедно место за враќање.'; break;
     }
     if (msg) this.flash(msg, 'warn');
     this.emitHud();
