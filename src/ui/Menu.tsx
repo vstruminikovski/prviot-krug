@@ -12,7 +12,7 @@ import { Booklet } from './Booklet';
 import { Settings } from './Settings';
 import { earnedStamps, nextStamp, STAMP_SETUP, STAMPS } from '../game/career';
 import { TIME_LABEL, WEATHER_LABEL, type TimeOfDay, type Weather } from '../game/render/atmosphere';
-import { Icon, Logo, Modal, Seg, type IconName } from './kit';
+import { FullscreenButton, Icon, Logo, Modal, Seg, type IconName } from './kit';
 
 const ASSISTS: { id: Assist; label: string; note: string }[] = [
   { id: 'learn', label: 'Со помош', note: 'Не гасне лесно, точката на зафаќање е означена, ти предлага брзина.' },
@@ -63,6 +63,7 @@ export function Menu({ engine }: { engine: GameEngine }) {
         <header className="menu-top">
           <Logo />
           <nav className="menu-icons">
+            <FullscreenButton />
             <button className="btn icon glass badge-wrap" onClick={() => setSheet('book')} title="Возачка книшка"><Icon name="book" />{stamps > 0 && <span className="badge-dot">{stamps}</span>}</button>
             <button className="btn icon glass" onClick={() => setSheet('settings')} title="Поставки"><Icon name="sliders" /></button>
             <button className="btn icon glass" onClick={() => setSheet('help')} title="Како се вози (?)"><Icon name="help" /></button>

@@ -125,6 +125,10 @@ export class GameEngine {
     this.view.camMode = this.store.settings.camera;
     this.applySettings();
     this.input.attach();
+    // phones: leaving fullscreen (swipe, back gesture) mid-drive pauses, so nothing happens unseen
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && this.coarse && this.phase === 'drive' && !this.paused && !this.sim?.finished) { this.paused = true; this.input.clear(); this.emitHud(); }
+    });
     this.input.onCommand = (c) => this.command(c);
     this.view.setEnvironment('city', { vehicleLength: 3.5 });
     this.raf = requestAnimationFrame(this.frame);

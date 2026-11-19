@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Icon, LogoMark } from './kit';
+import { Icon, LogoMark, enterFullscreen } from './kit';
 
 type W = Window & { __installPrompt?: Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> } };
 
@@ -21,11 +21,7 @@ export function MobileGate() {
     await p.prompt(); try { await p.userChoice; } catch { /* */ }
     (window as W).__installPrompt = undefined; setCanInstall(false);
   };
-  const fullscreen = async () => {
-    try { await document.documentElement.requestFullscreen?.({ navigationUI: 'hide' } as FullscreenOptions); } catch { /* not allowed */ }
-    try { await (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape'); } catch { /* not supported */ }
-    close();
-  };
+  const fullscreen = async () => { await enterFullscreen(); close(); };
   const ios = isIOS();
   const canFullscreen = !!document.documentElement.requestFullscreen && !ios;
   return (

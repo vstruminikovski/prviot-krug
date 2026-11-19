@@ -32,6 +32,7 @@ const P: Record<string, ReactNode> = {
   share: <><circle cx="6" cy="12" r="2.5" /><circle cx="17.5" cy="6" r="2.5" /><circle cx="17.5" cy="18" r="2.5" /><path d="M8.2 10.8l7.1-3.6M8.2 13.2l7.1 3.6" /></>,
   eye: <><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></>,
   home: <><path d="M4 11l8-6.5 8 6.5" /><path d="M6 9.5V20h12V9.5" /></>,
+  expand: <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
   sliders: <><path d="M5 4v16M12 4v16M19 4v16" /><circle cx="5" cy="14" r="2" fill="currentColor" /><circle cx="12" cy="8" r="2" fill="currentColor" /><circle cx="19" cy="16" r="2" fill="currentColor" /></>,
 };
 export type IconName = keyof typeof P;
@@ -126,4 +127,28 @@ export function CountUp({ to, ms = 1100 }: { to: number; ms?: number }) {
     return () => cancelAnimationFrame(raf.current);
   }, [to, ms]);
   return <>{v}</>;
+}
+
+// ---------------------------------------------------------------- fullscreen (phones in a browser tab)
+const standalone = () => matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
+/** Enter fullscreen and lock landscape where the browser allows it (Android); safe to call anywhere. */
+export async function enterFullscreen() {
+  try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.({ navigationUI: 'hide' } as FullscreenOptions); } catch { /* refused */ }
+  try { await (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape'); } catch { /* unsupported */ }
+}
+/** True when a fullscreen button makes sense right now: touch device, browser tab, fullscreen
+ *  supported (not iPhone Safari) and currently not fullscreen. Re-renders on every change. */
+export function useNeedsFullscreen() {
+  const calc = () => matchMedia('(pointer: coarse)').matches && !standalone() && !!document.fullscreenEnabled && !document.fullscreenElement;
+  const [need, setNeed] = useState(calc);
+  useEffect(() => { const f = () => setNeed(calc()); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
+  return need;
+}
+/** Small pill/button to go (back) to fullscreen. */
+export function FullscreenButton({ variant = 'icon', onDone, label = 'Назад на цел екран' }: { variant?: 'icon' | 'block'; onDone?: () => void; label?: string }) {
+  const need = useNeedsFullscreen();
+  if (!need) return null;
+  return variant === 'block'
+    ? <button className="btn primary block" onClick={() => { void enterFullscreen().then(() => onDone?.()); }}><Icon name="expand" size={18} />{label}</button>
+    : <button className="btn icon glass fs-btn" onClick={() => void enterFullscreen()} title="Цел екран" aria-label="Цел екран"><Icon name="expand" /></button>;
 }

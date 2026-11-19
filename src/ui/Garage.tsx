@@ -3,7 +3,7 @@ import type { GameEngine } from '../game/engine';
 import { VEHICLES, PAINT_PRESETS, turningCircle, vehicleById } from '../game/vehicles/defs';
 import { validPlate, DEFAULT_GARAGE } from '../game/store';
 import { compatibility } from '../game/attempt';
-import { Icon, Seg } from './kit';
+import { FullscreenButton, Icon, Seg } from './kit';
 
 const REGIONS = [{ code: 'SK', name: 'Скопје' }, { code: 'BT', name: 'Битола' }, { code: 'OH', name: 'Охрид' }, { code: 'KU', name: 'Куманово' }, { code: 'TE', name: 'Тетово' }, { code: 'VE', name: 'Велес' }, { code: 'ST', name: 'Штип' }, { code: 'PP', name: 'Прилеп' }];
 
@@ -92,6 +92,7 @@ export function Garage({ engine }: { engine: GameEngine }) {
           <button className="btn primary go" disabled={!!blocked} title={blocked ?? ''} onClick={() => engine.start({})}><Icon name="play" size={18} />Возиме</button>
         </footer>
       </aside>
+      <div className="fs-float"><FullscreenButton /></div>
       <div className="garage-hint"><Icon name="eye" size={15} />Влечи за вртење · тркалце или два прста за зум</div>
     </div>
   );

@@ -551,3 +551,7 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
   .clean { top: auto; left: 50%; bottom: calc(max(10px, var(--safe-b)) + 48px); transform: translateX(-50%); animation: none; }
   .clean.broke { animation: none; }
 }
+
+/* back to fullscreen */
+.fs-float { position: absolute; right: max(16px, var(--safe-r)); top: max(16px, var(--safe-t)); pointer-events: auto; }
+.fs-btn { color: var(--amber) !important; border-color: rgba(242,169,59,.5) !important; animation: pulse 1.4s ease-in-out infinite alternate; }
