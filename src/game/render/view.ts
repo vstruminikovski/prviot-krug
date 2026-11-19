@@ -14,6 +14,7 @@ import type { VehicleDef, PlateLayout } from '../vehicles/defs';
 import { loadVehicleGLB, rigFromGLB, proceduralRig, type VehicleRig } from './vehicleAssets';
 import { buildCityExtras, buildOpenRoadScene, buildPolygonScene, buildOsmScene, type CityExtras, type OpenRoadScene } from './envScenes';
 import { buildGarage, type GarageScene } from './garage';
+import { decorateOpenRoad } from './kenneyProps';
 import type { EnvId } from '../env/types';
 import type { Glance } from '../input';
 
@@ -175,7 +176,7 @@ export class View {
         this.cityExtras = buildCityExtras(); g.add(this.cityExtras.group); g.add(this.patrons);
       } else if (env === 'polygon') g = buildPolygonScene(opts.vehicleLength);
       else if (env === 'osm') g = buildOsmScene();
-      else { this.openRoad = buildOpenRoadScene(opts.debrisS ?? 2100); g = this.openRoad.group; }
+      else { this.openRoad = buildOpenRoadScene(opts.debrisS ?? 2100); g = this.openRoad.group; void decorateOpenRoad(g); }
       this.envGroups[env] = g; this.envKey[env] = key;
       this.scene.add(g);
     }
