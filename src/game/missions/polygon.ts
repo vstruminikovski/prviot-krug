@@ -11,6 +11,9 @@ import { EX_HILL, EX_LANE, EX_PARK, EX_REVERSE, EX_UTURN, SLALOM, BAY, parkRect 
 
 type ExId = 'lane' | 'reverse' | 'uturn' | 'park' | 'hill' | 'slalom' | 'bay';
 
+/** exercise start: within this distance of the marked point, pointing this close to its direction, stopped */
+const START_RADIUS = 2.2, START_HEADING_TOL = 0.45; // m, rad (≈ 26°)
+
 interface Ex {
   id: ExId; title: string; official: boolean; howTo: string;
   start: Pose; status: 'pending' | 'toStart' | 'ready' | 'running' | 'pass' | 'fail' | 'disabled';
@@ -132,7 +135,7 @@ export class PolygonMission implements Mission {
     if (!e || this.done) return;
     const p = sim.player;
     if (e.status === 'toStart') {
-      const inBox = Math.hypot(p.x - e.start.x, p.y - e.start.y) < 2.2 && Math.abs(angleDiff(p.h, e.start.h)) < 0.35;
+      const inBox = Math.hypot(p.x - e.start.x, p.y - e.start.y) < START_RADIUS && Math.abs(angleDiff(p.h, e.start.h)) < START_HEADING_TOL;
       if (inBox && Math.abs(p.vx) < 0.2) { e.status = 'ready'; sim.say(`Вежба: ${e.howTo}`, 1); }
       return;
     }
@@ -291,7 +294,19 @@ export class PolygonMission implements Mission {
     const n = this.ex.filter((x) => x.status !== 'disabled').indexOf(e) + 1;
     const total = this.ex.filter((x) => x.status !== 'disabled').length;
     const pts = sim.config.mode === 'exam' ? ` · ${sim.ledger.examTotal('Образец бр. 1')}/50 нег. поени` : '';
-    if (e.status === 'toStart') return { text: `Возете до почетокот: ${e.title}`, progress: `${n}/${total}${pts}`, nav: { arrow: 'park', dist: Math.round(Math.hypot(e.start.x - sim.player.x, e.start.y - sim.player.y)), at: e.start } };
+    if (e.status === 'toStart') {
+      // say exactly what is still missing — the player never has to guess why the start doesn't count
+      const p = sim.player, d = Math.hypot(e.start.x - p.x, e.start.y - p.y), off = angleDiff(p.h, e.start.h);
+      const nav = { arrow: 'park' as const, dist: Math.round(d), at: e.start, heading: e.start.h };
+      let text = `Возете до почетокот: ${e.title}`;
+      if (d < START_RADIUS + 2.5) {
+        if (Math.abs(off) > Math.PI / 2) text = 'Свртено си наопаку — возилото треба да гледа како стрелката во кругот';
+        else if (Math.abs(off) > START_HEADING_TOL) text = `Исправи го возилото по стрелката (уште ${Math.round(Math.abs(off) * 180 / Math.PI)}°)`;
+        else if (d > START_RADIUS) text = `Уште ${d.toFixed(1)} m до средината на кругот`;
+        else if (Math.abs(p.vx) >= 0.2) text = 'Тука си — запри';
+      }
+      return { text, progress: `${n}/${total}${pts}`, nav };
+    }
     return { text: `${e.official ? '' : '(вежба) '}${e.title}`, sub: e.status === 'ready' ? e.howTo : undefined, progress: `${n}/${total}${pts}` };
   }
 

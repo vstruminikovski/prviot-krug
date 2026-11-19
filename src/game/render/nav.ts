@@ -26,13 +26,19 @@ export class NavMarker {
   private burstRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   private t = 0; private show = 0; private burstT = -1;
   private at: Vec2 | null = null;
+  /** required direction at the gate (polygon starts): an arrow painted inside the ring */
+  private headArrow: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>;
 
   constructor() {
     this.curtain = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 2.8, 40, 1, true), curtainMaterial());
     this.curtain.position.y = 1.4;
     this.ring = new THREE.Mesh(new THREE.RingGeometry(1.85, 2.25, 48), new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
     this.ring.rotation.x = -Math.PI / 2; this.ring.position.y = 0.04;
-    this.gate.add(this.curtain, this.ring);
+    const hs = new THREE.Shape();
+    hs.moveTo(1.6, 0); hs.lineTo(0.3, 0.9); hs.lineTo(0.3, 0.32); hs.lineTo(-1.5, 0.32); hs.lineTo(-1.5, -0.32); hs.lineTo(0.3, -0.32); hs.lineTo(0.3, -0.9); hs.closePath();
+    this.headArrow = new THREE.Mesh(new THREE.ShapeGeometry(hs), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+    this.headArrow.position.y = 0.05; this.headArrow.visible = false;
+    this.gate.add(this.curtain, this.ring, this.headArrow);
     // guide chevron (flat, lying in the horizontal plane, tip along +x)
     const s = new THREE.Shape();
     s.moveTo(0.9, 0); s.lineTo(-0.5, 0.75); s.lineTo(-0.2, 0); s.lineTo(-0.5, -0.75); s.closePath();
@@ -44,7 +50,11 @@ export class NavMarker {
     this.group.visible = false;
   }
 
-  setTarget(at: Vec2 | null) { this.at = at ? { x: at.x, y: at.y } : null; }
+  setTarget(at: Vec2 | null, heading?: number) {
+    this.at = at ? { x: at.x, y: at.y } : null;
+    this.headArrow.visible = !!at && heading !== undefined;
+    if (heading !== undefined) this.headArrow.rotation.set(-Math.PI / 2, 0, heading);
+  }
 
   /** The gate was reached: a white ring expands from it. */
   burst(at: Vec2, z: number) { this.burstT = 0; this.burstRing.position.set(at.x, z + 0.06, -at.y); }

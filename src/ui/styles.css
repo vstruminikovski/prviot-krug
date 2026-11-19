@@ -683,3 +683,49 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
 .arrive svg { width: 34px; height: 34px; fill: none; stroke: #ffc65a; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; animation: arriveTick .32s .05s var(--ease) forwards; }
 @keyframes arrive { 0% { opacity: 0; transform: scale(.6); } 18% { opacity: 1; transform: scale(1.06); } 30% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(.96); } }
 @keyframes arriveTick { to { stroke-dashoffset: 0; } }
+
+/* ---------- phone messages: objective pill · help card · subtitle (no permanent bar) ---------- */
+.obj, .obj-panel, .help, .subtitle { display: none; }
+@media (pointer: coarse) {
+  .obj { display: flex; align-items: center; gap: 8px; position: absolute; z-index: 4; top: max(8px, var(--safe-t)); left: 50%; transform: translateX(-50%); max-width: calc(100vw - 2 * max(12px, var(--safe-l)) - 340px); min-width: 0; height: 40px; padding: 0 14px 0 10px; border-radius: 20px; background: var(--glass-c); border: .5px solid var(--glass-b); backdrop-filter: blur(22px) saturate(170%); -webkit-backdrop-filter: blur(22px) saturate(170%); color: #fff; font: 600 12.5px var(--f-text); animation: hudIn var(--t3) var(--ease) 2.3s both; }
+  .obj-a { font-size: 16px; color: #ffc65a; flex: none; } .obj-dot { width: 7px; height: 7px; border-radius: 50%; background: #ffc65a; flex: none; }
+  .obj-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  .obj b { color: #ffc65a; font-variant-numeric: tabular-nums; flex: none; } .obj i { font-style: normal; color: rgba(255,255,255,.55); font-size: 11px; flex: none; }
+  .obj.open { background: rgba(255,255,255,.88); color: #111; } .obj.open .obj-a, .obj.open b { color: #b26b00; }
+  .obj-panel { display: block; position: absolute; z-index: 6; top: calc(max(8px, var(--safe-t)) + 48px); left: 50%; transform: translateX(-50%); width: min(420px, calc(100vw - 24px)); max-height: 55vh; overflow: auto; padding: 14px 16px; border-radius: 20px; background: rgba(28,30,32,.78); border: .5px solid var(--glass-b); backdrop-filter: blur(26px) saturate(170%); -webkit-backdrop-filter: blur(26px) saturate(170%); pointer-events: auto; animation: riseIn var(--t2) var(--ease); }
+  .obj-full { font: 600 15px/1.35 var(--f-text); color: #fff; } .obj-sub { margin-top: 4px; font-size: 12.5px; color: rgba(255,255,255,.65); }
+  .obj-log { list-style: none; margin: 12px 0 0; padding: 10px 0 0; border-top: .5px solid rgba(255,255,255,.12); display: flex; flex-direction: column; gap: 8px; }
+  .obj-log li { display: flex; gap: 8px; font-size: 12.5px; line-height: 1.35; color: rgba(255,255,255,.78); } .obj-log li svg { flex: none; margin-top: 2px; }
+  .obj-log li.t-bad, .obj-log li.t-warn { color: #ffb3a5; } .obj-log li.t-ok { color: #8fe3b6; }
+  /* help card: appears with a message, gone when there is none */
+  .help { display: flex; align-items: flex-start; gap: 8px; position: absolute; z-index: 4; left: max(12px, var(--safe-l)); top: calc(max(10px, var(--safe-t)) + 140px); max-width: min(300px, 44vw); padding: 9px 12px; border-radius: 14px; background: rgba(28,30,32,.62); border: .5px solid var(--glass-b); backdrop-filter: blur(22px) saturate(170%); -webkit-backdrop-filter: blur(22px) saturate(170%); color: #fff; font: 500 12.5px/1.35 var(--f-text); pointer-events: none; animation: helpIn .28s var(--ease) both; }
+  .help svg { flex: none; margin-top: 1px; color: #ffc65a; }
+  .help.t-bad, .help.t-warn { border-color: rgba(255,90,71,.6); } .help.t-bad svg, .help.t-warn svg { color: #ff6b61; }
+  .help.t-ok svg { color: #63e6a0; }
+  /* new objective: a short subtitle, then it lives only in the pill */
+  .subtitle { display: block; position: absolute; z-index: 3; left: 50%; top: 56%; transform: translateX(-50%); width: max-content; max-width: 86vw; text-align: center; font: 700 15px/1.35 var(--f-text); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8), 0 0 18px rgba(0,0,0,.55); pointer-events: none; animation: subIn 3.6s var(--ease) both; }
+  @keyframes helpIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+  @keyframes subIn { 0% { opacity: 0; transform: translate(-50%, 6px); } 8% { opacity: 1; transform: translate(-50%, 0); } 85% { opacity: 1; } 100% { opacity: 0; } }
+  /* manual gearbox on glass: shifter, ignition key, clutch pedal */
+  .tbtn.shift { width: 46px; height: auto; flex-direction: column; gap: 0; padding: 2px 0; border-radius: 23px; }
+  .tbtn.shift button { width: 46px; height: 38px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: inherit; pointer-events: auto; touch-action: manipulation; }
+  .tbtn.shift button:active { color: #ffc65a; }
+  .tbtn.shift b { font: 700 16px var(--f-text); color: #fff; line-height: 1; } .tbtn.shift.rev b { color: #ff6b61; }
+  .tbtn.key { background: #ffc65a; color: #1d1d1f; border-color: transparent; animation: keyPulse 1.2s var(--ease) infinite; }
+  @keyframes keyPulse { 50% { box-shadow: 0 0 0 8px rgba(255,198,90,.18); } }
+  .tpedal.clutch { width: 58px; height: 100px; }
+  .tpedal.clutch.held { color: #ffc65a; border-color: rgba(255,198,90,.7); }
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  .obj { top: calc(max(10px, var(--safe-t)) + 50px); left: max(10px, var(--safe-l)); right: max(10px, var(--safe-r)); transform: none; max-width: none; }
+  .obj-panel { top: calc(max(10px, var(--safe-t)) + 98px); }
+  .help { top: calc(max(10px, var(--safe-t)) + 172px); max-width: calc(100vw - 2 * max(12px, var(--safe-l))); }
+  .touch.manual .steer-pad { width: 33vw; }
+  .touch.manual .touch-right { width: 218px; }
+  .touch.manual .tcol .tbtn.shift { flex: 1; flex-direction: row; height: 42px; padding: 0 2px; } .touch.manual .tcol .tbtn.shift button { width: 40px; height: 42px; }
+  .touch.manual .tcol .tbtn.key { width: 42px; height: 42px; }
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  .touch.manual .tcol { width: 184px; margin-left: auto; }
+  .touch.manual .tcol .tbtn.shift { flex: none; width: 128px; }
+}

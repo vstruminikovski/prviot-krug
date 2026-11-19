@@ -107,7 +107,7 @@ export function Menu({ engine }: { engine: GameEngine }) {
               ))}
             </div>
           </section>
-          {touch ? <p className="hint touch-note"><Icon name="info" size={14} />На телефон се вози со автоматски менувач. Рачниот менувач со кумплунг е на компјутер.</p> : (
+          {(
             <section>
               <h3 className="sec">Менувач</h3>
               <Seg value={assist} onChange={setAssist} options={ASSISTS.map((a) => ({ id: a.id, label: a.label, title: a.note }))} />
@@ -173,9 +173,10 @@ export function HowTo({ onClose }: { onClose: () => void }) {
         {touch ? (
           <ol className="steps">
             <li><b>Лев палец</b> лизга по подлогата — волан.</li>
-            <li><b>Десен палец</b>: ГАС и СОП. Подлабоко притискање = повеќе. Рачната сама се спушта.</li>
-            <li><b>D / R</b> — напред или рикверц (кога стоиш).</li>
-            <li>Горе лево: <b>◀ ▶</b> покажувачи и <b>око</b> — држи за огледало, подолго за поглед преку рамо.</li>
+            <li><b>Десно</b>: широката педала кочи, тесната е гас. Подлабоко = повеќе.</li>
+            <li><b>Автоматски</b>: D / R — напред или рикверц.</li>
+            <li><b>Рачен</b>: третата педала е кумплунг — лизгај надолу за до дното; кога ќе го кренеш прстот, сам излегува полека. Брзини со <b>+ / −</b>, палење со клучот.</li>
+            <li><b>(P)</b> рачна. Стрелките горе се покажувачи, <b>окото</b> — огледало, подолго преку рамо.</li>
           </ol>
         ) : (
           <ol className="steps">
@@ -185,7 +186,7 @@ export function HowTo({ onClose }: { onClose: () => void }) {
             <li><kbd>Q</kbd>/<kbd>E</kbd> покажувач, <kbd>J</kbd>/<kbd>K</kbd>/<kbd>M</kbd> огледала, <kbd>U</kbd>/<kbd>I</kbd> преку рамо, <kbd>V</kbd> камера.</li>
           </ol>
         )}
-        <p className="hint">Изгасна? Кумплунг + <kbd>R</kbd>. Не тргнува? Жолтата порака под инструкторот кажува зошто.</p>
+        <p className="hint">{touch ? 'Изгасна? Кумплунг до дното, па клучот. Не тргнува? Пораката горе кажува зошто.' : <>Изгасна? Кумплунг + <kbd>R</kbd>. Не тргнува? Жолтата порака под инструкторот кажува зошто.</>}</p>
         {!touch && (
           <details className="all-keys"><summary>Сите контроли</summary>
             <div className="keys-grid">{BINDINGS.map((b) => <div key={b.keys}><kbd>{b.keys}</kbd><span>{b.action}</span></div>)}</div>

@@ -185,29 +185,57 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
   );
 }
 
-/** Phones: every message lives in one bar under the top buttons — the road stays clear. One message at a
- *  time, most urgent first (warning → instructor → hint → praise). Also tells the view where the HUD ends,
- *  so the mirrors sit right under it. */
+/** Phones, the way open-world driving games do it: a small objective pill (tap → full task and the
+ *  recent messages), a help card that appears only while there is something to say, and a short
+ *  subtitle in the middle when the objective changes. Nothing stays on screen that isn't needed. */
 function PhoneBar({ engine, hud, intro, arrowCh }: { engine: GameEngine; hud: HudState; intro: boolean; arrowCh: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [sub, setSub] = useState<{ text: string; key: number } | null>(null);
+  const lastTask = useRef('');
+  const taskText = hud.task?.text ?? '';
+  useEffect(() => {
+    if (intro || !taskText || taskText === lastTask.current) return;
+    // only a new objective gets the subtitle (live wording tweaks like distances don't)
+    const changed = taskText.replace(/[\d.,]+/g, '#') !== lastTask.current.replace(/[\d.,]+/g, '#');
+    lastTask.current = taskText;
+    if (!changed) return;
+    setSub({ text: taskText, key: Date.now() });
+    const id = window.setTimeout(() => setSub(null), 3600);
+    return () => window.clearTimeout(id);
+  }, [taskText, intro]);
   useLayoutEffect(() => {
-    const el = ref.current; if (!el || !engine.view.coarse) return;
+    if (!engine.view.coarse) return;
     const top = document.querySelector('.hud .topbar')?.getBoundingClientRect();
     engine.view.hudRow = top ? top.bottom : 54;
-    engine.view.hudTop = el.offsetHeight ? el.getBoundingClientRect().bottom : engine.view.hudRow;
+    const el = ref.current;
+    engine.view.hudTop = el && el.offsetHeight ? el.getBoundingClientRect().bottom : engine.view.hudRow;
   });
-  const feed = hud.feed.at(-1);
-  const msg = intro ? null
-    : hud.toast ? { key: hud.toast.text, cls: `t-${hud.toast.tone}`, icon: hud.toast.tone === 'ok' ? 'check' : hud.toast.tone === 'info' ? 'info' : 'warn', text: hud.toast.text }
-    : hud.say ? { key: hud.say.text, cls: 'say', icon: 'info', text: hud.say.text }
-    : hud.coach ? { key: hud.coach.id, cls: `coach ${hud.coach.tone}`, icon: hud.coach.tone === 'good' ? 'check' : 'info', text: hud.coach.text }
-    : hud.prompt ? { key: hud.prompt, cls: 'prompt', icon: 'info', text: hud.prompt }
-    : feed ? { key: String(feed.id), cls: 't-ok', icon: 'check', text: feed.text } : null;
+  if (intro || hud.finished) return null;
+  const msg = hud.toast ? { key: 't' + hud.toast.text, tone: hud.toast.tone, text: hud.toast.text }
+    : hud.say ? { key: 's' + hud.say.text, tone: 'say', text: hud.say.text }
+    : hud.coach ? { key: 'c' + hud.coach.id, tone: hud.coach.tone === 'good' ? 'ok' : hud.coach.tone === 'warn' ? 'warn' : 'info', text: hud.coach.text }
+    : hud.prompt ? { key: 'p' + hud.prompt, tone: 'info', text: hud.prompt } : null;
+  const icon = (tone: string) => (tone === 'ok' ? 'check' : tone === 'bad' || tone === 'warn' ? 'warn' : 'info') as 'info';
   return (
-    <div ref={ref} className={`mbar ${intro || hud.finished ? 'off' : ''}`} role="status" aria-live="polite">
-      {hud.task && <div className="mbar-task">{hud.task.nav && <span className="task-arrow">{arrowCh}</span>}<span className="mbar-tt">{hud.task.text}</span>{hud.task.nav?.dist ? <b>{hud.task.nav.dist} м</b> : null}{hud.task.progress && <i>{hud.task.progress}</i>}</div>}
-      {msg && <div key={msg.key} className={`mbar-msg ${msg.cls}`}><Icon name={msg.icon as 'info'} size={14} /><span>{msg.text}</span></div>}
-    </div>
+    <>
+      {hud.task && (
+        <button ref={ref} className={`obj ${open ? 'open' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Задача — допри за детали">
+          {hud.task.nav ? <span className="obj-a">{arrowCh}</span> : <span className="obj-dot" />}
+          <span className="obj-t">{hud.task.text}</span>
+          {hud.task.nav?.dist ? <b>{hud.task.nav.dist} м</b> : hud.task.progress ? <i>{hud.task.progress}</i> : null}
+        </button>
+      )}
+      {open && (
+        <div className="obj-panel" onClick={() => setOpen(false)}>
+          <div className="obj-full">{hud.task?.text}</div>
+          {hud.task?.sub && <div className="obj-sub">{hud.task.sub}</div>}
+          {hud.log.length > 0 && <ul className="obj-log">{hud.log.slice().reverse().map((l) => <li key={l.id} className={`t-${l.tone}`}><Icon name={icon(l.tone)} size={13} /><span>{l.text}</span></li>)}</ul>}
+        </div>
+      )}
+      {msg && !open && <div key={msg.key} className={`help t-${msg.tone}`} role="status" aria-live="polite"><Icon name={icon(msg.tone)} size={15} /><span>{msg.text}</span></div>}
+      {sub && !open && <div key={sub.key} className="subtitle" aria-hidden>{sub.text}</div>}
+    </>
   );
 }
 
@@ -347,6 +375,9 @@ function TouchControls({ engine, hud }: { engine: GameEngine; hud: HudState }) {
   const depth = (fy: number) => Math.max(0.25, Math.min(1, 0.25 + fy * 0.9));
   const gRef = useDrag((_, fy, el) => { t.throttle = depth(fy); el.style.setProperty('--d', String(t.throttle)); }, () => { t.throttle = 0; });
   const bRef = useDrag((_, fy, el) => { t.brake = depth(fy); el.style.setProperty('--d', String(t.brake)); }, () => { t.brake = 0; });
+  // clutch: finger lower = pedal deeper; lifting the finger lets it out slowly through the bite (input.ts)
+  const cRef = useDrag((_, fy, el) => { t.clutchLatch = Math.max(0, Math.min(1, 0.3 + fy * 0.85)); el.style.setProperty('--d', String(t.clutchLatch)); }, () => { t.clutchLatch = null; });
+  const manual = hud.assist !== 'auto';
   const lookTimer = useRef(0);
   const lookRef = useHold((v) => {
     window.clearTimeout(lookTimer.current);
@@ -360,7 +391,7 @@ function TouchControls({ engine, hud }: { engine: GameEngine; hud: HudState }) {
   const cmd = (c: Parameters<GameEngine['command']>[0]) => { engine.buzz(c.type === 'gear' ? 14 : 8, 40); engine.command(c); };
   const reverse = hud.gear === 'R';
   return (
-    <div className="touch">
+    <div className={`touch ${manual ? 'manual' : ''}`}>
       <div className="touch-top">
         <button className={`tbtn ind ${(hud.indicator === 'left' || hud.hazards) && hud.blink ? 'blink' : hud.indicator === 'left' ? 'armed' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'left' })} aria-label="Лев покажувач"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M14 6l-6 6 6 6" /></svg></button>
         <button ref={lookRef} className="tbtn look" aria-label="Погледни: огледало, подолго — преку рамо"><Icon name="eye" size={19} /></button>
@@ -372,8 +403,18 @@ function TouchControls({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       <div className="touch-right">
         <div className="tcol">
           <button className={`tbtn pb ${hud.parkingBrake ? 'on' : ''}`} onClick={() => cmd({ type: 'parkingBrake' })} aria-label="Рачна сопирачка" aria-pressed={hud.parkingBrake}><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden><circle cx="12" cy="12" r="6.2" /><path d="M10.4 15V9h2.1a1.8 1.8 0 010 3.6h-2.1" /><path d="M4.6 7.4a8.6 8.6 0 000 9.2M19.4 7.4a8.6 8.6 0 010 9.2" /></svg></button>
-          <button className={`tbtn dr ${reverse ? 'rev' : ''}`} onClick={() => cmd({ type: 'gear', gear: reverse ? 1 : 'R' })} aria-label={reverse ? 'Рикверц — допри за напред' : 'Напред — допри за рикверц'}><b className={!reverse ? 'on' : ''}>D</b><b className={reverse ? 'on' : ''}>R</b></button>
+          {manual ? (
+            <div className={`tbtn shift ${reverse ? 'rev' : ''}`} role="group" aria-label={`Менувач: ${hud.gear}`}>
+              <button onClick={() => cmd({ type: 'gearUp' })} aria-label="Брзина нагоре"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden><path d="M6 15l6-6 6 6" /></svg></button>
+              <b>{hud.gear}</b>
+              <button onClick={() => cmd({ type: 'gearDown' })} aria-label="Брзина надолу"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden><path d="M6 9l6 6 6-6" /></svg></button>
+            </div>
+          ) : (
+            <button className={`tbtn dr ${reverse ? 'rev' : ''}`} onClick={() => cmd({ type: 'gear', gear: reverse ? 1 : 'R' })} aria-label={reverse ? 'Рикверц — допри за напред' : 'Напред — допри за рикверц'}><b className={!reverse ? 'on' : ''}>D</b><b className={reverse ? 'on' : ''}>R</b></button>
+          )}
+          {manual && hud.engine !== 'running' && <button className="tbtn key" onClick={() => cmd({ type: 'engine' })} aria-label="Пали го моторот"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden><circle cx="8" cy="12" r="3.6" /><path d="M11.6 12H20M17 12v3M20 12v2.4" /></svg></button>}
         </div>
+        {manual && <div ref={cRef} className="tpedal clutch" aria-label="Кумплунг"><i /><svg viewBox="0 0 40 40" aria-hidden><path d="M12 14h16M12 20h16M12 26h16" /></svg></div>}
         <div ref={bRef} className="tpedal brake" aria-label="Сопирачка"><i /><svg viewBox="0 0 40 40" aria-hidden><path d="M9 14h22M9 20h22M9 26h22" /></svg></div>
         <div ref={gRef} className="tpedal gas" aria-label="Гас"><i /><svg viewBox="0 0 40 60" aria-hidden><path d="M14 14v32M20 14v32M26 14v32" /></svg></div>
       </div>

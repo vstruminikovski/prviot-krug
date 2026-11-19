@@ -35,6 +35,7 @@ export interface HudState {
   throttle: number; brake: number; clutch: number; bite: [number, number]; parkingBrake: boolean;
   indicator: 'off' | 'left' | 'right'; hazards: boolean; blink: boolean;
   assist: string; mode: Mode; env: EnvId;
+  log: { id: number; text: string; tone: 'bad' | 'warn' | 'ok' | 'info' | 'say' }[];
   task: TaskInfo | null; /** id of the latest reached waypoint while its confirmation shows (0 = none) */ arrive: number; say: Say | null; prompt: string | null; toast: { text: string; tone: 'bad' | 'warn' | 'ok' | 'info' } | null;
   bubbles: Bubble[]; camMode: CamMode; muted: boolean; paused: boolean; glance: Glance;
   limit: number; suggestGear: number | null; countdown: number | null; coach: CoachTip | null;
@@ -63,14 +64,14 @@ export class GameEngine {
   private hudT = 0;
   // ---- navigation: reaching the marked point is confirmed the same instant (ping, burst, tick)
   private navAt: { x: number; y: number } | null = null; private arriveId = 0; private arriveUntil = 0;
-  private trackNav(at: { x: number; y: number } | null, p: { x: number; y: number; z: number }, nowS: number) {
+  private trackNav(at: { x: number; y: number } | null, p: { x: number; y: number; z: number }, nowS: number, heading?: number) {
     const prev = this.navAt;
     const moved = !at || !prev || Math.hypot(at.x - prev.x, at.y - prev.y) > 3;
     if (prev && moved && Math.hypot(prev.x - p.x, prev.y - p.y) < 28 && !this.paused && this.countdown === null) {
       this.audio.ping(); this.buzz(14, 60); this.view.nav.burst(prev, p.z);
       this.arriveId++; this.arriveUntil = nowS + 0.7;
     }
-    if (moved) { this.navAt = at ? { x: at.x, y: at.y } : null; this.view.nav.setTarget(this.navAt); }
+    if (moved) { this.navAt = at ? { x: at.x, y: at.y } : null; this.view.nav.setTarget(this.navAt, heading); }
   }
   private glanceStart: { kind: Glance; t: number } | null = null;
   replay: ReplayState | null = null;
@@ -212,8 +213,6 @@ export class GameEngine {
     const g = this.store.garage;
     const prev = this.config;
     this.config = { ...prev, ...opts, v: CONTENT_VERSION, vehicle: opts.vehicle ?? g.vehicle, load: opts.load ?? g.load, assist: opts.assist ?? this.store.settings.assist, seed: same ? prev.seed : (opts.seed ?? randomSeed()) };
-    // phones: a clutch and a gear lever on glass are not a good experience — automatic, always
-    if (this.coarse) this.config.assist = 'auto';
     // the exam is taken without on-screen help (the automatic accessibility profile stays automatic)
     if (this.config.mode === 'exam' && this.config.assist !== 'auto') this.config.assist = 'exam';
     if (this.config.mode === 'free') this.config.mode = 'practice';
@@ -222,7 +221,7 @@ export class GameEngine {
     if (why) { this.flash(why, 'warn'); return false; }
     const sim = createSim(this.config);
     this.sim = sim; this.result = null; this.replay = null; this.paused = false; this.auto = null; this.finishT = null;
-    this.navAt = null; this.view.nav.setTarget(null); this.arriveUntil = 0;
+    this.navAt = null; this.view.nav.setTarget(null); this.arriveUntil = 0; this.log = [];
     this.retryCard = null; this.feed = []; this.goodCool.clear(); this.cleanSince = 0; this.indOnSince = -1; this.turnArmed = true; this.stopTrack = { from: 0, maxDecel: 0, prevV: 0 };
     const def = vehicleById(this.config.vehicle);
     const debris = this.config.env === 'openRoad' ? (sim.mission as OpenRoadMission).debrisS : undefined;
@@ -282,7 +281,14 @@ export class GameEngine {
   }
   toggleCamera() { const order: CamMode[] = ['chase', 'high', 'driver']; this.view.setCamMode(order[(order.indexOf(this.view.camMode) + 1) % order.length]); this.store.settings.camera = this.view.camMode; this.persist(); this.emitHud(); }
   toggleMute() { this.audio.setMuted(!this.audio.muted); this.store.settings.muted = this.audio.muted; this.persist(); this.emitHud(); }
-  flash(text: string, tone: NonNullable<HudState['toast']>['tone'] = 'info', secs = 2.4) { this.toast = { text, tone }; this.toastUntil = performance.now() / 1000 + secs; }
+  flash(text: string, tone: NonNullable<HudState['toast']>['tone'] = 'info', secs = 2.4) { this.toast = { text, tone }; this.toastUntil = performance.now() / 1000 + secs; this.logMsg(text, tone); this.emitHud(); }
+  /** recent messages (newest last) — the phone's expandable message history */
+  private log: HudState['log'] = []; private logId = 0;
+  private logMsg(text: string, tone: HudState['log'][number]['tone']) {
+    const last = this.log[this.log.length - 1];
+    if (last && last.text === text) return;
+    this.log = [...this.log.slice(-11), { id: ++this.logId, text, tone }];
+  }
 
   // ---------------------------------------------------------------- replay
   startReplay(t0: number, t1: number, info: { title: string; detail: string; status: string; cueT: number | null; decisionT: number | null; focus: string | null }) {
@@ -404,7 +410,7 @@ export class GameEngine {
     if (this.sayQueue.length && this.countdown === null) {
       this.sayQueue.sort((a, b) => b.priority - a.priority);
       const nx = this.sayQueue[0];
-      if (!this.current || nx.priority > this.current.priority) { this.current = { ...nx, until: nowS + Math.max(3.2, nx.text.length / 14) }; this.sayQueue.shift(); }
+      if (!this.current || nx.priority > this.current.priority) { this.current = { ...nx, until: nowS + Math.max(3.2, nx.text.length / 14) }; this.sayQueue.shift(); this.logMsg(nx.text, 'say'); this.emitHud(); }
     }
     this.updateCoach(dt);
     if (this.phase === 'drive') for (const h of this.frameHooks) { try { h(dt); } catch (e) { console.warn('[hook]', e); } }
@@ -477,14 +483,14 @@ export class GameEngine {
     }
     const nowS = performance.now() / 1000;
     const task = s ? s.mission.task(s) : null;
-    if (s && p && this.phase === 'drive') this.trackNav(task?.nav?.at ?? null, p, nowS);
+    if (s && p && this.phase === 'drive') this.trackNav(task?.nav?.at ?? null, p, nowS, task?.nav?.heading);
     return {
       phase: this.phase,
       speed: p ? kmh(Math.abs(p.vx)) : 0, rpm: p ? p.rpm : 0, redline: def?.engine.redline ?? 6000, gear: p ? String(p.gear) : 'N', engine: p?.engine ?? 'off',
       throttle: p?.throttle ?? 0, brake: p?.brake ?? 0, clutch: p?.clutchPedal ?? 0, bite: [def?.clutch.biteLow ?? 0.34, def?.clutch.biteHigh ?? 0.66], parkingBrake: (p?.parkingBrake ?? 0) > 0.5,
       indicator: p?.indicator ?? 'off', hazards: !!p?.hazards, blink: (this.blinkT % 0.66) < 0.36,
       assist: this.config.assist, mode: this.config.mode, env: this.config.env,
-      task, arrive: nowS < this.arriveUntil ? this.arriveId : 0, say: this.current && this.current.until > nowS ? this.current : null,
+      log: this.log, task, arrive: nowS < this.arriveUntil ? this.arriveId : 0, say: this.current && this.current.until > nowS ? this.current : null,
       prompt: p && this.config.assist !== 'exam' && this.config.mode !== 'exam' ? p.whyNotMoving() : null, toast: this.toast,
       bubbles: this.bubbles.map((b) => ({ ...b })), camMode: this.view.camMode, muted: this.audio.muted, paused: this.paused, glance: this.input.glance(),
       limit: s && p ? (p.def.family === 'truck' ? Math.min(80, s.world.speedLimitAt(p.x, p.y).kmh) : s.world.speedLimitAt(p.x, p.y).kmh) : 50,
