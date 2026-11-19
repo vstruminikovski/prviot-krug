@@ -677,3 +677,9 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
   .tpedal.brake { width: 76px; height: 104px; } .tpedal.gas { width: 60px; height: 124px; }
   .steer-pad { height: 76px; }
 }
+
+/* waypoint reached — confirmed the same instant, then gone */
+.arrive { position: absolute; left: 50%; top: 42%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(28,30,32,.45); border: .5px solid rgba(255,255,255,.22); backdrop-filter: blur(18px) saturate(170%); -webkit-backdrop-filter: blur(18px) saturate(170%); pointer-events: none; animation: arrive .7s var(--ease) both; }
+.arrive svg { width: 34px; height: 34px; fill: none; stroke: #ffc65a; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; animation: arriveTick .32s .05s var(--ease) forwards; }
+@keyframes arrive { 0% { opacity: 0; transform: scale(.6); } 18% { opacity: 1; transform: scale(1.06); } 30% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(.96); } }
+@keyframes arriveTick { to { stroke-dashoffset: 0; } }

@@ -291,7 +291,7 @@ export class PolygonMission implements Mission {
     const n = this.ex.filter((x) => x.status !== 'disabled').indexOf(e) + 1;
     const total = this.ex.filter((x) => x.status !== 'disabled').length;
     const pts = sim.config.mode === 'exam' ? ` · ${sim.ledger.examTotal('Образец бр. 1')}/50 нег. поени` : '';
-    if (e.status === 'toStart') return { text: `Возете до почетокот: ${e.title}`, progress: `${n}/${total}${pts}`, nav: { arrow: 'park', dist: Math.round(Math.hypot(e.start.x - sim.player.x, e.start.y - sim.player.y)) } };
+    if (e.status === 'toStart') return { text: `Возете до почетокот: ${e.title}`, progress: `${n}/${total}${pts}`, nav: { arrow: 'park', dist: Math.round(Math.hypot(e.start.x - sim.player.x, e.start.y - sim.player.y)), at: e.start } };
     return { text: `${e.official ? '' : '(вежба) '}${e.title}`, sub: e.status === 'ready' ? e.howTo : undefined, progress: `${n}/${total}${pts}` };
   }
 

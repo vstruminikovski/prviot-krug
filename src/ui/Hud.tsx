@@ -151,6 +151,7 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
         </div>
       ) : hud.prompt && !intro && <div key={hud.prompt} className="prompt"><Icon name="info" size={16} />{hud.prompt}</div>}
       {hud.toast && <div key={hud.toast.text} className={`toast ${hud.toast.tone}`}><Icon name={hud.toast.tone === 'ok' ? 'check' : hud.toast.tone === 'info' ? 'info' : 'warn'} size={16} />{hud.toast.text}</div>}
+      {hud.arrive > 0 && <div key={hud.arrive} className="arrive" aria-hidden><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg></div>}
       {intro && <Intro engine={engine} hud={hud} />}
       {hud.finished && <div className={`finish-card ${hud.failed ? 'bad' : ''}`}><div className="intro-k">{hud.failed ? 'Обидот заврши' : 'Крај'}</div><div className="finish-t">{hud.failed ? hud.failed : hud.env === 'city' ? 'Кругот е готов' : 'Вежбата е готова'}</div></div>}
       <div className="mode-tag"><span>{MODE_LABEL[hud.mode]}</span><i />{ASSIST_LABEL[hud.assist]}</div>

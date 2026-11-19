@@ -6,7 +6,7 @@ export const MODE_LABEL: Record<Mode, string> = {
   lesson: 'Часови', practice: 'Часови', challenge: 'Часови', exam: 'Полагање', free: 'Часови',
 };
 
-export interface NavHint { arrow: 'left' | 'right' | 'straight' | 'uturn' | 'stop' | 'park' | 'reverse'; dist: number | null }
+export interface NavHint { arrow: 'left' | 'right' | 'straight' | 'uturn' | 'stop' | 'park' | 'reverse'; dist: number | null; /** world point of the next decision / destination (in-world marker) */ at?: { x: number; y: number } }
 export interface TaskInfo { text: string; sub?: string; nav?: NavHint; progress?: string }
 
 export interface MissionItem { id: string; title: string; status: 'pass' | 'fail' | 'partial' | 'missed' | 'pending' | 'unscored'; detail: string; points?: number; max?: number; t0?: number; t1?: number; cueT?: number | null; focus?: string | null }

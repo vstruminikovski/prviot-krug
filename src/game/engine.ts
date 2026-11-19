@@ -35,7 +35,7 @@ export interface HudState {
   throttle: number; brake: number; clutch: number; bite: [number, number]; parkingBrake: boolean;
   indicator: 'off' | 'left' | 'right'; hazards: boolean; blink: boolean;
   assist: string; mode: Mode; env: EnvId;
-  task: TaskInfo | null; say: Say | null; prompt: string | null; toast: { text: string; tone: 'bad' | 'warn' | 'ok' | 'info' } | null;
+  task: TaskInfo | null; /** id of the latest reached waypoint while its confirmation shows (0 = none) */ arrive: number; say: Say | null; prompt: string | null; toast: { text: string; tone: 'bad' | 'warn' | 'ok' | 'info' } | null;
   bubbles: Bubble[]; camMode: CamMode; muted: boolean; paused: boolean; glance: Glance;
   limit: number; suggestGear: number | null; countdown: number | null; coach: CoachTip | null;
   feed: { id: number; text: string }[]; clean: number;
@@ -61,6 +61,17 @@ export class GameEngine {
   private toast: HudState['toast'] = null; private toastUntil = 0;
   private listeners = new Set<(h: HudState) => void>();
   private hudT = 0;
+  // ---- navigation: reaching the marked point is confirmed the same instant (ping, burst, tick)
+  private navAt: { x: number; y: number } | null = null; private arriveId = 0; private arriveUntil = 0;
+  private trackNav(at: { x: number; y: number } | null, p: { x: number; y: number; z: number }, nowS: number) {
+    const prev = this.navAt;
+    const moved = !at || !prev || Math.hypot(at.x - prev.x, at.y - prev.y) > 3;
+    if (prev && moved && Math.hypot(prev.x - p.x, prev.y - p.y) < 28 && !this.paused && this.countdown === null) {
+      this.audio.ping(); this.buzz(14, 60); this.view.nav.burst(prev, p.z);
+      this.arriveId++; this.arriveUntil = nowS + 0.7;
+    }
+    if (moved) { this.navAt = at ? { x: at.x, y: at.y } : null; this.view.nav.setTarget(this.navAt); }
+  }
   private glanceStart: { kind: Glance; t: number } | null = null;
   replay: ReplayState | null = null;
   private countdown: number | null = null;
@@ -211,6 +222,7 @@ export class GameEngine {
     if (why) { this.flash(why, 'warn'); return false; }
     const sim = createSim(this.config);
     this.sim = sim; this.result = null; this.replay = null; this.paused = false; this.auto = null; this.finishT = null;
+    this.navAt = null; this.view.nav.setTarget(null); this.arriveUntil = 0;
     this.retryCard = null; this.feed = []; this.goodCool.clear(); this.cleanSince = 0; this.indOnSince = -1; this.turnArmed = true; this.stopTrack = { from: 0, maxDecel: 0, prevV: 0 };
     const def = vehicleById(this.config.vehicle);
     const debris = this.config.env === 'openRoad' ? (sim.mission as OpenRoadMission).debrisS : undefined;
@@ -464,13 +476,15 @@ export class GameEngine {
       else if (rpm < def.engine.idle * 1.3 && p.gear > 1 && p.vx > 2) suggest = p.gear - 1;
     }
     const nowS = performance.now() / 1000;
+    const task = s ? s.mission.task(s) : null;
+    if (s && p && this.phase === 'drive') this.trackNav(task?.nav?.at ?? null, p, nowS);
     return {
       phase: this.phase,
       speed: p ? kmh(Math.abs(p.vx)) : 0, rpm: p ? p.rpm : 0, redline: def?.engine.redline ?? 6000, gear: p ? String(p.gear) : 'N', engine: p?.engine ?? 'off',
       throttle: p?.throttle ?? 0, brake: p?.brake ?? 0, clutch: p?.clutchPedal ?? 0, bite: [def?.clutch.biteLow ?? 0.34, def?.clutch.biteHigh ?? 0.66], parkingBrake: (p?.parkingBrake ?? 0) > 0.5,
       indicator: p?.indicator ?? 'off', hazards: !!p?.hazards, blink: (this.blinkT % 0.66) < 0.36,
       assist: this.config.assist, mode: this.config.mode, env: this.config.env,
-      task: s ? s.mission.task(s) : null, say: this.current && this.current.until > nowS ? this.current : null,
+      task, arrive: nowS < this.arriveUntil ? this.arriveId : 0, say: this.current && this.current.until > nowS ? this.current : null,
       prompt: p && this.config.assist !== 'exam' && this.config.mode !== 'exam' ? p.whyNotMoving() : null, toast: this.toast,
       bubbles: this.bubbles.map((b) => ({ ...b })), camMode: this.view.camMode, muted: this.audio.muted, paused: this.paused, glance: this.input.glance(),
       limit: s && p ? (p.def.family === 'truck' ? Math.min(80, s.world.speedLimitAt(p.x, p.y).kmh) : s.world.speedLimitAt(p.x, p.y).kmh) : 50,

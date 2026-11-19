@@ -145,7 +145,8 @@ export class CityMission implements Mission {
       }
       this.lastEdge = loc.edge.id;
     }
-    if (loc.edge.id === g.edge) return { text: g.edge === 'BE1' ? 'Продолжи до кафичот и запри безбедно' : `Продолжи по ${g.name}` };
+    const end = loc.edge.pts[loc.edge.pts.length - 1];
+    if (loc.edge.id === g.edge) return { text: g.edge === 'BE1' ? 'Продолжи до кафичот и запри безбедно' : `Продолжи по ${g.name}`, nav: { arrow: 'straight', dist: null, at: g.edge === 'BE1' ? { x: 70, y: -2 } : end } };
     const r = route(loc.edge.id, g.edge);
     if (!r || r.length < 2) return null;
     const link = linksFrom(loc.edge.id).find((l) => l.to === r[1])!;
@@ -154,7 +155,7 @@ export class CityMission implements Mission {
     if (g.compassOnly && this.goal === 2) return { text: 'Назад кон кафичот — следи ги знаците', sub: 'Најкраткиот пат не е секогаш дозволен.' };
     const verb = link.turn === 'left' ? 'сврти лево' : link.turn === 'right' ? 'сврти десно' : 'продолжи право';
     const prep = 40 + Math.abs(p.vx) * 6; // preparation distance grows with speed
-    return { text: dist <= prep ? `На раскрсницата ${verb} — ${edgeById(r[1]).label}` : `Продолжи, па ${verb} кон ${edgeById(r[1]).label}`, nav: { arrow: link.turn, dist } };
+    return { text: dist <= prep ? `На раскрсницата ${verb} — ${edgeById(r[1]).label}` : `Продолжи, па ${verb} кон ${edgeById(r[1]).label}`, nav: { arrow: link.turn, dist, at: end } };
   }
 
   task(sim: Sim): TaskInfo | null {
@@ -162,14 +163,14 @@ export class CityMission implements Mission {
     const cp = this.checkpoint;
     if (this.retry) return { text: SCENARIOS.find((d) => d.id === this.retry)?.objective ?? '' };
     if (cp < CHECKPOINTS.length - 1) { const nav = this.navigate(sim); if (nav) return nav; }
-    if (cp >= CHECKPOINTS.length - 1) return { text: 'Запри кај кафичот', nav: { arrow: 'park', dist: Math.round(Math.hypot(70 - p.x, -2 - p.y) / 10) * 10 } };
+    if (cp >= CHECKPOINTS.length - 1) return { text: 'Запри кај кафичот', nav: { arrow: 'park', dist: Math.round(Math.hypot(70 - p.x, -2 - p.y) / 10) * 10, at: { x: 70, y: -2 } } };
     const h = [...ROUTE_HINTS].reverse().find((x) => x.afterCheckpoint <= cp);
     if (!h) return null;
     const target: Vec2 = h.turnAt ?? { x: 70, y: -2 };
     const dist = Math.hypot(target.x - p.x, target.y - p.y);
     // preparation distance grows with speed: never say "now" after the decision point
     const prep = 40 + Math.abs(p.vx) * 6;
-    return { text: h.text, nav: h.arrow === 'compass' ? undefined : { arrow: h.arrow === 'left' ? 'left' : 'straight', dist: dist < prep * 3 ? Math.round(dist / 10) * 10 : null } };
+    return { text: h.text, nav: h.arrow === 'compass' ? undefined : { arrow: h.arrow === 'left' ? 'left' : 'straight', dist: dist < prep * 3 ? Math.round(dist / 10) * 10 : null, at: h.turnAt } };
   }
 
   items(sim: Sim): MissionItem[] {

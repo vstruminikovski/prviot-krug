@@ -19,6 +19,7 @@ import { Atmosphere } from './atmosphere';
 import { patchXray, aimXray, xrayUniforms } from './xray';
 import type { EnvId } from '../env/types';
 import type { Glance } from '../input';
+import { NavMarker } from './nav';
 
 export type CamMode = 'chase' | 'high' | 'driver';
 export type ShotMode = CamMode | 'replay' | 'title' | 'finish';
@@ -120,6 +121,7 @@ export class View {
     pin.rotation.x = Math.PI; pin.position.y = 3.6; pin.renderOrder = 10;
     this.highlight.add(ring, pin); this.highlight.visible = false;
     this.scene.add(this.highlight);
+    this.scene.add(this.nav.group);
     // mirrors: three cameras into small render targets, shown as flipped panels in an overlay
     for (let i = 0; i < 3; i++) {
       const cam = new THREE.PerspectiveCamera(i === 2 ? 34 : 30, 2, 0.15, 260);
@@ -343,9 +345,12 @@ export class View {
   jolt(v: number) { this.susp.hv -= v * 0.6; this.susp.pv -= v * 0.5; }
 
   /** Live: mirror the simulation state. */
+  /** in-world navigation (gate + guide chevron) */
+  readonly nav = new NavMarker();
   syncLive(sim: Sim, dt: number, blink: boolean) {
     const p = sim.player;
     const ip = this.playerPose(sim);
+    this.nav.update(dt, { x: ip.x, y: ip.y, z: ip.z ?? 0, h: ip.h }, (x, y) => sim.world.heightAt(x, y), this.camMode === 'driver');
     this.stepSuspension(dt, this.stepAx, p.vx * p.r);
     const haz = p.hazards && blink;
     this.placePlayer(ip, p.vx, p.steer, dt, (p.indicator === 'left' && blink) || haz, (p.indicator === 'right' && blink) || haz, p.brake > 0.1, String(p.gear), this.susp.p + p.grade, p.roll * 0.5 + this.susp.r);

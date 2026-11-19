@@ -173,6 +173,8 @@ export class GameAudio {
     this.engineOn = true;
   }
 
+  /** a waypoint reached: one bright, short two-note ping */
+  ping() { if (!this.ctx) return; const t = this.ctx.currentTime; this.tone(t, 988, 0.12, 0.07, 'sine'); this.tone(t + 0.06, 1319, 0.2, 0.06, 'sine'); }
   chime() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
