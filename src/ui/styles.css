@@ -253,3 +253,23 @@ kbd { background: var(--paper-2); border: 1px solid #b9a77f; border-bottom-width
 
 .osm-attr { position: absolute; right: 10px; bottom: 6px; font-size: 11px; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; }
 .env-osm { border-left: 8px solid var(--petrol-2); }
+.chip-sep { width: 10px; }
+
+/* licence booklet */
+.booklet { background: #f6efdc; border: 3px solid #5a2a22; border-radius: 10px; max-width: 760px; width: 100%; max-height: 92vh; overflow: auto; padding: 18px 22px; box-shadow: 0 16px 50px rgba(0,0,0,.5); background-image: repeating-linear-gradient(0deg, transparent 0 25px, rgba(90,42,34,.06) 25px 26px); user-select: text; }
+.booklet-cover h2 { margin: 2px 0; color: #5a2a22; font-size: 30px; letter-spacing: 1px; }
+.booklet-progress { display: inline-block; background: #5a2a22; color: var(--cream); font-weight: 800; padding: 3px 10px; border-radius: 4px; }
+.stamps { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin: 14px 0; }
+.stamp-slot { display: flex; gap: 12px; align-items: center; }
+.stamp { width: 86px; height: 86px; border-radius: 50%; border: 3px dashed #c9b48a; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #c9b48a; font-weight: 900; flex: none; }
+.stamp-slot.on .stamp { border: 4px double #b3342b; color: #b3342b; background: rgba(179,52,43,.06); font-size: 10.5px; line-height: 1.1; padding: 6px; animation: stampIn .5s ease-out; }
+.stamp small { font-size: 8px; letter-spacing: 1px; }
+.stamp-how { display: flex; flex-direction: column; font-size: 13px; } .stamp-how small { color: #6b6455; }
+@keyframes stampIn { 0% { transform: scale(1.8) rotate(-20deg); opacity: 0; } 100% { opacity: 1; } }
+.licence { border: 3px solid #c9b48a; border-radius: 10px; padding: 10px 14px; margin: 8px 0 12px; opacity: .55; background: linear-gradient(135deg, #f3e9d0, #e8f0e8); }
+.licence.on { opacity: 1; border-color: #1f45a8; box-shadow: 0 0 0 4px rgba(31,69,168,.12); }
+.lic-head { font-weight: 900; color: #1f45a8; letter-spacing: 2px; font-size: 13px; }
+.lic-body { display: flex; gap: 14px; align-items: center; margin-top: 6px; }
+.lic-cat { font-size: 40px; font-weight: 900; color: #1f45a8; border: 3px solid #1f45a8; border-radius: 8px; width: 60px; text-align: center; }
+.new-stamp { background: #fbe9e4; border: 2px solid #b3342b; color: #b3342b; font-weight: 800; padding: 8px 12px; border-radius: 8px; margin: 10px 0; animation: stampIn .5s ease-out; }
+.modal-back.fixed { position: fixed; z-index: 60; }

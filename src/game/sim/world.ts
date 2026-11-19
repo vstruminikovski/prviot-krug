@@ -46,7 +46,9 @@ export class World {
   }
 
   heightAt(x: number, y: number) { return this.env.heightAt(x, y); }
-  gripAt(x: number, y: number) { return this.env.gripAt ? this.env.gripAt(x, y) : 1; }
+  /** weather multiplier (rain ≈ 0.72) on top of the surface grip */
+  gripScale = 1;
+  gripAt(x: number, y: number) { return (this.env.gripAt ? this.env.gripAt(x, y) : 1) * this.gripScale; }
 
   /** First obstacle overlapping the quad (knocked soft obstacles are ignored). */
   hitStatic(quad: Vec2[]): { id: string; kind: string; soft?: boolean } | null {

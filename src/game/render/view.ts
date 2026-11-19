@@ -15,6 +15,7 @@ import { loadVehicleGLB, rigFromGLB, proceduralRig, type VehicleRig } from './ve
 import { buildCityExtras, buildOpenRoadScene, buildPolygonScene, buildOsmScene, type CityExtras, type OpenRoadScene } from './envScenes';
 import { buildGarage, type GarageScene } from './garage';
 import { decorateOpenRoad } from './kenneyProps';
+import { Atmosphere } from './atmosphere';
 import type { EnvId } from '../env/types';
 import type { Glance } from '../input';
 
@@ -62,6 +63,11 @@ export class View {
   private garageToken = 0;
   orbit = { yaw: 0.8, pitch: 0.25, dist: 7.5, cockpit: false };
   width = 1; height = 1;
+  atmo: Atmosphere;
+  private speedFov = 0;
+  private shake = 0;
+  /** camera impulse on impacts (presentation only) */
+  kick(strength: number) { this.shake = Math.min(1, this.shake + strength); }
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -84,6 +90,8 @@ export class View {
     sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70; sc.near = 1; sc.far = 320;
     this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun, this.sun.target);
+    this.atmo = new Atmosphere(this.renderer, this.scene, this.camera, this.sun, this.hemi);
+    if (matchMedia('(pointer: coarse)').matches) this.atmo.enabled = false; // phones: plain render for frame rate
     // replay cue marker
     this.highlight = new THREE.Group();
     const ring = new THREE.Mesh(new THREE.RingGeometry(2.4, 3.0, 48), new THREE.MeshBasicMaterial({ color: '#ffb020', transparent: true, opacity: 0.85, side: THREE.DoubleSide, toneMapped: false, depthTest: false }));
@@ -139,6 +147,7 @@ export class View {
     this.width = w; this.height = h;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+    this.atmo.setSize(w, h);
     this.overlayCam.right = w; this.overlayCam.top = h; this.overlayCam.updateProjectionMatrix();
     this.layoutMirrors(null);
   }
@@ -188,13 +197,10 @@ export class View {
 
   /** Atmosphere per environment / condition (wet road, dusk). */
   setMood(m: { wet?: boolean; dusk?: boolean }) {
-    this.sun.intensity = m.dusk ? 1.6 : m.wet ? 1.9 : 3.0;
-    this.sun.color.set(m.dusk ? '#ff9a5a' : '#ffbf7a');
-    this.hemi.intensity = m.wet ? 1.0 : 1.25;
-    (this.scene.fog as THREE.Fog).color.set(m.wet ? '#a9a49a' : '#e8c39a');
-    (this.scene.background as THREE.Color).set(m.wet ? '#a9a49a' : '#e8c39a');
-    (this.scene.fog as THREE.Fog).far = m.wet ? 420 : 700;
+    if (m.wet && this.atmo.weather === 'clear') this.atmo.setWeather('rain');
+    this.atmo.updateLamps();
   }
+
 
   // ------------------------------------------------------------ vehicles
   private makeRig(def: VehicleDef, c: Custom, onReady: (r: VehicleRig) => void): VehicleRig {
@@ -256,6 +262,7 @@ export class View {
     this.pitchS += (clamp(-acc * 0.006, -0.035, 0.035) + p.grade * 0 - this.pitchS) * Math.min(1, dt * 6);
     const haz = p.hazards && blink;
     this.placePlayer({ ...p.pose, z: p.z }, p.vx, p.steer, dt, (p.indicator === 'left' && blink) || haz, (p.indicator === 'right' && blink) || haz, p.brake > 0.1, String(p.gear), this.pitchS - p.grade, p.roll * 0.5 + clamp(p.vx * p.steer * 0.008, -0.03, 0.03));
+    this.atmo.update(dt, { x: p.x, y: p.y, z: p.z, h: p.h, vx: p.vx, vy: p.vy, brake: p.brake, spin: (p as unknown as { wheelspinning: boolean }).wheelspinning, track: p.def.dims.track, wheelbase: p.def.dims.wheelbase, L: p.L });
     const seen = new Set<string>();
     for (const c of sim.cars) {
       if (c.done) continue;
@@ -385,9 +392,16 @@ export class View {
       const pos = base.clone().addScaledVector(cf, -dist).setY(z + H + 1.2);
       const look = base.clone().addScaledVector(cf, 3.5).setY(z + H * 0.7);
       if (!this.camInit) { this.camPos.copy(pos); this.camLook.copy(look); this.camInit = true; }
+      this.speedFov += (clamp(Math.abs(v) - 8, 0, 20) * 0.45 - this.speedFov) * Math.min(1, dt * 2);
+      fov = 62 + this.speedFov;
       const k = 1 - Math.exp(-dt * 4.5);
       this.camPos.lerp(pos, k); this.camLook.lerp(look, Math.min(1, k * 1.6));
       cam.position.copy(this.camPos); cam.lookAt(this.camLook);
+    }
+    if (this.shake > 0.001) {
+      const k = this.shake * this.shake * 0.12;
+      cam.position.x += (Math.random() - 0.5) * k; cam.position.y += (Math.random() - 0.5) * k; cam.rotation.z += (Math.random() - 0.5) * k * 0.3;
+      this.shake *= Math.exp(-dt * 7);
     }
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
     this.sun.target.position.set(p.x, z, -p.y);
@@ -421,7 +435,7 @@ export class View {
       r.render(this.garage.scene, this.garageCam());
       return;
     }
-    r.render(this.scene, this.camera);
+    this.atmo.render();
     if (mirrors && this.mirrorsOn && pose) {
       this.mirrorFrame++;
       if (this.mirrorQuality === 'high' || this.mirrorFrame % 2 === 0) {

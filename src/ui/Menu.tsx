@@ -9,6 +9,9 @@ import type { EnvId } from '../game/env/types';
 import type { Assist } from '../game/vehicles/vehicle';
 import { Sources } from './Sources';
 import { GoogleTilesView } from './GoogleTilesView';
+import { Booklet } from './Booklet';
+import { earnedStamps, STAMPS } from '../game/career';
+import { TIME_LABEL, WEATHER_LABEL, type TimeOfDay, type Weather } from '../game/render/atmosphere';
 import { googleTilesEnabled } from '../game/render/googleTiles';
 
 const ASSISTS: { id: Assist; label: string; note: string }[] = [
@@ -31,12 +34,15 @@ export function Menu({ engine }: { engine: GameEngine }) {
   const [assist, setAssist] = useState<Assist>(engine.store.settings.assist);
   const [sources, setSources] = useState(false);
   const [gmap, setGmap] = useState(false);
+  const [book, setBook] = useState(false);
+  const [time, setTime] = useState<TimeOfDay>(engine.config.time ?? 'golden');
+  const [weather, setWeather] = useState<Weather>(engine.config.weather ?? 'clear');
   const code = incomingChallenge();
   const ch = decodeChallenge(code);
   const def = vehicleById(engine.store.garage.vehicle);
   const block = compatibility(def.id, env);
   const last = engine.store.history.slice(-3).reverse();
-  const go = () => { engine.store.settings.assist = assist; engine.persist(); engine.start({ env, mode, assist }); };
+  const go = () => { engine.store.settings.assist = assist; engine.persist(); engine.start({ env, mode, assist, time, weather }); };
   return (
     <div className="menu">
       <div className="menu-card">
@@ -63,6 +69,13 @@ export function Menu({ engine }: { engine: GameEngine }) {
         <p className="note">{MODES.find((m) => m.id === mode)?.note}</p>
         <div className="chips">{ASSISTS.map((a) => <button key={a.id} className={`chip ${assist === a.id ? 'sel' : ''}`} onClick={() => setAssist(a.id)} title={a.note}>{a.label}</button>)}</div>
         <p className="note">{ASSISTS.find((a) => a.id === assist)?.note}</p>
+        <h3>Кога?</h3>
+        <div className="chips">
+          {(Object.keys(TIME_LABEL) as TimeOfDay[]).map((t) => <button key={t} className={`chip ${time === t ? 'sel' : ''}`} onClick={() => setTime(t)}>{TIME_LABEL[t]}</button>)}
+          <span className="chip-sep" />
+          {(Object.keys(WEATHER_LABEL) as Weather[]).map((w) => <button key={w} className={`chip ${weather === w ? 'sel' : ''}`} onClick={() => setWeather(w)}>{WEATHER_LABEL[w]}</button>)}
+        </div>
+        {weather === 'rain' && <p className="note">Дожд: помало прилепување (≈72 %), подолг пат на сопирање.</p>}
         <div className="vehicle-row">
           <span className="swatch" style={{ background: engine.store.garage.paint }} />
           <div><b>{def.name}</b> · {def.familyLabel}<br /><small>{def.scope.label}</small></div>
@@ -71,6 +84,7 @@ export function Menu({ engine }: { engine: GameEngine }) {
         {block && <p className="warn">{block}</p>}
         <div className="row">
           <button className="btn primary big" disabled={!!block} onClick={go}>Возиме</button>
+          <button className="btn small" onClick={() => setBook(true)}>📕 Возачка книшка {earnedStamps(engine.store.history).length}/{STAMPS.length}</button>
           <button className="btn ghost small" onClick={() => setSources(true)}>Извори и правила</button>
           <button className="btn ghost small" disabled={!googleTilesEnabled()} title={googleTilesEnabled() ? '' : 'Потребен е VITE_GOOGLE_MAPS_API_KEY (види README)'} onClick={() => setGmap(true)}>Google 3D поглед</button>
         </div>
@@ -83,6 +97,7 @@ export function Menu({ engine }: { engine: GameEngine }) {
       <ControlCard />
       {sources && <Sources onClose={() => setSources(false)} />}
       {gmap && <GoogleTilesView onClose={() => setGmap(false)} />}
+      {book && <Booklet history={engine.store.history} plate={engine.store.garage.plate} onClose={() => setBook(false)} />}
       <span className="sr">{VEHICLES.length}</span>
     </div>
   );

@@ -7,6 +7,7 @@ import { ENV_INFO } from '../game/attempt';
 import { vehicleById } from '../game/vehicles/defs';
 import { challengeUrl, isHosted } from '../game/host';
 import { Sources } from './Sources';
+import { STAMPS } from '../game/career';
 
 const CAT: Record<RuleCategory, { label: string; cls: string }> = {
   trafficLaw: { label: 'Закон', cls: 'law' }, officialExam: { label: 'Испитен лист', cls: 'exam' },
@@ -41,6 +42,7 @@ export function Result({ engine }: { engine: GameEngine }) {
           </div>
           <div className="score"><div className="score-n">{r.gameScore}</div><div className="score-l">поени во играта</div></div>
         </header>
+        {engine.newStamps.length > 0 && <div className="new-stamp">Нов печат во книшката: {engine.newStamps.map((id) => STAMPS.find((x) => x.id === id)?.title).join(', ')}</div>}
         <div className="layers">
           {layer('Безбедност и прописи', r.layers.safety, 'Само проверени правила од законот.')}
           {layer('Техника на возење', r.layers.technique, 'Кумплунг, брзини, рачна, мазност.')}

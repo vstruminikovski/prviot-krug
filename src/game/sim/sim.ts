@@ -26,6 +26,8 @@ export interface AttemptConfig {
   assist: Assist;
   load: number;
   retry?: string; // scenario id to restage (city)
+  time?: 'golden' | 'noon' | 'dusk' | 'night';
+  weather?: 'clear' | 'rain' | 'fog';
 }
 
 export type SimEvent =
@@ -91,6 +93,7 @@ export class Sim {
     this.env = env;
     this.world = world ?? new World(env);
     this.rng = streams(config.seed);
+    if (config.weather === 'rain') this.world.gripScale = 0.72;
     this.mission = mission;
     const def = vehicleById(config.vehicle);
     this.player = new Vehicle(def, env.start, config.assist, { engineRunning: true, parkingBrake: true, gear: 'N', load: config.load });

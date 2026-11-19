@@ -425,7 +425,7 @@ export class Vehicle {
     }
     if (this.assist === 'auto') this.autoGearbox(dt);
   }
-  private wheelspinning = false;
+  wheelspinning = false;
   private rollbackReported = false;
   private overRevCool = 0;
 

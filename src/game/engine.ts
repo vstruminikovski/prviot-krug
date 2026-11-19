@@ -10,6 +10,7 @@ import { vehicleById, type VehicleDef } from './vehicles/defs';
 import { load, save, type Save, type GarageChoice } from './store';
 import { randomSeed } from './sim/seed';
 import { emitComplete } from './host';
+import { earnedStamps } from './career';
 import { kmh } from './math';
 import type { Gear } from './vehicles/vehicle';
 import type { EnvId } from './env/types';
@@ -58,6 +59,7 @@ export class GameEngine {
   private countdown: number | null = null;
   private auto: Autopilot | null = null;
   timeScale = 1;
+  newStamps: string[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.view = new View(canvas);
@@ -105,7 +107,10 @@ export class GameEngine {
     const def = vehicleById(this.config.vehicle);
     const debris = this.config.env === 'openRoad' ? (sim.mission as OpenRoadMission).debrisS : undefined;
     this.view.setEnvironment(this.config.env, { vehicleLength: def.dims.L, debrisS: debris });
-    this.view.setMood({ wet: this.config.env === 'openRoad' && (sim.mission as OpenRoadMission).wet });
+    const wetRoad = this.config.env === 'openRoad' && (sim.mission as OpenRoadMission).wet;
+    this.view.atmo.setTime(this.config.time ?? 'golden');
+    this.view.atmo.setWeather(wetRoad ? 'rain' : this.config.weather ?? 'clear');
+    this.view.atmo.updateLamps();
     this.view.setPlayer(def, this.custom);
     this.view.resetShot();
     this.input.clear();
@@ -269,7 +274,7 @@ export class GameEngine {
   private handleEvents(sim: Sim) {
     for (const e of sim.drainEvents()) {
       if (e.type === 'say') this.sayQueue.push({ text: e.text, who: e.who ?? 'Инструктор', priority: e.priority, until: 0 });
-      else if (e.type === 'contact') { this.audio.thud(e.contact.speed); }
+      else if (e.type === 'contact') { this.audio.thud(e.contact.speed); this.view.kick(Math.min(1, e.contact.speed / 6)); }
       else if (e.type === 'incident') {
         const i = e.incident;
         if (i.severity !== 'note' || i.layer === 'mission') this.flash(`${i.text}${i.points ? ` −${i.points}` : ''}`, i.severity === 'note' ? 'ok' : i.severity === 'minor' ? 'warn' : 'bad', 2.8);
@@ -288,9 +293,12 @@ export class GameEngine {
     this.result = r;
     this.phase = 'result';
     this.input.clear();
+    const before = earnedStamps(this.store.history);
     const skills: Record<string, number> = {};
     for (const i of r.incidents) for (const id of i.ruleIds) skills[id] = (skills[id] ?? 0) + 1;
-    this.store.history.push({ at: new Date().toISOString(), env: r.config.env, mode: r.config.mode, seed: r.config.seed, vehicle: r.config.vehicle, assist: r.config.assist, score: r.gameScore, passed: r.exam ? r.exam.passed : null, failed: r.failed?.text ?? null, skills });
+    this.store.history.push({ at: new Date().toISOString(), env: r.config.env, mode: r.config.mode, seed: r.config.seed, vehicle: r.config.vehicle, assist: r.config.assist, score: r.gameScore, passed: r.exam ? r.exam.passed : null, failed: r.failed?.text ?? null, skills, mission: r.layers.mission, time: r.config.time ?? 'golden', weather: r.config.weather ?? 'clear' });
+    const after = earnedStamps(this.store.history);
+    this.newStamps = after.filter((id) => !before.includes(id));
     this.persist();
     emitComplete(r);
     this.audio.chime();

@@ -8,7 +8,7 @@ const KEY = 'krug-niz-maaloto';
 export const SCHEMA = 3;
 
 export interface GarageChoice { vehicle: string; paint: string; finish: 'solid' | 'metallic'; trims: string[]; plate: string; layout: PlateLayout; interior: string; mirrorAdj: number; load: number }
-export interface AttemptRecord { at: string; env: EnvId; mode: Mode; seed: number; vehicle: string; assist: Assist; score: number; passed: boolean | null; failed: string | null; skills: Record<string, number> }
+export interface AttemptRecord { at: string; env: EnvId; mode: Mode; seed: number; vehicle: string; assist: Assist; score: number; passed: boolean | null; failed: string | null; skills: Record<string, number>; mission?: number; time?: string; weather?: string }
 
 export interface Save {
   schema: number;
@@ -49,7 +49,7 @@ export function load(): Save {
 }
 
 export function save(s: Save) {
-  try { localStorage.setItem(KEY, JSON.stringify({ ...s, history: s.history.slice(-30) })); } catch { /* storage unavailable */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ ...s, history: s.history.slice(-60) })); } catch { /* storage unavailable */ }
 }
 
 /** Fictional registration validation: SK + 3–4 digits + 2 letters from the Latin set used on Macedonian plates. */
