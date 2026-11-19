@@ -118,7 +118,7 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
   const intro = hud.countdown !== null;
   const camLabel = hud.camMode === 'chase' ? 'Зад колата' : hud.camMode === 'high' ? 'Од високо' : 'Возач';
   return (
-    <div className={`hud ${intro ? 'intro-on' : ''}`}>
+    <div className={`hud ${intro ? 'intro-on' : ''} ${hud.finished ? 'finishing' : ''}`}>
       <div className="instruments">
         <Gauge value={hud.speed} read={sp} lcd max={hud.env === 'openRoad' ? 140 : 120} ticks={hud.env === 'openRoad' ? 14 : 12} label="км/ч" unit="kmh" />
         <div className="gearbox">
@@ -145,6 +145,7 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       {hud.prompt && !intro && <div key={hud.prompt} className="prompt"><Icon name="info" size={16} />{hud.prompt}</div>}
       {hud.toast && <div key={hud.toast.text} className={`toast ${hud.toast.tone}`}><Icon name={hud.toast.tone === 'ok' ? 'check' : hud.toast.tone === 'info' ? 'info' : 'warn'} size={16} />{hud.toast.text}</div>}
       {intro && <Intro engine={engine} hud={hud} />}
+      {hud.finished && <div className={`finish-card ${hud.failed ? 'bad' : ''}`}><div className="intro-k">{hud.failed ? 'Обидот заврши' : 'Крај'}</div><div className="finish-t">{hud.failed ? hud.failed : hud.env === 'city' ? 'Кругот е готов' : 'Вежбата е готова'}</div></div>}
       <div className="mode-tag"><span>{MODE_LABEL[hud.mode]}</span><i />{ASSIST_LABEL[hud.assist]}</div>
       <div className="topbar">
         <button className="btn icon glass wide" onClick={() => engine.toggleCamera()} title="Камера (V)"><Icon name="camera" /><span>{camLabel}</span></button>

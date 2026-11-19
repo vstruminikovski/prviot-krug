@@ -1,6 +1,10 @@
 // Career: a driving-school booklet with stamps earned from actual attempt results.
 // The final stamp is an *in-game* licence — never presented as an official document.
 import type { AttemptRecord } from './store';
+import type { EnvId } from './env/types';
+import type { Mode } from './missions/types';
+import type { Assist } from './vehicles/vehicle';
+import type { TimeOfDay } from './render/atmosphere';
 
 export interface Stamp { id: string; title: string; how: string; earned: (h: AttemptRecord[]) => boolean }
 
@@ -16,6 +20,20 @@ export const STAMPS: Stamp[] = [
   { id: 'manual', title: 'Без помош', how: 'Заврши кој било предел во мануелен или испитен профил со ≥ 70 поени.', earned: (h) => done(h, (r) => (r.assist === 'manual' || r.assist === 'exam') && r.score >= 70) },
   { id: 'cityExam', title: 'Втор практичен дел', how: 'Испитен предизвик во градско: ≤ 50 негативни поени (Образец бр. 4).', earned: (h) => done(h, (r) => r.env === 'city' && r.mode === 'exam' && r.passed === true) },
 ];
+
+/** What to set up in the menu to go for each stamp. */
+export const STAMP_SETUP: Record<string, { env: EnvId; mode: Mode; assist?: Assist; time?: TimeOfDay }> = {
+  first: { env: 'polygon', mode: 'lesson' },
+  polygon: { env: 'polygon', mode: 'lesson' },
+  polygonExam: { env: 'polygon', mode: 'exam', assist: 'exam' },
+  city: { env: 'city', mode: 'lesson' },
+  openRoad: { env: 'openRoad', mode: 'lesson' },
+  hard: { env: 'city', mode: 'practice', time: 'night' },
+  manual: { env: 'polygon', mode: 'practice', assist: 'manual' },
+  cityExam: { env: 'city', mode: 'exam', assist: 'exam' },
+};
+/** First stamp still missing, in booklet order. */
+export function nextStamp(h: AttemptRecord[]): Stamp | null { const got = earnedStamps(h); return STAMPS.find((s) => !got.includes(s.id)) ?? null; }
 
 export function earnedStamps(h: AttemptRecord[]) { return STAMPS.filter((s) => s.earned(h)).map((s) => s.id); }
 export function licenceEarned(h: AttemptRecord[]) { return earnedStamps(h).length === STAMPS.length; }

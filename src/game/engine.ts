@@ -2,7 +2,10 @@
 // React never owns per-frame physics; it receives a throttled HUD snapshot.
 import { createSim, compatibility, encodeChallenge } from './attempt';
 import { CONTENT_VERSION, type AttemptConfig, type AttemptResult, type Sim } from './sim/sim';
+import * as THREE from 'three';
 import { View, type CamMode, type Custom } from './render/view';
+import { loadVehicleGLB } from './render/vehicleAssets';
+import { decorateOpenRoad } from './render/kenneyProps';
 import { GameAudio } from './audio/audio';
 import { Input, type Command, type Glance } from './input';
 import { Autopilot } from './sim/autopilot';
@@ -61,6 +64,10 @@ export class GameEngine {
   timeScale = 1;
   newStamps: string[] = [];
   private errStreak = 0;
+  /** phone haptics (no-op where unsupported) */
+  private buzz(p: number | number[]) { try { if (this.coarse && 'vibrate' in navigator) navigator.vibrate(p); } catch { /* */ } }
+  private coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+  finishT: number | null = null;
   onFatal: ((msg: string) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -72,8 +79,18 @@ export class GameEngine {
     this.input.onCommand = (c) => this.command(c);
     this.view.setEnvironment('city', { vehicleLength: 3.5 });
     this.raf = requestAnimationFrame(this.frame);
+    this.warmUp();
   }
 
+  /** While the menu idles: load the chosen car, prebuild the other places and compile their shaders,
+   *  so the first drive starts without a hitch or a placeholder car. */
+  private warmUp() {
+    const idle = (fn: () => void, ms: number) => setTimeout(() => ((window as unknown as { requestIdleCallback?: (f: () => void) => void }).requestIdleCallback ?? ((f: () => void) => f()))(() => { try { if (this.phase === 'menu' || this.phase === 'garage') fn(); } catch (e) { console.warn('[warmup]', e); } }), ms);
+    void loadVehicleGLB(this.store.garage.vehicle);
+    idle(() => this.view.prebuild('polygon', { vehicleLength: this.def.dims.L }), 1200);
+    idle(() => this.view.prebuild('osm', { vehicleLength: this.def.dims.L }), 2400);
+    idle(() => { void decorateOpenRoad(new THREE.Group()); }, 3200);
+  }
   dispose() { cancelAnimationFrame(this.raf); this.input.detach(); this.view.renderer.dispose(); }
   subscribe(fn: (h: HudState) => void) { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; }
   persist() { save(this.store); }
@@ -115,7 +132,7 @@ export class GameEngine {
     const why = compatibility(this.config.vehicle, this.config.env);
     if (why) { this.flash(why, 'warn'); return false; }
     const sim = createSim(this.config);
-    this.sim = sim; this.result = null; this.replay = null; this.paused = false; this.auto = null;
+    this.sim = sim; this.result = null; this.replay = null; this.paused = false; this.auto = null; this.finishT = null;
     const def = vehicleById(this.config.vehicle);
     const debris = this.config.env === 'openRoad' ? (sim.mission as OpenRoadMission).debrisS : undefined;
     this.view.setEnvironment(this.config.env, { vehicleLength: def.dims.L, debrisS: debris });
@@ -251,10 +268,15 @@ export class GameEngine {
       } else v.alpha = 1;
       v.syncLive(sim, dt, blink);
       const ip = v.playerPose(sim);
-      v.updateCamera(dt, v.camMode, ip, p.vx, p.steer, glance);
-      v.render('world', true, ip);
+      v.updateCamera(dt, this.finishT !== null ? 'finish' : v.camMode, ip, p.vx, p.steer, this.finishT !== null ? null : glance);
+      v.render('world', this.finishT === null, ip);
       this.audio.update(dt, { revs: p.rpm / p.def.engine.redline, throttle: p.throttle, speed: Math.abs(p.vx), horn: !!p.horn, cafeProximity: 0, cafePan: 0, running: p.engine === 'running' && !this.paused, siren: sim.extraState.siren === 1, diesel: !!p.def.engine.diesel, load: p.engineLoad, slip: !p.locked && p.clutchEff > 0.05 && p.clutchEff < 0.95 && p.gear !== 'N' ? 1 : 0, rpm: p.rpm, tyre: this.paused ? 0 : Math.max(Math.min(1, Math.max(0, Math.abs(p.vy) - 0.8) * 0.6), p.wheelspinning ? 0.8 : 0, p.brake > 0.85 && Math.abs(p.vx) > 9 && sim.world.gripAt(p.x, p.y) < 0.9 ? 0.6 : 0) });
-      if (sim.finished && !this.result) this.onFinished(sim);
+      // finish beat: a slow orbit and a title card before the results screen
+      if (sim.finished && !this.result) {
+        if (this.finishT === null) { this.finishT = 2.2; this.audio.chime(); this.input.clear(); this.view.resetShot(); this.emitHud(); }
+        this.finishT -= dt;
+        if (this.finishT <= 0) { this.finishT = null; this.onFinished(sim); }
+      }
     } else if (this.phase === 'result') {
       v.updateCamera(dt, 'chase', { ...sim.player.pose, z: sim.player.z }, 0, 0, null);
       v.render('world', false);
@@ -301,9 +323,10 @@ export class GameEngine {
   private handleEvents(sim: Sim) {
     for (const e of sim.drainEvents()) {
       if (e.type === 'say') this.sayQueue.push({ text: e.text, who: e.who ?? 'Инструктор', priority: e.priority, until: 0 });
-      else if (e.type === 'contact') { this.audio.thud(e.contact.speed); this.view.kick(Math.min(1, e.contact.speed / 6)); this.view.jolt(Math.min(1.5, e.contact.speed / 4)); }
+      else if (e.type === 'contact') { this.audio.thud(e.contact.speed); this.view.kick(Math.min(1, e.contact.speed / 6)); this.view.jolt(Math.min(1.5, e.contact.speed / 4)); this.buzz(Math.min(120, 30 + e.contact.speed * 15)); }
       else if (e.type === 'incident') {
         const i = e.incident;
+        if (i.severity === 'serious' || i.severity === 'critical') this.buzz([20, 50, 20]);
         if (i.severity !== 'note' || i.layer === 'mission') this.flash(`${i.text}${i.points ? ` −${i.points}` : ''}`, i.severity === 'note' ? 'ok' : i.severity === 'minor' ? 'warn' : 'bad', 2.8);
         if (i.severity === 'critical' && sim.config.mode !== 'exam' && sim.config.mode !== 'challenge') this.sayQueue.push({ text: `Инструкторот интервенира: ${i.text}`, who: 'Инструктор', priority: 3, until: 0 });
       } else if (e.type === 'speech') this.bubbles.push({ id: ++this.bubbleId, text: e.text, wx: e.x, wy: e.y, x: -999, y: -999, until: performance.now() / 1000 + 4.2 });
@@ -311,7 +334,8 @@ export class GameEngine {
         if (e.e.type === 'stall') this.audio.stall();
         if (e.e.type === 'engineStart') this.audio.started();
         if (e.e.type === 'crank') this.audio.crank();
-        if (e.e.type === 'gearChange') this.audio.clunk();
+        if (e.e.type === 'gearChange') { this.audio.clunk(); this.buzz(8); }
+        if (e.e.type === 'stall') this.buzz([30, 40, 60]);
       } else if (e.type === 'fail') this.sayQueue.push({ text: `Обидот заврши: ${e.incident.text}`, who: 'Инструктор', priority: 3, until: 0 });
     }
   }
@@ -329,7 +353,6 @@ export class GameEngine {
     this.newStamps = after.filter((id) => !before.includes(id));
     this.persist();
     emitComplete(r);
-    this.audio.chime();
     this.emitHud();
   }
 
@@ -357,7 +380,7 @@ export class GameEngine {
       bubbles: this.bubbles.map((b) => ({ ...b })), camMode: this.view.camMode, muted: this.audio.muted, paused: this.paused, glance: this.input.glance(),
       limit: s && p ? (p.def.family === 'truck' ? Math.min(80, s.world.speedLimitAt(p.x, p.y).kmh) : s.world.speedLimitAt(p.x, p.y).kmh) : 50,
       suggestGear: suggest, countdown: this.countdown === null ? null : Math.ceil(this.countdown),
-      replay: this.replay ? { ...this.replay } : null, failed: s?.failed?.text ?? null, finished: !!s?.finished,
+      replay: this.replay ? { ...this.replay } : null, failed: s?.failed?.text ?? null, finished: !!s?.finished && this.finishT !== null,
     };
   }
   private emitHud() { const h = this.hud(); for (const l of this.listeners) l(h); }

@@ -7,7 +7,7 @@ import { ENV_INFO } from '../game/attempt';
 import { vehicleById } from '../game/vehicles/defs';
 import { challengeUrl, isHosted } from '../game/host';
 import { Sources } from './Sources';
-import { STAMPS } from '../game/career';
+import { STAMPS, nextStamp } from '../game/career';
 import { CountUp, Icon, Seg } from './kit';
 
 const CAT: Record<RuleCategory, { label: string; cls: string }> = {
@@ -58,6 +58,7 @@ export function Result({ engine }: { engine: GameEngine }) {
           </div>
         </header>
         {engine.newStamps.length > 0 && <div className="banner newstamp"><span className="stamp-mini">★</span><div><b>Нов печат во книшката</b><small>{engine.newStamps.map((id) => STAMPS.find((x) => x.id === id)?.title).join(' · ')}</small></div></div>}
+        {(() => { const g = nextStamp(engine.store.history); return g && engine.newStamps.length === 0 ? <p className="next-goal"><Icon name="flag" size={15} />Следен печат: <b>{g.title}</b> — {g.how}</p> : null; })()}
         <div className="layers">
           {layer('Безбедност и прописи', r.layers.safety, 'Само проверени правила од законот.', 0)}
           {layer('Техника на возење', r.layers.technique, 'Кумплунг, брзини, рачна, мазност.', 1)}

@@ -11,7 +11,7 @@ import { Sources } from './Sources';
 import { GoogleTilesView } from './GoogleTilesView';
 import { Booklet } from './Booklet';
 import { Settings } from './Settings';
-import { earnedStamps } from '../game/career';
+import { earnedStamps, nextStamp, STAMP_SETUP, STAMPS } from '../game/career';
 import { TIME_LABEL, WEATHER_LABEL, type TimeOfDay, type Weather } from '../game/render/atmosphere';
 import { googleTilesEnabled } from '../game/render/googleTiles';
 import { Icon, Logo, Modal, Seg, type IconName } from './kit';
@@ -46,6 +46,7 @@ export function Menu({ engine }: { engine: GameEngine }) {
   const block = compatibility(def.id, env);
   const stamps = earnedStamps(engine.store.history).length;
   const last = engine.store.history.slice(-3).reverse();
+  const goal = nextStamp(engine.store.history);
   const go = () => { if (block) return; engine.store.settings.assist = assist; engine.persist(); engine.start({ env, mode, assist, time, weather }); };
   // keyboard: Enter drives, ? opens help, G garage
   useEffect(() => {
@@ -75,6 +76,13 @@ export function Menu({ engine }: { engine: GameEngine }) {
               <div><b>Предизвик од другар</b><small>{ENV_INFO[ch.config.env].title} · {MODE_LABEL[ch.config.mode]} · {vehicleById(ch.config.vehicle).name}{ch.score !== null ? ` · ${ch.score} поени` : ''}</small>{ch.versionMismatch && <small className="warn-t">Од друга верзија — ситуацијата може да се разликува.</small>}</div>
               <button className="btn primary sm" onClick={() => { engine.store.garage.vehicle = ch.config.vehicle; engine.start(ch.config, false); }}>Прифати</button>
             </div>
+          )}
+          {goal && (
+            <button className="goal" onClick={() => { const g = STAMP_SETUP[goal.id]; setEnv(g.env); setMode(g.mode); if (g.assist) setAssist(g.assist); if (g.time) setTime(g.time); }}>
+              <span className="goal-stamp">{STAMPS.indexOf(goal) + 1}</span>
+              <span className="goal-t"><small>Следен печат · {stamps}/{STAMPS.length}</small><b>{goal.title}</b><span>{goal.how}</span></span>
+              <span className="goal-go">Постави<Icon name="next" size={15} /></span>
+            </button>
           )}
           <section>
             <h3 className="sec">Каде возиш</h3>

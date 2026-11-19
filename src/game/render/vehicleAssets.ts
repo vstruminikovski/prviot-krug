@@ -10,13 +10,16 @@ import type { PlateAtlas } from './textures';
 const cache = new Map<string, Promise<GLTF | null>>();
 const loader = new GLTFLoader();
 
+const ready = new Map<string, GLTF | null>();
 export function loadVehicleGLB(id: string): Promise<GLTF | null> {
   if (!cache.has(id)) {
     const url = `${import.meta.env.BASE_URL}assets/vehicles/${id}.glb`;
-    cache.set(id, loader.loadAsync(url).catch((e) => { console.warn('vehicle GLB missing, using procedural', id, e); return null; }));
+    cache.set(id, loader.loadAsync(url).then((g) => { ready.set(id, g); return g; }).catch((e) => { console.warn('vehicle GLB missing, using procedural', id, e); ready.set(id, null); return null; }));
   }
   return cache.get(id)!;
 }
+/** Already-loaded model (undefined while still loading) — lets the view skip the placeholder. */
+export function vehicleReady(id: string): GLTF | null | undefined { return ready.get(id); }
 
 export interface VehicleRig extends CarRig {
   setSteer(roadWheelAngle: number, spin: number): void;

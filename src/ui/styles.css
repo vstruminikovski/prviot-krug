@@ -385,7 +385,7 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
 .stamp-slot { display: flex; gap: 12px; align-items: center; }
 .stamp { width: 80px; height: 80px; border-radius: 50%; border: 2px dashed #c9b48a; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #c9b48a; font-family: var(--f-display); font-weight: 700; flex: none; }
 .stamp-slot.on .stamp { border: 4px double #b3342b; color: #b3342b; background: rgba(179,52,43,.06); font-size: 9.5px; line-height: 1.15; padding: 6px; animation: stampIn .5s var(--spring); mix-blend-mode: multiply; }
-.stamp small { font-size: 7.5px; letter-spacing: .1em; }
+.stamp small { font-size: 7px; letter-spacing: .08em; white-space: nowrap; }
 .stamp-how { display: flex; flex-direction: column; gap: 2px; font-size: 13px; } .stamp-how small { color: #6b6455; line-height: 1.35; }
 @keyframes stampIn { 0% { transform: scale(1.8) rotate(-20deg); opacity: 0; } 100% { opacity: 1; } }
 .licence { border: 2px solid #c9b48a; border-radius: 12px; padding: 12px 16px; margin: 8px 0 14px; opacity: .55; background: linear-gradient(135deg, #f3e9d0, #e4eee6); }
@@ -490,3 +490,22 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
 .gtiles-err { position: absolute; top: 70px; left: 12px; background: rgba(190,52,32,.9); color: #fff; padding: 8px 12px; border-radius: var(--r-sm); }
 .gtiles-attr { position: absolute; left: 10px; bottom: 8px; right: 10px; display: flex; gap: 12px; align-items: center; color: #fff; font-size: 11px; text-shadow: 0 1px 2px #000; pointer-events: none; }
 .gtiles-logo { font: 700 16px Arial, sans-serif; color: #fff; padding: 2px 0 2px 2px; }
+
+/* finish beat */
+.finish-card { position: absolute; left: 50%; top: 24%; transform: translate(-50%, -50%); text-align: center; text-shadow: 0 4px 24px rgba(0,0,0,.6); animation: finishIn 2.2s var(--ease) forwards; pointer-events: none; }
+.finish-t { font-family: var(--f-display); font-weight: 800; font-size: clamp(28px, 5vw, 64px); letter-spacing: -.02em; color: var(--text); margin-top: 6px; max-width: 80vw; }
+.finish-card.bad .intro-k { color: var(--bad); } .finish-card.bad .finish-t { font-size: clamp(20px, 3.2vw, 40px); }
+@keyframes finishIn { 0% { opacity: 0; transform: translate(-50%, -40%) scale(.96); } 18%, 78% { opacity: 1; transform: translate(-50%, -50%); } 100% { opacity: 0; transform: translate(-50%, -54%); } }
+.hud.finishing .instruments, .hud.finishing .task, .hud.finishing .topbar, .hud.finishing .touch, .hud.finishing .say, .hud.finishing .prompt, .hud.finishing .legend, .hud.finishing .mode-tag, .hud.finishing .toast { animation: hudOut .5s var(--ease) forwards !important; pointer-events: none; }
+@keyframes hudOut { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
+
+/* next goal */
+.goal { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; margin: 2px 0 4px; border-radius: var(--r); border: 1px dashed rgba(217,71,47,.55); background: linear-gradient(120deg, rgba(217,71,47,.14), rgba(217,71,47,.03)); transition: transform var(--t2) var(--ease), border-color var(--t2); animation: riseIn var(--t3) var(--ease) both; }
+.goal:hover { transform: translateY(-1px); border-color: rgba(217,71,47,.9); }
+.goal-stamp { width: 42px; height: 42px; flex: none; border-radius: 50%; border: 3px double var(--enamel); color: var(--enamel); font-family: var(--f-display); font-weight: 800; display: flex; align-items: center; justify-content: center; transform: rotate(-10deg); }
+.goal-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.goal-t small { font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #ff9a88; }
+.goal-t b { font-size: 14px; } .goal-t span { font-size: 12px; color: var(--text-2); line-height: 1.35; }
+.goal-go { display: flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 800; color: var(--text); white-space: nowrap; }
+.next-goal { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; font-size: 13px; color: var(--text-2); } .next-goal b { color: var(--text); }
+@media (max-height: 560px) { .goal-t span { display: none; } .goal { padding: 8px 12px; } }

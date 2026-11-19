@@ -11,7 +11,7 @@ import type { Sim, ActorMeta } from '../sim/sim';
 import type { CarType } from '../content/generate';
 import { clamp, wrapAngle, type Pose } from '../math';
 import type { VehicleDef, PlateLayout } from '../vehicles/defs';
-import { loadVehicleGLB, rigFromGLB, proceduralRig, type VehicleRig } from './vehicleAssets';
+import { loadVehicleGLB, vehicleReady, rigFromGLB, proceduralRig, type VehicleRig } from './vehicleAssets';
 import { buildCityExtras, buildOpenRoadScene, buildPolygonScene, buildOsmScene, type CityExtras, type OpenRoadScene } from './envScenes';
 import { buildGarage, type GarageScene } from './garage';
 import { decorateOpenRoad } from './kenneyProps';
@@ -21,7 +21,7 @@ import type { EnvId } from '../env/types';
 import type { Glance } from '../input';
 
 export type CamMode = 'chase' | 'high' | 'driver';
-export type ShotMode = CamMode | 'replay' | 'title';
+export type ShotMode = CamMode | 'replay' | 'title' | 'finish';
 
 export interface Custom { paint: string; finish: 'solid' | 'metallic'; plate: string; layout: PlateLayout; trims: string[]; interior: string; mirrorAdj: number }
 
@@ -190,8 +190,16 @@ export class View {
   }
 
   // ------------------------------------------------------------ environments
-  setEnvironment(env: EnvId, opts: { vehicleLength: number; debrisS?: number }) {
-    this.env = env;
+  /** Build an environment ahead of time (hidden) and compile its shaders, so starting a drive never hitches. */
+  prebuild(env: EnvId, opts: { vehicleLength: number; debrisS?: number }) {
+    const g = this.ensureEnv(env, opts);
+    if (env === this.env) return;
+    g.visible = true;
+    const p = this.renderer.compileAsync(this.scene, this.camera);
+    g.visible = false;
+    void p.catch(() => {});
+  }
+  private ensureEnv(env: EnvId, opts: { vehicleLength: number; debrisS?: number }): THREE.Group {
     const key = env === 'polygon' ? `L${opts.vehicleLength > 6 ? 'big' : opts.vehicleLength > 4 ? 'long' : 'short'}` : env === 'openRoad' ? `d${Math.round(opts.debrisS ?? 0)}` : 'c';
     if (this.envGroups[env] && this.envKey[env] !== key) { this.scene.remove(this.envGroups[env]!); delete this.envGroups[env]; }
     if (!this.envGroups[env]) {
@@ -201,12 +209,19 @@ export class View {
         this.cityExtras = buildCityExtras(); g.add(this.cityExtras.group); g.add(this.patrons);
       } else if (env === 'polygon') g = buildPolygonScene(opts.vehicleLength);
       else if (env === 'osm') g = buildOsmScene();
-      else { this.openRoad = buildOpenRoadScene(opts.debrisS ?? 2100); g = this.openRoad.group; void decorateOpenRoad(g); }
+      else { this.openRoad = buildOpenRoadScene(opts.debrisS ?? 2100); g = this.openRoad.group; void decorateOpenRoad(g).then(() => patchXray(g)); }
+      patchXray(g);
+      g.visible = env === this.env;
       this.envGroups[env] = g; this.envKey[env] = key;
       this.scene.add(g);
     }
+    return this.envGroups[env]!;
+  }
+
+  setEnvironment(env: EnvId, opts: { vehicleLength: number; debrisS?: number }) {
+    this.env = env;
+    this.ensureEnv(env, opts);
     for (const [k, g] of Object.entries(this.envGroups)) g!.visible = k === env;
-    patchXray(this.envGroups[env]!);
     for (const r of this.cars.values()) r.group.visible = false;
     for (const r of this.peds.values()) r.group.visible = false;
     for (const r of this.strollers.values()) r.group.visible = env === 'city';
@@ -221,6 +236,8 @@ export class View {
 
   // ------------------------------------------------------------ vehicles
   private makeRig(def: VehicleDef, c: Custom, onReady: (r: VehicleRig) => void): VehicleRig {
+    const have = vehicleReady(def.id);
+    if (have) return rigFromGLB(have, def, c.paint, c.finish, c.plate, c.layout); // no placeholder pop
     const proc = proceduralRig(def, c.paint, c.finish, c.plate, this.atlas, c.trims);
     loadVehicleGLB(def.id).then((gltf) => { if (gltf) onReady(rigFromGLB(gltf, def, c.paint, c.finish, c.plate, c.layout)); });
     return proc;
@@ -444,6 +461,14 @@ export class View {
       if (!this.camInit) { this.camPos.copy(pos); this.camLook.copy(look); this.camInit = true; }
       this.camPos.lerp(pos, 1 - Math.exp(-dt * 2.5)); this.camLook.lerp(look, 1 - Math.exp(-dt * 3));
       cam.position.copy(this.camPos); cam.lookAt(this.camLook);
+    } else if (shot === 'finish') {
+      // slow orbit around the stopped car
+      if (!this.camInit) { this.camYaw = p.h + Math.PI * 0.3; this.camInit = true; }
+      this.camYaw += dt * 0.42;
+      const L = def?.dims.L ?? 3.5, r = L * 1.5 + 3.4;
+      cam.position.set(p.x + Math.cos(this.camYaw) * r, z + 1.9, -(p.y + Math.sin(this.camYaw) * r));
+      cam.lookAt(p.x, z + 0.75, -p.y);
+      fov = 46;
     } else if (shot === 'title') {
       // menu: a slow crane drifting along the neighbourhood (tilt-shift makes it a diorama)
       const t = performance.now() / 1000;
