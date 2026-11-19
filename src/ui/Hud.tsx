@@ -126,6 +126,7 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       {hud.glance && hud.glance.startsWith('shoulder') && <div className="glance-tag">Поглед преку {hud.glance === 'shoulderL' ? 'левото' : 'десното'} рамо</div>}
       {hud.bubbles.map((b) => b.y > -900 && <div key={b.id} className="bubble" style={{ left: b.x, top: b.y }}>{b.text}</div>)}
       {hud.paused && <PauseMenu engine={engine} hud={hud} />}
+      {hud.env === 'osm' && <div className="osm-attr">Податоци за улици и згради © OpenStreetMap contributors (ODbL)</div>}
       <TouchControls engine={engine} hud={hud} />
     </>
   );

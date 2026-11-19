@@ -1,7 +1,7 @@
 // Shared description of a drivable environment (simulation side only — no three.js).
 import type { Pose, Rect, Vec2 } from '../math';
 
-export type EnvId = 'polygon' | 'city' | 'openRoad';
+export type EnvId = 'polygon' | 'city' | 'openRoad' | 'osm';
 
 export type ObstacleKind = 'parked' | 'pole' | 'cone' | 'barrier' | 'post' | 'debris' | 'wall' | 'marker';
 

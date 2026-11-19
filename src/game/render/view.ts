@@ -12,7 +12,7 @@ import type { CarType } from '../content/generate';
 import { clamp, wrapAngle, type Pose } from '../math';
 import type { VehicleDef, PlateLayout } from '../vehicles/defs';
 import { loadVehicleGLB, rigFromGLB, proceduralRig, type VehicleRig } from './vehicleAssets';
-import { buildCityExtras, buildOpenRoadScene, buildPolygonScene, type CityExtras, type OpenRoadScene } from './envScenes';
+import { buildCityExtras, buildOpenRoadScene, buildPolygonScene, buildOsmScene, type CityExtras, type OpenRoadScene } from './envScenes';
 import { buildGarage, type GarageScene } from './garage';
 import type { EnvId } from '../env/types';
 import type { Glance } from '../input';
@@ -174,6 +174,7 @@ export class View {
         g = buildWorld(this.atlas).group;
         this.cityExtras = buildCityExtras(); g.add(this.cityExtras.group); g.add(this.patrons);
       } else if (env === 'polygon') g = buildPolygonScene(opts.vehicleLength);
+      else if (env === 'osm') g = buildOsmScene();
       else { this.openRoad = buildOpenRoadScene(opts.debrisS ?? 2100); g = this.openRoad.group; }
       this.envGroups[env] = g; this.envKey[env] = key;
       this.scene.add(g);
@@ -407,8 +408,8 @@ export class View {
       cam.position.copy(pos);
       cam.lookAt(pos.clone().add(new THREE.Vector3(Math.cos(back), -0.05, -Math.sin(back))));
     };
-    set(this.mirrorCams[0], def.mirrors.left, -0.22);
-    set(this.mirrorCams[1], def.mirrors.right, 0.22);
+    set(this.mirrorCams[0], def.mirrors.left, -0.34);
+    set(this.mirrorCams[1], def.mirrors.right, 0.34);
     if (def.mirrors.interior) set(this.mirrorCams[2], { ...def.mirrors.interior, x: def.mirrors.interior.x - 0.6 }, 0);
     this.noRearPanel.visible = !def.rearWindow;
   }
@@ -428,7 +429,10 @@ export class View {
         r.shadowMap.autoUpdate = false;
         for (let i = 0; i < 3; i++) {
           if (i === 2 && !this.playerDef?.rearWindow) continue;
+          // the interior mirror looks through the cabin: hide the car shell for it
+          if (i === 2 && this.player) this.player.group.visible = false;
           r.setRenderTarget(this.mirrorRTs[i]); r.render(this.scene, this.mirrorCams[i]);
+          if (this.player) this.player.group.visible = true;
         }
         r.setRenderTarget(null); r.shadowMap.autoUpdate = shadow; this.scene.fog = prevFog;
       }

@@ -313,3 +313,36 @@ export function buildOpenRoadScene(debrisS: number): OpenRoadScene {
   const hz = buildHorizon(); hz.position.set(900, 0, 600); group.add(hz);
   return { group, works: [w0, w1] };
 }
+
+// ------------------------------------------------------------------ real Debar Maalo (OSM)
+import { OSM } from '../env/osm';
+export function buildOsmScene(): THREE.Group {
+  const group = new THREE.Group();
+  const b = new Batcher();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), lam({ color: '#b9b08a' }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; ground.receiveShadow = true; group.add(ground);
+  const pal = ['#e9c9ae', '#cfe0c8', '#efdcc0', '#e6c2a8', '#d9e4d6', '#e3cfa6', '#ecd9c6'];
+  OSM.buildings.forEach((bd, i) => {
+    if (bd.p.length < 4) return;
+    const shape = new THREE.Shape(bd.p.map(([x, y]) => new THREE.Vector2(x, y)));
+    const g = new THREE.ExtrudeGeometry(shape, { depth: bd.h, bevelEnabled: false });
+    g.rotateX(-Math.PI / 2); // shape (x, y) → world (x, -z); extrude up along +y
+    const col = pal[i % pal.length];
+    b.add(g, 'osm-' + col, () => lam({ color: col }));
+  });
+  for (const r of OSM.roads) {
+    const pts = r.p.map(([x, y]) => ({ x, y }));
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], c = pts[i + 1];
+      const len = Math.hypot(c.x - a.x, c.y - a.y); if (len < 0.1) continue;
+      const g = new THREE.PlaneGeometry(len + r.w * 0.5, r.w + 1.2);
+      g.rotateX(-Math.PI / 2); g.rotateY(Math.atan2(c.y - a.y, c.x - a.x));
+      g.translate((a.x + c.x) / 2, 0.01 + (r.w > 7 ? 0.004 : 0), -(a.y + c.y) / 2);
+      const uv = g.attributes.uv as THREE.BufferAttribute; for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * len / 7, uv.getY(k) * r.w / 7);
+      b.add(g, 'road', () => lam({ map: T.asphalt(), color: '#ffffff' }), undefined, false);
+    }
+  }
+  group.add(b.build());
+  const hz = buildHorizon(); hz.position.set(-240, 0, 300); group.add(hz);
+  return group;
+}
