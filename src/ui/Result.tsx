@@ -10,7 +10,7 @@ import { Sources } from './Sources';
 import { STAMPS, nextStamp } from '../game/career';
 import { TASK_BRIEFS } from '../game/content/briefs';
 import { ACTION_LABEL, MATRIX_CONFIG, type Action } from '../game/rules/matrix';
-import { CountUp, FullscreenButton, Icon, Seg } from './kit';
+import { CountUp, Icon, Seg } from './kit';
 
 const CAT: Record<RuleCategory, { label: string; cls: string }> = {
   trafficLaw: { label: 'Закон', cls: 'law' }, officialExam: { label: 'Испитен лист', cls: 'exam' },
@@ -94,7 +94,6 @@ export function Result({ engine }: { engine: GameEngine }) {
         <p className="fine">Игровни поени — не се официјални казнени поени. „Испитен лист“ ги користи вредностите од Образец бр. 1 / бр. 4 (Сл. весник 29/2025) само каде играта сигурно ја гледа грешката. Погледите се контрола-проксија, не мерење на вниманието. Верзии: содржина {r.versions.content}, правила {r.versions.rules}, физика {r.versions.physics}.</p>
         {copied && <p className="hint">Линкот е копиран: {copied}</p>}
         <footer className="result-foot">
-          <FullscreenButton />
           <button className="btn ghost" data-sound="back" onClick={() => engine.backToMenu()}><Icon name="home" size={18} /><span className="hide-sm">Мени</span></button>
           <button className="btn ghost" onClick={() => setSrc(true)}><Icon name="info" size={18} /><span className="hide-sm">Извори</span></button>
           <span className="grow" />

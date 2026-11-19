@@ -5,8 +5,7 @@ import { Menu } from './Menu';
 import { Garage } from './Garage';
 import { Result, ReplayPanel } from './Result';
 import { ErrorBoundary } from './ErrorBoundary';
-import { LogoMark } from './kit';
-import { MobileGate } from './MobileGate';
+import { LogoMark, useAutoFullscreen } from './kit';
 
 declare global { interface Window { __krug?: GameEngine } }
 
@@ -17,6 +16,7 @@ export default function App() {
   const [hud, setHud] = useState<HudState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [booted, setBooted] = useState(false);
+  useAutoFullscreen();
 
   useEffect(() => {
     let eng: GameEngine;
@@ -75,7 +75,6 @@ export default function App() {
         <div className="boot-word">КРУГ <span>низ маалото</span></div>
         <div className="boot-bar"><i /></div>
       </div>
-      <MobileGate />
       <div className="rotate-hint"><svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M2.5 12a9.5 9.5 0 0 0 4 7.7M21.5 12a9.5 9.5 0 0 0-4-7.7" /></svg><b>Сврти го телефонот</b><span>Играта се вози хоризонтално.</span></div>
     </div>
   );

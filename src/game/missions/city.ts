@@ -1,5 +1,6 @@
 // Градско возење — Debar Maalo. The four verified situations from Episode 1 now run inside a
 // living neighbourhood (ambient traffic, signalised crossing, pedestrians) with instructor navigation.
+import { DETECT } from '../sim/params';
 import { Path, angleDiff, inRect, rect, type Vec2 } from '../math';
 import { Stroller, type Pedestrian } from '../sim/actors';
 import { makeScenarios, type ScenarioRuntime } from '../sim/scenarios';
@@ -83,7 +84,7 @@ export class CityMission implements Mission {
         this.cornerState.set(c.id, true);
         const lastNot = [...sim.rec.sample(sim.t - 6, sim.t)].reverse().find((f) => f.p.ind !== 1);
         const onFor = p.indicator === 'left' ? (lastNot ? sim.t - lastNot.t : 6) : 0;
-        if (onFor < 1.5) sim.incident('corner-' + c.id, { layer: 'safety', severity: 'significant', ruleIds: ['law.signalling'], text: 'Свртување налево без навремен покажувач.', exam: ['exam4.2K'] }, 30);
+        if (onFor < DETECT.indicatorLeadSeconds) sim.incident('corner-' + c.id, { layer: 'safety', severity: 'significant', ruleIds: ['law.signalling'], text: 'Свртување налево без навремен покажувач.', exam: ['exam4.2K'] }, 30);
         if (!sim.observedSince(['mirrorL', 'mirrorC', 'shoulderL'], sim.t - 6)) sim.incident('mirror-' + c.id, { layer: 'technique', severity: 'note', ruleIds: ['tech.mirror.before'], text: 'Свртување без поглед во огледало (контрола-проксија).', exam: sim.config.mode === 'exam' ? ['exam4.1I'] : [] }, 30);
       }
     }

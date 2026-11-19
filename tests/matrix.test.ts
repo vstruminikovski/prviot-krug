@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { MISTAKES, MATRIX_CONFIG, classify } from '../src/game/rules/matrix';
 import { ruleById } from '../src/game/rules/registry';
+import { PARAM_INFO } from '../src/game/sim/params';
 import { createSim } from '../src/game/attempt';
 import { CONTENT_VERSION, type Sim, type SimEvent } from '../src/game/sim/sim';
 import type { EnvId } from '../src/game/env/types';
@@ -26,6 +27,13 @@ describe('matrix data', () => {
       expect(['retry', 'exerciseFail', 'warn', 'intervene', 'note'].includes(cell.action), `${m.id}/${place}: lesson actions never in exam cells`).toBe(false);
       const l = m.lesson[place].action;
       expect(['examMinor', 'examCritical'].includes(l), `${m.id}/${place}: exam actions never in lesson cells`).toBe(false);
+    }
+  });
+  it('every detected mistake states its detection, named thresholds with units, and a false-positive caveat', () => {
+    for (const m of MISTAKES.filter((x) => x.detected)) {
+      expect(m.detect.length, m.id).toBeGreaterThan(5);
+      expect((m.caveat ?? '').length, `${m.id} caveat`).toBeGreaterThan(5);
+      for (const k of m.params ?? []) expect(PARAM_INFO[k]?.unit, `${m.id} ${k}`).toBeTruthy();
     }
   });
   it('every mistake has a reason and a verification status', () => {

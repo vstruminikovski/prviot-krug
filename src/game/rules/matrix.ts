@@ -11,6 +11,7 @@ import { ruleById, SRC } from './registry';
 import type { Severity } from './ledger';
 import type { Mode } from '../missions/types';
 import type { EnvId } from '../env/types';
+import { DETECT, PARAM_INFO } from '../sim/params';
 
 export type Action =
   | 'none' // not applicable / not detected in this place
@@ -38,15 +39,18 @@ export interface Mistake {
   status: 'confirmed' | 'needsInstructorReview';
   why: string; // reason for the classification
   say?: string; // instructor explanation in Часови
+  /** named thresholds used by the detection (see sim/params.ts) and the false-positive caveat */
+  params?: (keyof typeof DETECT)[];
+  caveat?: string;
 }
 
 /** Tuning lives here — never in mission code. */
 export const MATRIX_CONFIG = {
-  /** > threshold negative points = not passed. Polygon: чл. 36 ст. 2 (verified). City: same value applied, flagged for review. */
-  examThreshold: { polygon: 50, city: 50 } as Record<'polygon' | 'city', number>,
-  examThresholdStatus: { polygon: 'confirmed', city: 'needsInstructorReview' } as Record<'polygon' | 'city', Mistake['status']>,
-  /** whether a single above-threshold item ends the drive immediately (examiner practice: needs review) */
-  examEndOnCritical: true,
+  /** > threshold negative points = not passed — Правилник 29/2025 чл. 36 ст. 2, each practical part separately */
+  get examThreshold() { return DETECT.examPointLimit; },
+  examThresholdStatus: { polygon: 'confirmed', city: 'confirmed' } as Record<'polygon' | 'city', Mistake['status']>,
+  /** whether a single above-threshold item ends the drive immediately — not prescribed (чл. 35 ст. 2 only allows a shorter part 2): needs verification */
+  get examEndOnCritical() { return DETECT.examStopsImmediatelyOnCriticalItem; },
   lessonSeverity: { none: 'note', note: 'note', warn: 'minor', intervene: 'serious', exerciseFail: 'serious', retry: 'critical', gameOnly: 'minor', examMinor: 'minor', examCritical: 'critical' } as Record<Action, Severity>,
   /** lesson actions that stop and offer a repeat */
   lessonRetry: ['retry', 'exerciseFail'] as Action[],
@@ -64,15 +68,20 @@ const NA = C('none');
 
 export const MISTAKES: Mistake[] = [
   // ------------------------------------------------ safety-critical
-  { id: 'collision.vehicle', title: 'Судир со возило', did: 'Удри во друго возило (над 1,5 m/s).', detect: 'Контакт на каросеријата со возило во движење или паркирано НПЦ возило.', detected: true,
-    match: { keys: /^contact-(?!ped-)/ }, law: ['law.speed.adapt'], game: [],
+  { id: 'collision.vehicle', title: 'Судир со возило', did: 'Удри во друго возило со брзина на приближување над прагот collisionRelativeSpeedMps.', detect: 'Контакт на каросеријата со возило во движење или паркирано НПЦ возило.', detected: true,
+    match: { keys: /^collision-veh-/ }, law: ['law.speed.adapt'], game: [],
     lesson: { polygon: NA, city: C('retry') }, exam: { polygon: NA, city: C('examCritical', ['exam4.1H']) },
-    status: 'confirmed', why: 'Образец бр. 4, 1-Х „создавање непосредно опасна ситуација“ (51) — над прагот од 50 сам по себе.',
+    status: 'needsInstructorReview', why: 'Образец бр. 4, 1-Х „создавање непосредно опасна ситуација“ (51). Поените се од листот; дека секој судир над прагот на брзина е 1-Х е толкување — за проверка.',
     say: 'Судир. Застануваме — ќе ја повториме ситуацијата. Брзината мора да овозможи запирање пред секоја предвидлива пречка (чл. 33).' },
+  { id: 'touch.vehicle', title: 'Лесен допир со возило', did: 'Допре друго возило со мала брзина на приближување (на пр. при паркирање).', detect: 'Контакт со возило под прагот на судир.', detected: true,
+    match: { keys: /^touch-veh-/ }, law: [], game: ['game.contact'],
+    lesson: { polygon: NA, city: C('warn') }, exam: { polygon: NA, city: C('gameOnly') },
+    status: 'needsInstructorReview', why: 'Нема посебна ставка во Образец бр. 4 за лесен допир; дали испитувачот би го бодувал како 1-Х е за проверка. Засега не влијае на испитот.',
+    say: 'Допре возило. Полека — гледај ги аглите во огледалата.' },
   { id: 'collision.ped', title: 'Удар во пешак', did: 'Контакт со пешак.', detect: 'Контакт на каросеријата со пешак.', detected: true,
     match: { keys: /^contact-ped-/ }, law: ['law.ped.attention', 'law.speed.adapt'], game: [],
     lesson: { polygon: NA, city: C('retry') }, exam: { polygon: NA, city: C('examCritical', ['exam4.1H']) },
-    status: 'confirmed', why: 'Образец бр. 4, 1-Х (51); чл. 19 — внимание кон пешаците.',
+    status: 'needsInstructorReview', why: 'Образец бр. 4, 1-Х (51); чл. 19 — внимание кон пешаците. Пресликувањето контакт → 1-Х е толкување.',
     say: 'Стоп! Пешак. Ова е најтешката грешка — ја повторуваме ситуацијата со помала брзина.' },
   { id: 'object.hit', title: 'Удар во објект', did: 'Удри во столб, граничник или паркиран предмет.', detect: 'Контакт со статичен објект (не рабник, не конус).', detected: true,
     match: { keys: /^obj-/ }, law: [], game: ['game.contact'],
@@ -135,7 +144,7 @@ export const MISTAKES: Mistake[] = [
     lesson: { polygon: NA, city: C('intervene') }, exam: { polygon: NA, city: C('examMinor', ['exam4.2D']) },
     status: 'confirmed', why: 'чл. 50, 54, 56–58; Образец бр. 4, 2-Д (15).',
     say: 'Обиколувај само кога спротивната лента е слободна доволно далеку.' },
-  { id: 'distance', title: 'Растојание', did: 'Возеше преблиску до возилото пред тебе.', detect: 'Временски размак < 1 с подолго од 3 с (прагот е игра).', detected: true,
+  { id: 'distance', title: 'Растојание', did: 'Возеше преблиску до возилото пред тебе.', detect: 'Не е детектирано во оваа верзија (параметар minimumFollowingTimeSeconds е подготвен).', detected: false,
     match: { rules: ['law.distance'] }, law: ['law.distance'], game: [],
     lesson: { polygon: NA, city: C('warn') }, exam: { polygon: NA, city: C('examMinor', ['exam4.2Zh']) },
     status: 'needsInstructorReview', why: 'чл. 93 ст. 1; Образец бр. 4, 2-Ж (10). Прагот на размак е проценка.',
@@ -233,6 +242,43 @@ export const MISTAKES: Mistake[] = [
     lesson: { polygon: NA, city: C('note') }, exam: { polygon: NA, city: C('examMinor', ['exam4.1F']) },
     status: 'needsInstructorReview', why: 'Образец бр. 4, 1-Ф (30).' },
 ];
+
+// Thresholds (named, with units in sim/params.ts) and the honest false-positive caveat per mistake.
+const PARAMS: Record<string, (keyof typeof DETECT)[]> = {
+  'collision.vehicle': ['collisionRelativeSpeedMps'], 'touch.vehicle': ['collisionRelativeSpeedMps', 'contactReportSpeedMps'], 'object.hit': ['contactReportSpeedMps'], curb: ['contactReportSpeedMps'],
+  speed: ['overspeedToleranceKmh', 'overspeedDurationSeconds'], 'signal.turn': ['indicatorLeadSeconds'], 'handbrake.moving': ['movingWithParkingBrakeSpeedMps', 'movingWithParkingBrakeSeconds'],
+  rollback: ['hillRollbackLimitM'], riding: ['clutchRidingPedal', 'clutchRidingSpeedMps', 'clutchRidingSeconds'], 'poly.stopline': ['stopLineMaxDistanceM'], distance: ['minimumFollowingTimeSeconds'], 'harsh.brake': ['hardBrakingMps2'],
+};
+const CAVEATS: Record<string, string> = {
+  'collision.vehicle': 'Брзината е брзина на приближување на двете тела; агол и оштета не се моделирани.',
+  'collision.ped': 'Секој контакт со пешак, без оглед на брзината.',
+  'touch.vehicle': 'Ист настан како судир — само брзината одлучува; прагот не е калибриран.',
+  'object.hit': 'Контакт со статичен објект; не разликува огледало од браник.',
+  'red.light': 'Мери позиција на стоп-линијата при промена на светлото; не мери гледање.',
+  'priority.right': 'Проценка по време до крстосница (≤ 3 с), не по намера на возачот.',
+  'priority.left': 'Конфликт во крстосница; блиски ситуации може да се погрешно оценат.',
+  'meeting.obstacle': 'Пресметка на време на стигнување до тесниот дел.',
+  'ped.yield': 'Положба на пешакот во/кон лентата; не гледа контакт со погледот.',
+  'wrong.way': 'Влез во забранет сегмент од графот на улиците.',
+  emergency: 'Мерено време додека возилото е зад тебе без простор.',
+  'signal.turn': 'Почеток на свртување се одредува од аголот на возилото; рано вклучен и исклучен покажувач се смета како вклучен.',
+  speed: 'Ограничувањето е од податоците на зоната; толеранцијата избегнува шум, законот не дава толеранција.',
+  yellow: 'Запирното растојание е пресметано од моделот на сопирање.',
+  overtake: 'Се гледа само принудното сопирање на спротивното возило.',
+  curb: 'Секој контакт на тркало со рабникот над прагот на пријава; благото чешање е под прагот.',
+  mirror: 'Проксија: дали погледот бил прикажан на екранот, не каде гледал човекот.',
+  horn: 'Секоја употреба на сирена на испит.',
+  stall: 'Настан од моделот на моторот/кумплунгот.', startInGear: 'Настан од моделот.', gear: 'Одбиено менување од менувачот.',
+  'handbrake.moving': 'Делумно спуштена рачна се смета како крената над половина од ходот.',
+  rollback: 'Мерено растојание наназад по запирање; прагот е проценка.',
+  riding: 'Положба на педалот, не притисок на ногата.', wheelspin: 'Погонската сила над достапното прилепување.',
+  'poly.lines': 'Точки на тркалата наспроти правоаголниците на вежбата.', 'poly.uturn3': 'Бројач на промени на насока.', 'poly.object': 'Контакт со граничник.',
+  'poly.stopline': 'Растојание браник–линија по мирување.', 'poly.unneeded': 'Мирување во лентата пред крајот.', 'poly.second': 'Највисока брзина во вежбата.',
+  'poly.park': 'Агол и растојание до рабовите на просторот.', 'poly.hill.handbrake': 'Мирување на угорнината без рачна над половина од ходот.',
+};
+for (const m of MISTAKES) { m.params = PARAMS[m.id] ?? []; m.caveat = CAVEATS[m.id] ?? (m.detected ? '' : 'Не е детектирано.'); }
+/** "1,5 m/s (provisional)" style text for a mistake's thresholds. */
+export const thresholdText = (m: Mistake) => (m.params ?? []).map((k) => { const v = DETECT[k]; const i = PARAM_INFO[k]; return `${k} = ${typeof v === 'object' ? JSON.stringify(v) : v} ${i.unit} (${i.status})`; }).join('; ') || 'настан од моделот (без праг)';
 
 export const mistakeById = (id: string) => MISTAKES.find((m) => m.id === id);
 

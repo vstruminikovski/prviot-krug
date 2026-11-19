@@ -137,19 +137,25 @@ export async function enterFullscreen() {
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.({ navigationUI: 'hide' } as FullscreenOptions); } catch { /* refused */ }
   try { await (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape'); } catch { /* unsupported */ }
 }
-/** True when a fullscreen button makes sense right now: touch device, browser tab, fullscreen
- *  supported (not iPhone Safari) and currently not fullscreen. Re-renders on every change. */
-export function useNeedsFullscreen() {
-  const calc = () => matchMedia('(pointer: coarse)').matches && !standalone() && !!document.fullscreenEnabled && !document.fullscreenElement;
-  const [need, setNeed] = useState(calc);
-  useEffect(() => { const f = () => setNeed(calc()); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
-  return need;
-}
-/** Small pill/button to go (back) to fullscreen. */
-export function FullscreenButton({ variant = 'icon', onDone, label = 'Назад на цел екран' }: { variant?: 'icon' | 'block'; onDone?: () => void; label?: string }) {
-  const need = useNeedsFullscreen();
-  if (!need) return null;
-  return variant === 'block'
-    ? <button className="btn primary block" onClick={() => { void enterFullscreen().then(() => onDone?.()); }}><Icon name="expand" size={18} />{label}</button>
-    : <button className="btn icon glass fs-btn" onClick={() => void enterFullscreen()} title="Цел екран" aria-label="Цел екран"><Icon name="expand" /></button>;
+/** Phones in a browser tab: go fullscreen + landscape automatically on the user's taps.
+ *  Browsers only allow it right after a gesture, and for touch the activating events are
+ *  pointerup / touchend / click (not pointerdown) — so we listen to those, in the capture phase,
+ *  without consuming the tap: the button the player pressed still does its job. After leaving
+ *  fullscreen (back gesture, notification) the next tap brings it back. No buttons, no prompts. */
+export function useAutoFullscreen() {
+  useEffect(() => {
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    if (!coarse || standalone() || !document.fullscreenEnabled) return;
+    let pending = false;
+    const go = (e: Event) => {
+      if (document.fullscreenElement || pending) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('input, textarea, select, [contenteditable]')) return; // keyboard would fight fullscreen
+      pending = true;
+      void enterFullscreen().finally(() => { pending = false; });
+    };
+    const evs = ['pointerup', 'touchend', 'click'] as const;
+    for (const ev of evs) window.addEventListener(ev, go, { capture: true, passive: true });
+    return () => { for (const ev of evs) window.removeEventListener(ev, go, { capture: true }); };
+  }, []);
 }

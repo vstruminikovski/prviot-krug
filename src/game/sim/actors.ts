@@ -30,6 +30,8 @@ export class NpcCar {
 
   get pose(): Pose { return this.path.at(this.s); }
   quad(): Vec2[] { return obbCorners(this.pose, this.L, this.W); }
+  /** world velocity (m/s) — for relative-speed contact classification */
+  velocity(): Vec2 { const h = this.pose.h; return { x: Math.cos(h) * this.v, y: Math.sin(h) * this.v }; }
   frontS() { return this.s + this.L / 2; }
 
   update(dt: number, ctx: ActorContext) {

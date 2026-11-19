@@ -11,6 +11,7 @@
 // - Brakes: service brake with lag, parking brake on the rear, static hold without jitter.
 import { clamp, obbCorners, obbSamples, quadsOverlap, angleDiff, type Pose, type Vec2 } from '../math';
 import type { VehicleDef } from './defs';
+import { PHYSICS, DETECT } from '../sim/params';
 
 export type Gear = 'R' | 'N' | 1 | 2 | 3 | 4 | 5;
 export type EngineState = 'off' | 'starting' | 'running' | 'stalled';
@@ -39,11 +40,12 @@ export type VehicleEventType =
 
 export interface VehicleEvent { t: number; type: VehicleEventType; data?: Record<string, number | string> }
 
+/** speed = closing speed between the two bodies (m/s): player velocity minus the other body's velocity */
 export interface Contact { t: number; kind: 'curb' | 'parked' | 'pole' | 'cone' | 'barrier' | 'vehicle' | 'pedestrian' | 'static'; id: string; speed: number }
 
-export interface DynamicBody { id: string; kind: 'vehicle' | 'pedestrian'; quad(): Vec2[] }
+export interface DynamicBody { id: string; kind: 'vehicle' | 'pedestrian'; quad(): Vec2[]; /** world velocity m/s (optional) */ velocity?(): Vec2 }
 
-const G = 9.81;
+const G = PHYSICS.gravityMps2;
 const rpmToRad = (rpm: number) => (rpm * Math.PI) / 30;
 const radToRpm = (w: number) => (w * 30) / Math.PI;
 
@@ -256,12 +258,19 @@ export class Vehicle {
 
     // ---- resistive forces along the body x axis (signed)
     const vx = this.vx;
+    // normal force on the road (slope-aware) and the grip budget left after cornering (friction circle)
+    const N = m * G * Math.cos(this.grade);
+    const gripN = mu * N;
+    const longBudget = gripN * Math.sqrt(Math.max(0, 1 - this.latUse * this.latUse));
     const Fgrav = -m * G * Math.sin(this.grade);
-    const Froll = -Math.sign(vx) * d.aero.rolling * m * G * (Math.abs(vx) < 0.1 ? Math.abs(vx) / 0.1 : 1);
-    const Faero = -Math.sign(vx) * 0.5 * 1.2 * d.aero.cdA * vx * vx;
-    // brakes (with lag for air brakes)
+    const Froll = -Math.sign(vx) * d.aero.rolling * N * (Math.abs(vx) < PHYSICS.rollingRampSpeedMps ? Math.abs(vx) / PHYSICS.rollingRampSpeedMps : 1);
+    const Faero = -Math.sign(vx) * 0.5 * PHYSICS.airDensityKgM3 * d.aero.cdA * vx * vx;
+    // brakes (with lag for air brakes): service brake on all wheels, parking brake on the rear axle;
+    // the total can never exceed what the tyres can transmit
     this.brakeApplied += (this.brake - this.brakeApplied) * clamp(dt / Math.max(d.brakes.lag, dt), 0, 1);
-    const Fbrake = Math.min(this.brakeApplied * d.brakes.decel, mu * G) * m + this.parkingBrake * d.brakes.parkDecel * m;
+    const Fservice = this.brakeApplied * d.brakes.decel * m;
+    const Fpark = Math.min(this.parkingBrake * d.brakes.parkDecel * m, gripN * (1 - d.frontWeight));
+    const Fbrake = Math.min(Fservice + Fpark, longBudget);
 
     const G_ratio = this.gearRatio;
     const rW = d.dims.wheelR;
@@ -284,7 +293,7 @@ export class Vehicle {
       const alphaE = (aLock / rW) * G_ratio;
       const Treq = Tnet - Ie * alphaE;
       const slip = this.omegaE - omegaD;
-      const canLock = Math.abs(Treq) <= Tcap && (this.locked || Math.abs(slip) < 6);
+      const canLock = Math.abs(Treq) <= Tcap && (this.locked || Math.abs(slip) < PHYSICS.clutchLockWindowRadS);
       if (canLock) {
         this.locked = true;
         aVeh = aLock;
@@ -292,7 +301,7 @@ export class Vehicle {
         newOmega = (vx + aVeh * dt) / rW * G_ratio;
       } else {
         this.locked = false;
-        const Tcl = Tcap * Math.tanh(slip / 3);
+        const Tcl = Tcap * Math.tanh(slip / PHYSICS.clutchSlipScaleRadS);
         newOmega = this.omegaE + ((Tnet - Tcl) / Ie) * dt;
         Fdrive = (Tcl * G_ratio * eff) / rW;
         aVeh = this.applyBrakes(Fdrive + Fext, Fbrake, m, dt);
@@ -307,10 +316,11 @@ export class Vehicle {
     }
 
     // traction limit on the driven axle
+    // (applies at every speed: wet roads limit acceleration at speed too)
     const driveShare = d.drive === 'AWD' ? 1 : d.drive === 'FWD' ? d.frontWeight - (aVeh * d.comHeight) / (G * d.dims.wheelbase) : 1 - d.frontWeight + (aVeh * d.comHeight) / (G * d.dims.wheelbase);
-    const Fmax = mu * m * G * clamp(driveShare, 0.2, 1);
-    if (Math.abs(Fdrive) > Fmax * 1.02 && Math.abs(vx) < 12) {
-      if (!this.wheelspinning) this.emit('wheelspin');
+    const Fmax = longBudget * clamp(driveShare, 0.2, 1);
+    if (Math.abs(Fdrive) > Fmax * PHYSICS.tractionSlack) {
+      if (!this.wheelspinning && Math.abs(vx) < 12) this.emit('wheelspin');
       this.wheelspinning = true;
       const excess = (Math.abs(Fdrive) - Fmax) * Math.sign(Fdrive);
       aVeh -= excess / m;
@@ -320,6 +330,8 @@ export class Vehicle {
     this.omegaE = newOmega;
     this.engineLoad = clamp(Te / Math.max(tq, 1), 0, 1);
     let nvx = vx + aVeh * dt;
+    // longitudinal tyre utilisation this step (drive + brake), shared with cornering below
+    this.longUse = gripN > 1 ? clamp(Math.abs(m * aVeh - (Fgrav + Froll + Faero)) / gripN, 0, 1) : 0;
     if (!coupled && Math.abs(vx) < 1e-4 && Math.abs(nvx) < 1e-4) nvx = 0;
 
     // stall
@@ -346,47 +358,53 @@ export class Vehicle {
     if (Math.abs(nvx) < 0.05) { this.stoppedAt = t; this.rollbackDist = 0; }
     if (dirSel !== 0 && this.stoppedAt !== null && Math.sign(nvx) === -dirSel && Math.abs(nvx) > 0.05) {
       this.rollbackDist += Math.abs(nvx) * dt;
-      if (this.rollbackDist > 0.3 && !this.rollbackReported) { this.rollbackReported = true; this.emit('rollback', { m: Math.round(this.rollbackDist * 10) / 10 }); }
+      if (this.rollbackDist > DETECT.hillRollbackLimitM && !this.rollbackReported) { this.rollbackReported = true; this.emit('rollback', { m: Math.round(this.rollbackDist * 10) / 10 }); }
     } else if (Math.sign(nvx) === dirSel && Math.abs(nvx) > 0.5) { this.rollbackReported = false; this.stoppedAt = null; }
 
     // riding the clutch / moving with the parking brake
-    if (Math.abs(nvx) > 3 && this.gear !== 'N' && this.clutchPedal > 0.25 && this.assist !== 'auto') this.ridingTime += dt; else this.ridingTime = 0;
-    if (this.ridingTime > 3) { this.emit('clutchRiding'); this.ridingTime = -30; }
-    if (Math.abs(nvx) > 1 && this.parkingBrake > 0.5) this.pbMovingTime += dt; else this.pbMovingTime = 0;
-    if (this.pbMovingTime > 1.5) { this.emit('movingWithParkingBrake'); this.pbMovingTime = -60; }
+    if (Math.abs(nvx) > DETECT.clutchRidingSpeedMps && this.gear !== 'N' && this.clutchPedal > DETECT.clutchRidingPedal && this.assist !== 'auto') this.ridingTime += dt; else this.ridingTime = 0;
+    if (this.ridingTime > DETECT.clutchRidingSeconds) { this.emit('clutchRiding'); this.ridingTime = -30; }
+    if (Math.abs(nvx) > DETECT.movingWithParkingBrakeSpeedMps && this.parkingBrake > 0.5) this.pbMovingTime += dt; else this.pbMovingTime = 0;
+    if (this.pbMovingTime > DETECT.movingWithParkingBrakeSeconds) { this.emit('movingWithParkingBrake'); this.pbMovingTime = -60; }
     if (radToRpm(this.omegaE) > d.engine.redline + 50 && this.overRevCool <= 0) { this.emit('overRev'); this.overRevCool = 4; }
     this.overRevCool -= dt;
 
     // ---- steering and lateral dynamics
     const sp = Math.abs(nvx);
-    const lockAtSpeed = d.steer.lock * (1 - 0.62 * clamp(sp / 24, 0, 1));
+    const lockAtSpeed = d.steer.lock * (1 - PHYSICS.steerLockReductionAtSpeed * clamp(sp / PHYSICS.steerLockReductionFullSpeedMps, 0, 1));
     const target = this.steerInput * lockAtSpeed;
     const rate = d.steer.rate * dt;
     this.steer += clamp(target - this.steer, -rate, rate);
     const a = d.dims.wheelbase * (1 - d.frontWeight), b = d.dims.wheelbase * d.frontWeight;
     const Iz = m * (d.dims.L * d.dims.L + d.dims.W * d.dims.W) / 12 * 1.1;
     const steps = 2;
-    let vy = this.vy, r = this.r;
+    let vy = this.vy, r = this.r, latSum = 0;
     for (let i = 0; i < steps; i++) {
       const h2 = dt / steps;
       if (sp > 0.5) {
         const sgn = Math.sign(nvx);
         const af = Math.atan2(vy + a * r, sp) - this.steer * sgn;
         const ar = Math.atan2(vy - b * r, sp);
-        const FzF = m * G * d.frontWeight, FzR = m * G * (1 - d.frontWeight);
-        const sat = (C: number, al: number, Fz: number) => { const lim = mu * Fz; return -lim * Math.tanh((C * al) / lim); };
+        const FzF = N * d.frontWeight, FzR = N * (1 - d.frontWeight);
+        const latFactor = Math.sqrt(Math.max(0.05, 1 - this.longUse * this.longUse)); // friction circle
+        const sat = (C: number, al: number, Fz: number) => { const lim = mu * Fz * latFactor; return -lim * Math.tanh((C * al) / lim); };
         const Fyf = sat(d.tyre.cornerF, af, FzF), Fyr = sat(d.tyre.cornerR, ar, FzR);
         vy += ((Fyf * Math.cos(this.steer) + Fyr) / m - nvx * r) * h2;
+        latSum = Math.abs(Fyf * Math.cos(this.steer) + Fyr);
         r += ((a * Fyf * Math.cos(this.steer) - b * Fyr) / Iz) * sgn * h2;
       }
     }
     // kinematic model at low speed (no rotating on the spot; exact low-speed turning circle)
     const rKin = (nvx / d.dims.wheelbase) * Math.tan(this.steer);
     const vyKin = rKin * b * 0; // reference at the rear axle: lateral slip vanishes at walking pace
-    const kBlend = clamp((sp - 3) / 5, 0, 1);
+    const kBlend = clamp((sp - PHYSICS.kinematicBlendFromMps) / (PHYSICS.kinematicBlendToMps - PHYSICS.kinematicBlendFromMps), 0, 1);
     this.r = rKin * (1 - kBlend) + r * kBlend;
     this.vy = vyKin * (1 - kBlend) + vy * kBlend;
-    this.vy *= Math.exp(-dt * 0.4); // tyre relaxation
+    // relaxation only where the kinematic model rules: in the dynamic regime the tyre forces already
+    // damp sideslip, and an extra decay here acted as free lateral grip beyond μ·g
+    this.vy *= Math.exp(-dt * PHYSICS.lateralRelaxationPerS * (1 - kBlend));
+    // lateral tyre utilisation (dynamic regime only), shared with braking/drive next step
+    this.latUse = gripN > 1 ? clamp((latSum * kBlend) / gripN, 0, 0.98) : 0;
 
     // ---- integrate pose with collision response
     const nh = this.h + this.r * dt;
@@ -440,9 +458,13 @@ export class Vehicle {
       this.x = nx; this.y = ny; this.h = nh; this.vx = nvx;
       this.odometer += Math.hypot(wx, wy) * dt;
     } else {
-      const impact = Math.hypot(nvx, this.vy);
+      // closing speed: our world velocity minus the other body's (a moving NPC hitting a stopped
+      // player is still a collision; two cars touching while moving together are not)
+      const cH = Math.cos(this.h), sH = Math.sin(this.h);
+      const ov = bodies.find((b) => b.id === hit!.id)?.velocity?.() ?? { x: 0, y: 0 };
+      const impact = Math.hypot(nvx * cH - this.vy * sH - ov.x, nvx * sH + this.vy * cH - ov.y);
       const last = this.lastContact.get(hit.id) ?? -99;
-      if (t - last > 1.5 && (impact > 0.3 || hit.kind === 'pedestrian' || hit.kind === 'vehicle' || hit.kind === 'cone')) onContact({ t, kind: hit.kind as Contact['kind'], id: hit.id, speed: impact });
+      if (t - last > 1.5 && (impact > DETECT.contactReportSpeedMps || hit.kind === 'pedestrian' || hit.kind === 'vehicle' || hit.kind === 'cone')) onContact({ t, kind: hit.kind as Contact['kind'], id: hit.id, speed: impact });
       this.lastContact.set(hit.id, t);
       this.vx = impact > 1.2 ? -nvx * 0.12 : 0;
       this.vy = 0; this.r = 0;
@@ -460,6 +482,8 @@ export class Vehicle {
     if (this.assist === 'auto') this.autoGearbox(dt);
   }
   wheelspinning = false;
+  /** tyre utilisation 0..1 (friction circle): longitudinal and lateral share one grip budget */
+  longUse = 0; latUse = 0;
   private rollbackReported = false;
   private overRevCool = 0;
 

@@ -2,6 +2,7 @@
 // official negative points of Образец бр. 1 in exam mode (> 50 = not passed, чл. 36 ст. 2),
 // plus two clearly labelled practice extras. Exercises are linked by driving between start boxes.
 import { MATRIX_CONFIG } from '../rules/matrix';
+import { DETECT } from '../sim/params';
 import { angleDiff, inRect, type Pose, type Vec2 } from '../math';
 import type { Sim } from '../sim/sim';
 import type { VehicleEvent, Contact } from '../vehicles/vehicle';
@@ -152,7 +153,7 @@ export class PolygonMission implements Mission {
     if (e.stopT > 1.5 && dist > 4 && ((back && front < lane.x1 - 3) || (!back && front > lane.x0 + 3))) this.examInc(sim, e, back ? 'exam1.2A' : 'exam1.1Z', 'Непотребно запирање во лентата.');
     // finished: stopped near the line for a second
     if (e.stopT > 1.0 && dist < 6) {
-      if (dist > 1) this.examInc(sim, e, back ? 'exam1.2V' : 'exam1.1Zh', `Запре ${dist.toFixed(1)} m пред линијата (дозволено до 1 m).`);
+      if (dist > DETECT.stopLineMaxDistanceM) this.examInc(sim, e, back ? 'exam1.2V' : 'exam1.1Zh', `Запре ${dist.toFixed(1)} m пред линијата (дозволено до 1 m).`);
       const needGear = this.truck ? 3 : 2;
       if (!back && sim.player.assist !== 'auto' && e.maxGear < needGear) this.examInc(sim, e, 'exam1.1Gj', this.truck ? 'Не смени од втора во трета.' : 'Не смени од прва во втора.');
       const ok = e.pts === 0 || !e.official ? !beyond : e.pts < 51;
@@ -213,7 +214,7 @@ export class PolygonMission implements Mission {
       if (e.stopT > 0.8 && front > line - 8) {
         e.stoppedOnHill = true;
         const dist = line - front;
-        if (dist > 1 || dist < -0.1) this.examInc(sim, e, 'exam1.6D', `Запирање ${dist.toFixed(1)} m од СТОП линијата.`);
+        if (dist > DETECT.stopLineMaxDistanceM || dist < -0.1) this.examInc(sim, e, 'exam1.6D', `Запирање ${dist.toFixed(1)} m од СТОП линијата.`);
         sim.say('Крени рачна. Кога ќе бидеш подготвен — тргни без враќање назад.', 1);
       }
       if (front > line + 3) this.examInc(sim, e, 'exam1.6D', 'Не запре пред СТОП линијата на угорнината.');

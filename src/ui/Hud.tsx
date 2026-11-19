@@ -5,7 +5,7 @@ import { MODE_LABEL } from '../game/missions/types';
 import { ENV_INFO } from '../game/attempt';
 import { TIME_LABEL, WEATHER_LABEL } from '../game/render/atmosphere';
 import { kmh } from '../game/math';
-import { FullscreenButton, Icon } from './kit';
+import { Icon } from './kit';
 import { Settings } from './Settings';
 import { ROUTE_WAYPOINTS } from '../game/content/debarMaalo';
 import { PLACE_BRIEFS } from '../game/content/briefs';
@@ -155,7 +155,6 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       {hud.finished && <div className={`finish-card ${hud.failed ? 'bad' : ''}`}><div className="intro-k">{hud.failed ? 'Обидот заврши' : 'Крај'}</div><div className="finish-t">{hud.failed ? hud.failed : hud.env === 'city' ? 'Кругот е готов' : 'Вежбата е готова'}</div></div>}
       <div className="mode-tag"><span>{MODE_LABEL[hud.mode]}</span><i />{ASSIST_LABEL[hud.assist]}</div>
       <div className="topbar">
-        <FullscreenButton />
         <button className="btn icon glass wide" onClick={() => engine.toggleCamera()} title="Камера (V)"><Icon name="camera" /><span>{camLabel}</span></button>
         <button className="btn icon glass" onClick={() => engine.toggleMute()} title="Звук (0)"><Icon name={hud.muted ? 'mute' : 'sound'} /></button>
         <button className="btn icon glass hide-touch hide-narrow" onClick={() => { setLegend(!legend); engine.store.settings.legend = !legend; engine.persist(); }} title="Копчиња"><Icon name="keys" /></button>
@@ -220,7 +219,6 @@ function PauseMenu({ engine, hud, onSettings }: { engine: GameEngine; hud: HudSt
       <div className="sheet narrow pause" onClick={(e) => e.stopPropagation()}>
         <header className="sheet-h"><div><div className="kicker">{ENV_INFO[hud.env].title} · {MODE_LABEL[hud.mode]}</div><h2>Пауза</h2></div></header>
         <div className="sheet-b pause-list">
-          <FullscreenButton variant="block" label="Продолжи на цел екран" onDone={resume} />
           <button className="btn primary block" onClick={resume}><Icon name="play" size={18} />Продолжи<kbd>Esc</kbd></button>
           <button className="btn glass block" onClick={() => engine.retrySame()}><Icon name="retry" size={18} />Истата ситуација одново</button>
           <button className="btn glass block" onClick={() => engine.retryNew()}><Icon name="shuffle" size={18} />Нова варијација</button>

@@ -2,6 +2,7 @@
 // One authoritative clock, vehicle, world, actors, rules monitor and mission per attempt.
 import { kmh, type Path, type Vec2 } from '../math';
 import { World } from './world';
+import { DETECT } from './params';
 import { classify, examItemsFor, severityFor, actionFor, sourceLine, MATRIX_CONFIG, type Action } from '../rules/matrix';
 import { Vehicle, type Assist, type Contact, type Controls, type DynamicBody, type VehicleEvent, type Gear } from '../vehicles/vehicle';
 import { vehicleById, VEHICLE_DATA_VERSION } from '../vehicles/defs';
@@ -217,10 +218,14 @@ export class Sim {
     this.contacts.push(c);
     this.emit({ type: 'contact', contact: c });
     const strict = this.config.mode === 'exam' || this.config.mode === 'challenge';
-    if (c.kind === 'pedestrian' || (c.kind === 'vehicle' && c.speed > 1.5)) {
-      this.incident((c.kind === 'pedestrian' ? 'contact-ped-' : 'contact-') + c.id, { layer: 'safety', severity: 'critical', ruleIds: ['law.speed.adapt'], text: c.kind === 'pedestrian' ? 'Удар во пешак — инструкторот интервенираше.' : 'Судир со возило — инструкторот интервенираше.', exam: ['exam4.1H'] }, 10);
+    // four distinct contact kinds; c.speed is the closing speed (m/s)
+    if (c.kind === 'pedestrian') {
+      this.incident('contact-ped-' + c.id, { layer: 'safety', severity: 'critical', ruleIds: ['law.ped.attention'], text: 'Удар во пешак.', exam: ['exam4.1H'], evidence: `${c.speed.toFixed(1)} m/s` }, 10);
+    } else if (c.kind === 'vehicle' && c.speed >= DETECT.collisionRelativeSpeedMps) {
+      this.incident('collision-veh-' + c.id, { layer: 'safety', severity: 'critical', ruleIds: ['law.speed.adapt'], text: 'Судир со возило.', exam: ['exam4.1H'], evidence: `${c.speed.toFixed(1)} m/s ≥ ${DETECT.collisionRelativeSpeedMps} m/s` }, 10);
     } else if (c.kind === 'vehicle') {
-      this.incident('contact-' + c.id, { layer: 'safety', severity: 'serious', ruleIds: ['law.speed.adapt'], text: 'Допир со возило.', exam: ['exam4.1H'] }, 10);
+      // a light touch is never automatically the 51-point collision item
+      this.incident('touch-veh-' + c.id, { layer: 'safety', severity: 'significant', ruleIds: ['game.contact'], text: 'Лесен допир со возило.', evidence: `${c.speed.toFixed(1)} m/s < ${DETECT.collisionRelativeSpeedMps} m/s` }, 10);
     } else if (c.kind === 'curb') {
       this.incident('curb', { layer: 'technique', severity: strict && this.env.id !== 'polygon' ? 'serious' : 'minor', ruleIds: ['game.contact'], text: 'Удар во рабникот.', exam: this.env.id !== 'polygon' ? ['exam4.1Zh'] : [] }, 4);
     } else if (c.kind === 'parked' || c.kind === 'pole' || c.kind === 'barrier' || c.kind === 'wall' as never) {
@@ -255,10 +260,10 @@ export class Sim {
     if (p.def.family === 'truck' && lim.kmh > 80) lim = { kmh: 80, ruleId: 'law.speed.truck' };
     const sp = kmh(Math.abs(p.vx));
     if (this.env.id !== 'polygon') {
-      if (sp > lim.kmh + 1) {
+      if (sp > lim.kmh + DETECT.overspeedToleranceKmh) {
         if (this.overSince === null) { this.overSince = this.t; this.overMax = 0; this.overLimit = lim.kmh; this.overRule = lim.ruleId; }
         this.overMax = Math.max(this.overMax, sp);
-        if (this.t - this.overSince > 1) {
+        if (this.t - this.overSince > DETECT.overspeedDurationSeconds) {
           const over = this.overMax - this.overLimit;
           this.incident('speed', { layer: 'safety', severity: over > 20 ? 'serious' : 'significant', ruleIds: [this.overRule], text: `Брзина ${Math.round(this.overMax)} km/h каде што е дозволено ${this.overLimit} km/h.`, exam: ['exam4.2R'] }, 15);
         }
