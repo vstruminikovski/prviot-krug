@@ -66,7 +66,7 @@ export class View {
   garage: GarageScene | null = null;
   garageRig: VehicleRig | null = null;
   private garageToken = 0;
-  orbit = { yaw: 0.8, pitch: 0.25, dist: 7.5, cockpit: false };
+  orbit = { yaw: 0.8, pitch: 0.25, dist: 7.5 };
   width = 1; height = 1;
   atmo: Atmosphere;
   private speedFov = 0;
@@ -605,11 +605,6 @@ export class View {
     else { const px = (h < 560 ? Math.min(w * 0.54, 400) : Math.min(w * 0.46, 440)) + 16; cam.setViewOffset(w, h, -px / 2, 0, w, h); }
     cam.updateProjectionMatrix();
     const def = this.playerDef;
-    if (this.orbit.cockpit && def) {
-      const e = def.eye; cam.fov = 70; cam.updateProjectionMatrix();
-      cam.position.set(e.x, e.y, e.z); cam.lookAt(e.x + 5, e.y - 0.3, e.z);
-      return cam;
-    }
     cam.fov = 48; cam.updateProjectionMatrix();
     const { yaw, pitch, dist } = this.orbit;
     const target = new THREE.Vector3(0, (def?.dims.H ?? 1.4) * 0.45, 0);
@@ -633,7 +628,7 @@ export class View {
     this.orbit.dist = Math.max(5.5, def.dims.L * 1.75);
   }
   garageCustom(c: Custom) { this.garageRig?.setPaint(c.paint, c.finish); this.garageRig?.setPlate(c.plate, c.layout); }
-  garageSpin(dt: number) { if (this.garage && !this.orbit.cockpit) this.garage.turntable.rotation.y += dt * 0.12; }
+  garageSpin(dt: number) { if (this.garage) this.garage.turntable.rotation.y += dt * 0.12; }
 
   project(x: number, y: number, h: number): { x: number; y: number; visible: boolean } {
     const v = new THREE.Vector3(x, h, -y).project(this.camera);

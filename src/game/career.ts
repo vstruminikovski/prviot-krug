@@ -25,12 +25,12 @@ export const STAMPS: Stamp[] = [
 export const STAMP_SETUP: Record<string, { env: EnvId; mode: Mode; assist?: Assist; time?: TimeOfDay }> = {
   first: { env: 'polygon', mode: 'lesson' },
   polygon: { env: 'polygon', mode: 'lesson' },
-  polygonExam: { env: 'polygon', mode: 'exam', assist: 'exam' },
+  polygonExam: { env: 'polygon', mode: 'exam' },
   city: { env: 'city', mode: 'lesson' },
   openRoad: { env: 'openRoad', mode: 'lesson' },
   hard: { env: 'city', mode: 'practice', time: 'night' },
   manual: { env: 'polygon', mode: 'practice', assist: 'manual' },
-  cityExam: { env: 'city', mode: 'exam', assist: 'exam' },
+  cityExam: { env: 'city', mode: 'exam' },
 };
 /** First stamp still missing, in booklet order. */
 export function nextStamp(h: AttemptRecord[], touch = false): Stamp | null { const got = earnedStamps(h); return STAMPS.find((s) => !got.includes(s.id) && !(touch && s.id === 'manual')) ?? null; }

@@ -12,11 +12,9 @@ export function Garage({ engine }: { engine: GameEngine }) {
   const g = engine.store.garage;
   const def = vehicleById(g.vehicle);
   const [plateText, setPlateText] = useState(g.plate);
-  const [cockpit, setCockpit] = useState(false);
   const [tab, setTab] = useState<'car' | 'look' | 'plate' | 'data'>('car');
   const set = (p: Parameters<GameEngine['setGarage']>[0]) => { engine.setGarage(p); force((x) => x + 1); };
   useOrbit(engine);
-  useEffect(() => { engine.view.orbit.cockpit = cockpit; }, [cockpit, engine]);
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if ((e.target as HTMLElement)?.closest?.('input,select')) return; if (e.code === 'Escape') engine.backToMenu(); };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
@@ -88,11 +86,9 @@ export function Garage({ engine }: { engine: GameEngine }) {
           </>)}
         </div>
         <div className="garage-tools">
-          <button className={`btn glass sm ${cockpit ? 'on' : ''}`} onClick={() => setCockpit(!cockpit)}><Icon name={cockpit ? 'car' : 'eye'} size={16} />{cockpit ? 'Надвор' : 'Седни внатре'}</button>
           <button className="btn ghost sm" onClick={() => { set({ ...DEFAULT_GARAGE, vehicle: g.vehicle, paint: def.paint }); setPlateText(DEFAULT_GARAGE.plate); }}><Icon name="retry" size={16} />Ресетирај</button>
         </div>
         <footer className="garage-foot">
-          <button className="btn glass" onClick={() => engine.start({ env: 'polygon', mode: 'practice' })}>Проба на полигон</button>
           <button className="btn primary go" disabled={!!blocked} title={blocked ?? ''} onClick={() => engine.start({})}><Icon name="play" size={18} />Возиме</button>
         </footer>
       </aside>

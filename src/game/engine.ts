@@ -101,7 +101,7 @@ export class GameEngine {
   applySettings() {
     const s = this.store.settings;
     this.audio.volume = s.volume; this.audio.setMuted(s.muted);
-    this.view.mirrorQuality = s.mirrors;
+    this.view.mirrorQuality = s.quality === 'high' ? 'high' : 'low';
     this.view.motion = s.motion;
     if (this.view.quality !== s.quality || !this.qualityApplied) { this.view.setQuality(s.quality); this.qualityApplied = true; }
     this.input.steerSens = s.steerSens;
@@ -132,6 +132,9 @@ export class GameEngine {
     this.config = { ...prev, ...opts, v: CONTENT_VERSION, vehicle: opts.vehicle ?? g.vehicle, load: opts.load ?? g.load, assist: opts.assist ?? this.store.settings.assist, seed: same ? prev.seed : (opts.seed ?? randomSeed()) };
     // phones: a clutch and a gear lever on glass are not a good experience — automatic, always
     if (this.coarse) this.config.assist = 'auto';
+    // the exam is taken without on-screen help (the automatic accessibility profile stays automatic)
+    if (this.config.mode === 'exam' && this.config.assist !== 'auto') this.config.assist = 'exam';
+    if (this.config.mode === 'free') this.config.mode = 'practice';
     this.config.mission = this.config.env;
     const why = compatibility(this.config.vehicle, this.config.env);
     if (why) { this.flash(why, 'warn'); return false; }

@@ -17,15 +17,13 @@ import { Icon, Logo, Modal, Seg, type IconName } from './kit';
 const ASSISTS: { id: Assist; label: string; note: string }[] = [
   { id: 'learn', label: 'Со помош', note: 'Не гасне лесно, точката на зафаќање е означена, ти предлага брзина.' },
   { id: 'manual', label: 'Мануелно', note: 'Ти ги менуваш брзините и го водиш кумплунгот.' },
-  { id: 'exam', label: 'Испит', note: 'Без совети на екранот, без автоматика.' },
   { id: 'auto', label: 'Автоматски', note: 'Пристапност: кумплунгот и брзините се автоматски. Резултатите се означени.' },
 ];
 const MODES: { id: Mode; note: string }[] = [
   { id: 'lesson', note: 'Инструкторот води, советува и враќа кога треба.' },
   { id: 'practice', note: 'Без притисок, без задолжителен рестарт.' },
   { id: 'challenge', note: 'Кратко и строго — критична грешка го ресетира обидот.' },
-  { id: 'exam', note: 'Официјален оценувачки лист (над 50 нег. поени = не положено). Игра, не сертификат.' },
-  { id: 'free', note: 'Слободно возење без крај.' },
+  { id: 'exam', note: 'Официјален оценувачки лист, без совети на екранот (над 50 нег. поени = не положено). Игра, не сертификат.' },
 ];
 const ENV_ICON: Record<EnvId, IconName> = { polygon: 'flag', city: 'home', openRoad: 'wheel' };
 const TIME_ICON: Record<TimeOfDay, IconName> = { golden: 'sun', noon: 'sun', dusk: 'sun', night: 'moon' };
@@ -33,8 +31,8 @@ const WEATHER_ICON: Record<Weather, IconName> = { clear: 'sun', rain: 'rain', fo
 
 export function Menu({ engine }: { engine: GameEngine }) {
   const [env, setEnv] = useState<EnvId>(engine.config.env);
-  const [mode, setMode] = useState<Mode>(engine.config.mode);
-  const [assist, setAssist] = useState<Assist>(engine.store.settings.assist);
+  const [mode, setMode] = useState<Mode>(engine.config.mode === 'free' ? 'practice' : engine.config.mode);
+  const [assist, setAssist] = useState<Assist>(engine.store.settings.assist === 'exam' ? 'manual' : engine.store.settings.assist);
   const [time, setTime] = useState<TimeOfDay>(engine.config.time ?? 'golden');
   const [weather, setWeather] = useState<Weather>(engine.config.weather ?? 'clear');
   const [sheet, setSheet] = useState<null | 'sources' | 'book' | 'settings' | 'help'>(engine.store.history.length === 0 ? 'help' : null);
