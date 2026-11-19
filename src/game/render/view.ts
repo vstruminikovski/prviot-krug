@@ -422,6 +422,17 @@ export class View {
   }
 
   resetShot() { this.camInit = false; }
+  /** taller than wide (portrait phone) */
+  get portrait() { return this.height > this.width * 1.1; }
+  /** The vertical FOV that keeps the landscape design's horizontal view (16:9) on any screen shape,
+   *  capped so a portrait phone gets a wider picture without fish-eye distortion. */
+  private fovFor(v16x9: number) {
+    const aspect = this.width / Math.max(1, this.height);
+    if (aspect >= 16 / 9 * 0.85) return v16x9;
+    const h = 2 * Math.atan(Math.tan((v16x9 * Math.PI) / 360) * (16 / 9));
+    const v = (2 * Math.atan(Math.tan(h / 2) / aspect) * 180) / Math.PI;
+    return clamp(v, v16x9, this.portrait ? 82 : 75);
+  }
   private introT = 0; private introLen = 1;
   /** opening camera sweep: from a low front three-quarter view round to the driving camera */
   startIntro(secs: number) { this.introT = secs; this.introLen = secs; }
@@ -447,7 +458,7 @@ export class View {
       const look = pos.clone().add(new THREE.Vector3(Math.cos(yaw), -0.06, -Math.sin(yaw)).multiplyScalar(10));
       cam.position.copy(pos); cam.lookAt(look);
       cam.rotateZ(-this.susp.r * 0.35); cam.rotateX(-this.susp.p * 0.5);
-      fov = 70; this.camInit = false;
+      fov = this.fovFor(70); this.camInit = false;
       for (const o of glbInterior) o.visible = true;
     } else if (shot === 'replay') {
       if (!this.camInit) this.camYaw = p.h;
@@ -493,17 +504,19 @@ export class View {
       const side = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); // +right
       const L = def?.dims.L ?? 3.5, H = def?.dims.H ?? 1.4;
       const sp = clamp(Math.abs(v), 0, 30);
+      // portrait phones: pull back and up so the tall frame shows the road ahead, not the sky
+      const tall = this.portrait ? 1 : 0;
       if (high) {
-        const dist = 10.5 + L * 0.7 + sp * 0.06;
-        cam.position.copy(base).addScaledVector(cf, -dist).setY(z + 6.6 + L * 0.35 + sp * 0.04);
-        cam.lookAt(base.clone().addScaledVector(cf, 2.5 + sp * 0.12).addScaledVector(side, -this.lookSide * 1.2).setY(z + 0.6));
-        fov = 50;
+        const dist = (10.5 + L * 0.7 + sp * 0.06) * (1 + 0.15 * tall);
+        cam.position.copy(base).addScaledVector(cf, -dist).setY(z + 6.6 + L * 0.35 + sp * 0.04 + 2.5 * tall);
+        cam.lookAt(base.clone().addScaledVector(cf, 2.5 + sp * 0.12 + 5 * tall).addScaledVector(side, -this.lookSide * 1.2).setY(z + 0.6));
+        fov = this.fovFor(50);
       } else {
-        const dist = L * 1.2 + 2.3 + sp * 0.045 + this.pull;
-        cam.position.copy(base).addScaledVector(cf, -dist).addScaledVector(side, this.lookSide * 0.35).setY(z + H + 0.95 + sp * 0.012);
-        cam.lookAt(base.clone().addScaledVector(cf, 4 + sp * 0.18).addScaledVector(side, -this.lookSide * 1.1).setY(z + H * 0.62));
+        const dist = L * 1.2 + 2.3 + sp * 0.045 + this.pull + 2.2 * tall;
+        cam.position.copy(base).addScaledVector(cf, -dist).addScaledVector(side, this.lookSide * 0.35).setY(z + H + 0.95 + sp * 0.012 + 1.6 * tall);
+        cam.lookAt(base.clone().addScaledVector(cf, 4 + sp * 0.18 + 5 * tall).addScaledVector(side, -this.lookSide * 1.1).setY(z + H * 0.62));
         this.speedFov += ((this.motion ? clamp(sp - 8, 0, 22) * 0.42 : 0) - this.speedFov) * Math.min(1, dt * 2);
-        fov = 60 + this.speedFov;
+        fov = this.fovFor(60) + this.speedFov;
       }
       this.camInit = true;
       if (this.introT > 0) {

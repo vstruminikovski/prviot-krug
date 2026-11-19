@@ -42,7 +42,7 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
 .grow { flex: 1; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
-.app { position: fixed; inset: 0; overflow: hidden; }
+.app { position: fixed; left: 0; top: 0; width: 100%; height: 100%; height: 100dvh; overflow: hidden; } /* dvh: browser toolbars never cover the game */
 .scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
 .screen { position: absolute; inset: 0; pointer-events: none; animation: screenIn var(--t3) var(--ease); }
 .screen > * { pointer-events: auto; }
@@ -406,7 +406,6 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
 
 /* ---------- touch controls (coarse pointers only) ---------- */
 .touch, .tspeed { display: none; }
-.rotate-hint { display: none; }
 @media (pointer: coarse) {
   .hide-touch { display: none !important; }
   /* phone driving: thumbs bottom-left (steer) and bottom-right (pedals), signals top-left */
@@ -447,12 +446,6 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
   .topbar .btn.icon.wide span { display: none; } .topbar .btn.icon.wide { width: 40px; padding: 0; }
   .bubble { font-size: 11.5px; }
   .intro-t { font-size: 34px; } .intro-s { display: none; }
-}
-@media (pointer: coarse) and (orientation: portrait) {
-  .rotate-hint { display: flex; flex-direction: column; gap: 10px; position: fixed; inset: 0; z-index: 90; background: radial-gradient(ellipse at 50% 40%, #1c3735, var(--night) 70%); color: var(--text); align-items: center; justify-content: center; text-align: center; padding: 24px; }
-  .rotate-hint svg { color: var(--amber); animation: rot 2.4s var(--ease) infinite; }
-  .rotate-hint b { font-family: var(--f-display); font-size: 22px; } .rotate-hint span { color: var(--text-2); }
-  @keyframes rot { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
 }
 
 /* ---------- responsive layouts ---------- */
@@ -555,3 +548,52 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
 .cls { font-weight: 700; color: var(--text-2) !important; }
 .cls-retry, .cls-exerciseFail, .cls-examCritical { color: #ff9a88 !important; } .cls-warn, .cls-intervene, .cls-examMinor { color: var(--amber-2) !important; } .cls-gameOnly { color: var(--text-3) !important; }
 .matrix-wrap { overflow-x: auto; } .matrix { min-width: 860px; } .matrix th { text-align: left; font-size: 11px; color: var(--text-3); padding: 6px 4px; }
+
+/* ---------- phone held upright (portrait): the usual way mobile web games are played ---------- */
+@media (pointer: coarse) and (orientation: portrait) {
+  .topbar { top: max(10px, var(--safe-t)); right: max(10px, var(--safe-r)); }
+  .task { top: calc(max(10px, var(--safe-t)) + 50px); left: max(10px, var(--safe-l)); right: max(10px, var(--safe-r)); transform: none; max-width: none; animation-name: hudIn; }
+  .task-t { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .minimap { top: calc(max(10px, var(--safe-t)) + 104px); right: max(10px, var(--safe-r)); width: 86px; height: 86px; }
+  .say, .coach, .prompt { top: calc(max(10px, var(--safe-t)) + 190px); left: max(10px, var(--safe-l)); right: calc(max(10px, var(--safe-r)) + 98px); bottom: auto; transform: none; max-width: none; animation: riseIn var(--t3) var(--ease); }
+  .coach { top: calc(max(10px, var(--safe-t)) + 246px); }
+  .prompt { top: calc(max(10px, var(--safe-t)) + 246px); white-space: normal; }
+  .say { align-items: flex-start; text-align: left; }
+  .feed { top: calc(max(10px, var(--safe-t)) + 198px); right: max(10px, var(--safe-r)); }
+  .toast { top: 38%; bottom: auto; max-width: 90vw; }
+  /* thumbs */
+  .touch-top { top: auto; bottom: calc(max(12px, var(--safe-b)) + 100px); left: max(12px, var(--safe-l)); }
+  .steer-pad { width: 46vw; height: 80px; }
+  .steer-knob { width: 60px; height: 60px; }
+  .touch-right { flex-wrap: wrap; justify-content: flex-end; width: 152px; gap: 8px; }
+  .tbtn.dr { order: -1; width: 100%; height: 40px; flex-direction: row; gap: 18px; margin: 0; }
+  .tpedal.brake { width: 72px; height: 116px; } .tpedal.gas { width: 64px; height: 128px; }
+  /* read-outs live in the sky area, never over the car */
+  .tspeed { top: calc(max(10px, var(--safe-t)) + 104px); bottom: auto; left: max(10px, var(--safe-l)); transform: none; }
+  .clean { top: calc(max(10px, var(--safe-t)) + 156px); bottom: auto; left: max(10px, var(--safe-l)); transform: none; }
+  .intro-card { left: 6vw; right: 6vw; bottom: 30vh; } .intro-t { font-size: 30px; }
+  .finish-card { top: 30%; }
+}
+/* touch screens never show keyboard hints */
+@media (pointer: coarse) { .btn kbd, .pause-list kbd { display: none; } }
+/* narrow portrait menus */
+@media (max-width: 520px) {
+  .menu { padding: max(10px, var(--safe-t)) max(10px, var(--safe-r)) max(10px, var(--safe-b)) max(10px, var(--safe-l)); }
+  .menu-top { padding: 16px 16px 10px; }
+  .logo-k { font-size: 24px; } .logo-s { font-size: 10.5px; white-space: nowrap; } .logo-mark { width: 40px; height: 40px; }
+  .menu-icons { gap: 6px; } .menu-icons .btn.icon { width: 38px; min-height: 38px; }
+  .menu-scroll { padding: 4px 16px 14px; }
+  .menu-foot { flex-direction: column; padding: 12px 16px 14px; }
+  .menu-foot .car-chip, .menu-foot .btn.go { width: 100%; }
+  .btn.go { min-height: 52px; }
+  .mode-card small { font-size: 11.5px; }
+  .env-grid { grid-template-columns: 1fr; gap: 8px; } .env-tile { flex-direction: row; align-items: center; gap: 12px; } .env-tile small { display: none; }
+}
+@media (max-width: 520px) {
+  .result { padding: max(10px, var(--safe-t)) max(10px, var(--safe-r)) max(10px, var(--safe-b)) max(10px, var(--safe-l)); }
+  .result-inner { padding: 16px; } .result-foot { margin: 14px -16px -16px; padding: 12px 16px 14px; }
+  .result-foot .grow { display: none; }
+  .result-foot .btn.primary, .result-foot .btn.glass { flex: 1; }
+  .result-foot .btn.ghost { flex: none; }
+  .score-ring { transform: scale(.82); margin: -10px; }
+}

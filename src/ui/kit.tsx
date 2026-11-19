@@ -135,7 +135,6 @@ const standalone = () => matchMedia('(display-mode: fullscreen)').matches || mat
 /** Enter fullscreen and lock landscape where the browser allows it (Android); safe to call anywhere. */
 export async function enterFullscreen() {
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.({ navigationUI: 'hide' } as FullscreenOptions); } catch { /* refused */ }
-  try { await (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape'); } catch { /* unsupported */ }
 }
 /** Phones in a browser tab: go fullscreen + landscape automatically on the user's taps.
  *  Browsers only allow it right after a gesture, and for touch the activating events are
