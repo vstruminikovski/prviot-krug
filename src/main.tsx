@@ -20,6 +20,13 @@ export function mount(el: HTMLElement, opts: HostOptions = {}) {
 declare global { interface Window { KrugGame?: { mount: typeof mount } } }
 window.KrugGame = { mount };
 
+// installable app: offline cache + home-screen install (production builds only)
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {}); });
+}
+// keep the browser's install prompt so the game can offer it from its own button
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); (window as unknown as { __installPrompt?: Event }).__installPrompt = e; window.dispatchEvent(new Event('krug-installable')); });
+
 const rootEl = document.getElementById('root');
 if (rootEl && !rootEl.dataset.manual) {
   createRoot(rootEl).render(<App />);

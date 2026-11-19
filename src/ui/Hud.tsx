@@ -7,6 +7,7 @@ import { TIME_LABEL, WEATHER_LABEL } from '../game/render/atmosphere';
 import { kmh } from '../game/math';
 import { Icon } from './kit';
 import { Settings } from './Settings';
+import { ROUTE_WAYPOINTS } from '../game/content/debarMaalo';
 
 const ASSIST_LABEL: Record<string, string> = { learn: 'Со помош', manual: 'Мануелно', exam: 'Испит', auto: 'Автоматски' };
 
@@ -168,6 +169,9 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       {hud.bubbles.map((b) => b.y > -900 && <div key={b.id} className="bubble" style={{ left: b.x, top: b.y }}>{b.text}</div>)}
       {hud.paused && !settings && <PauseMenu engine={engine} hud={hud} onSettings={() => setSettings(true)} />}
       {settings && <Settings engine={engine} onClose={() => setSettings(false)} />}
+      <Minimap engine={engine} />
+      <div className="feed">{hud.feed.map((f) => <div key={f.id} className="feed-item"><Icon name="check" size={14} />{f.text}</div>)}</div>
+      {hud.mode !== 'exam' && <div key={hud.clean < 1 ? 'reset' : 'run'} className={`clean ${hud.clean < 1 ? 'broke' : ''}`} title="Време без казнени грешки"><Icon name="bolt" size={13} />Чисто {Math.floor(hud.clean / 60)}:{String(Math.floor(hud.clean % 60)).padStart(2, '0')}</div>}
       <TouchControls engine={engine} hud={hud} />
       <div className="tspeed"><b>{Math.round(hud.speed)}</b><small>км/ч</small><span className={`tgear ${hud.gear === 'R' ? 'r' : ''}`}>{hud.gear === 'R' ? 'R' : hud.gear === 'N' ? 'N' : 'D'}</span><span className="tlimit">{hud.limit}</span></div>
     </div>
@@ -236,6 +240,50 @@ function useHold(onChange: (v: boolean) => void) {
     return () => { el.removeEventListener('pointerdown', down); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.removeEventListener('lostpointercapture', up); };
   }, []);
   return ref;
+}
+
+/** Heading-up minimap: drivable area, other road users, the route (city), you at the centre. */
+function Minimap({ engine }: { engine: GameEngine }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const cv = ref.current; if (!cv) return;
+    const g = cv.getContext('2d'); if (!g) return;
+    let key = '', roads: Path2D | null = null, route: Path2D | null = null;
+    const draw = () => {
+      const s = engine.sim; if (!s) return;
+      const size = cv.clientWidth; if (!size) return;
+      const dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(size * dpr);
+      if (cv.width !== W || cv.height !== W) { cv.width = W; cv.height = W; }
+      const k = `${s.env.id}:${s.config.seed}`;
+      if (k !== key) {
+        key = k; roads = new Path2D();
+        for (const poly of s.env.drivable) { if (!poly.length) continue; roads.moveTo(poly[0].x, poly[0].y); for (let i = 1; i < poly.length; i++) roads.lineTo(poly[i].x, poly[i].y); roads.closePath(); }
+        route = null;
+        if (s.env.id === 'city') { route = new Path2D(); ROUTE_WAYPOINTS.forEach((w, i) => (i ? route!.lineTo(w.x, w.y) : route!.moveTo(w.x, w.y))); }
+      }
+      const p = engine.view.playerPose(s);
+      const span = s.env.id === 'polygon' ? 90 : 150; // metres across
+      const sc = W / span, cy = W * 0.62;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, W);
+      g.save(); g.beginPath(); g.arc(W / 2, W / 2, W / 2 - 1, 0, Math.PI * 2); g.clip();
+      g.fillStyle = 'rgba(10,20,19,0.82)'; g.fillRect(0, 0, W, W);
+      g.translate(W / 2, cy); g.scale(sc, -sc); g.rotate(Math.PI / 2 - p.h); g.translate(-p.x, -p.y);
+      if (roads) { g.fillStyle = 'rgba(244,236,216,0.42)'; g.fill(roads); }
+      if (route) { g.strokeStyle = 'rgba(242,169,59,0.85)'; g.lineWidth = 2.2 / sc; g.setLineDash([5 / sc, 4 / sc]); g.stroke(route); g.setLineDash([]); }
+      g.fillStyle = '#ff8a65';
+      for (const c of s.cars) { if (c.done) continue; const q = c.pose; g.save(); g.translate(q.x, q.y); g.rotate(q.h); g.fillRect(-2.1, -0.9, 4.2, 1.8); g.restore(); }
+      g.fillStyle = '#ffffff';
+      for (const d of s.peds) { if (d.done) continue; g.beginPath(); g.arc(d.pos.x, d.pos.y, 1.1, 0, Math.PI * 2); g.fill(); }
+      g.restore();
+      // you: an arrow at the anchor, pointing up
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.fillStyle = '#f2a93b'; g.beginPath(); const a = 7 * dpr; g.moveTo(W / 2, cy - a * 1.3); g.lineTo(W / 2 + a, cy + a); g.lineTo(W / 2, cy + a * 0.45); g.lineTo(W / 2 - a, cy + a); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(244,236,216,0.25)'; g.lineWidth = 1.5 * dpr; g.beginPath(); g.arc(W / 2, W / 2, W / 2 - 1, 0, Math.PI * 2); g.stroke();
+    };
+    engine.frameHooks.add(draw);
+    return () => { engine.frameHooks.delete(draw); };
+  }, [engine]);
+  return <canvas ref={ref} className="minimap" aria-hidden />;
 }
 
 /** Phone driving (automatic): steering pad on the left, brake + gas on the right, a D/R switch,

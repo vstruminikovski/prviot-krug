@@ -37,6 +37,7 @@ export interface HudState {
   task: TaskInfo | null; say: Say | null; prompt: string | null; toast: { text: string; tone: 'bad' | 'warn' | 'ok' | 'info' } | null;
   bubbles: Bubble[]; camMode: CamMode; muted: boolean; paused: boolean; glance: Glance;
   limit: number; suggestGear: number | null; countdown: number | null; coach: CoachTip | null;
+  feed: { id: number; text: string }[]; clean: number;
   replay: ReplayState | null; failed: string | null; finished: boolean;
 }
 
@@ -69,6 +70,39 @@ export class GameEngine {
   private buzz(p: number | number[]) { try { if (this.coarse && 'vibrate' in navigator) navigator.vibrate(p); } catch { /* */ } }
   private coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   finishT: number | null = null;
+  /** per-frame UI hooks (minimap) — driven by the game loop, not their own timers */
+  frameHooks = new Set<(dt: number) => void>();
+  // ---- positive feedback (presentation only — scoring is unchanged)
+  private feed: { id: number; text: string; until: number }[] = []; private feedId = 0;
+  private goodCool = new Map<string, number>();
+  private cleanSince = 0;
+  private stopTrack = { from: 0, maxDecel: 0, prevV: 0 };
+  private indOnSince = -1; private turnArmed = true;
+  private good(key: string, text: string, cool = 8) {
+    const s = this.sim; if (!s) return;
+    if ((this.goodCool.get(key) ?? -99) > s.t) return;
+    this.goodCool.set(key, s.t + cool);
+    this.feed.push({ id: ++this.feedId, text, until: performance.now() / 1000 + 2.6 });
+    if (this.feed.length > 3) this.feed.shift();
+    this.audio.ui('tick');
+  }
+  private watchHabits(sim: Sim, dt: number) {
+    const p = sim.player, v = Math.abs(p.vx);
+    // signalled before turning
+    if (p.indicator !== 'off') { if (this.indOnSince < 0) this.indOnSince = sim.t; } else this.indOnSince = -1;
+    if (Math.abs(p.steer) > 0.22 && v > 2 && this.turnArmed) {
+      this.turnArmed = false;
+      if (this.indOnSince >= 0 && sim.t - this.indOnSince > 1.2) this.good('signal', 'Навремен покажувач');
+    }
+    if (Math.abs(p.steer) < 0.05) this.turnArmed = true;
+    // smooth stop: from a real speed to standstill without harsh braking
+    const decel = dt > 0 ? (this.stopTrack.prevV - v) / dt : 0; this.stopTrack.prevV = v;
+    if (v > 3) { this.stopTrack.from = v; this.stopTrack.maxDecel = 0; }
+    else if (this.stopTrack.from > 3) {
+      this.stopTrack.maxDecel = Math.max(this.stopTrack.maxDecel, decel);
+      if (v < 0.05) { if (this.stopTrack.maxDecel < 4 && p.engine === 'running') this.good('stop', 'Мазно запирање'); this.stopTrack.from = 0; }
+    }
+  }
   // coach hysteresis: a tip must hold 0.35 s to appear and lingers 0.5 s after its condition ends
   private coachShown: CoachTip | null = null; private coachCand: CoachTip | null = null; private coachT = 0;
   private updateCoach(dt: number) {
@@ -153,6 +187,7 @@ export class GameEngine {
     if (why) { this.flash(why, 'warn'); return false; }
     const sim = createSim(this.config);
     this.sim = sim; this.result = null; this.replay = null; this.paused = false; this.auto = null; this.finishT = null;
+    this.feed = []; this.goodCool.clear(); this.cleanSince = 0; this.indOnSince = -1; this.turnArmed = true; this.stopTrack = { from: 0, maxDecel: 0, prevV: 0 };
     const def = vehicleById(this.config.vehicle);
     const debris = this.config.env === 'openRoad' ? (sim.mission as OpenRoadMission).debrisS : undefined;
     this.view.setEnvironment(this.config.env, { vehicleLength: def.dims.L, debrisS: debris });
@@ -286,6 +321,7 @@ export class GameEngine {
         }
         if (n === maxSteps) this.acc = 0;
         v.alpha = Math.min(1, this.acc * 60);
+        this.watchHabits(sim, dt);
         if (sim.rewound) { sim.rewound = false; this.view.resetInterp(); this.view.resetShot(); this.flash('Вратено на безбедно место', 'info'); }
         this.handleEvents(sim);
       } else v.alpha = 1;
@@ -333,6 +369,7 @@ export class GameEngine {
       if (!this.current || nx.priority > this.current.priority) { this.current = { ...nx, until: nowS + Math.max(3.2, nx.text.length / 14) }; this.sayQueue.shift(); }
     }
     this.updateCoach(dt);
+    if (this.phase === 'drive') for (const h of this.frameHooks) { try { h(dt); } catch (e) { console.warn('[hook]', e); } }
     this.hudT += dt;
     if (this.hudT > 1 / 15) { this.hudT = 0; this.emitHud(); }
   }
@@ -341,7 +378,7 @@ export class GameEngine {
   private trackGlance(sim: Sim, g: Glance) {
     const cur = this.glanceStart;
     if (cur && cur.kind !== g) { if (cur.kind) sim.observe(cur.kind as never, cur.t, sim.t); this.glanceStart = null; }
-    if (g && (!this.glanceStart || this.glanceStart.kind !== g)) this.glanceStart = { kind: g, t: sim.t };
+    if (g && (!this.glanceStart || this.glanceStart.kind !== g)) { this.glanceStart = { kind: g, t: sim.t }; if (g.startsWith('mirror') && sim.player.indicator !== 'off') this.good('mirror', 'Провери огледало пред маневар', 10); }
   }
 
   private handleEvents(sim: Sim) {
@@ -351,6 +388,7 @@ export class GameEngine {
       else if (e.type === 'incident') {
         const i = e.incident;
         if (i.severity === 'serious' || i.severity === 'critical') this.buzz([20, 50, 20]);
+        if (i.severity !== 'note') this.cleanSince = sim.t;
         if (i.severity !== 'note' || i.layer === 'mission') this.flash(`${i.text}${i.points ? ` −${i.points}` : ''}`, i.severity === 'note' ? 'ok' : i.severity === 'minor' ? 'warn' : 'bad', 2.8);
         if (i.severity === 'critical' && sim.config.mode !== 'exam' && sim.config.mode !== 'challenge') this.sayQueue.push({ text: `Инструкторот интервенира: ${i.text}`, who: 'Инструктор', priority: 3, until: 0 });
       } else if (e.type === 'speech') this.bubbles.push({ id: ++this.bubbleId, text: e.text, wx: e.x, wy: e.y, x: -999, y: -999, until: performance.now() / 1000 + 4.2 });
@@ -403,7 +441,7 @@ export class GameEngine {
       prompt: p && this.config.assist !== 'exam' ? p.whyNotMoving() : null, toast: this.toast,
       bubbles: this.bubbles.map((b) => ({ ...b })), camMode: this.view.camMode, muted: this.audio.muted, paused: this.paused, glance: this.input.glance(),
       limit: s && p ? (p.def.family === 'truck' ? Math.min(80, s.world.speedLimitAt(p.x, p.y).kmh) : s.world.speedLimitAt(p.x, p.y).kmh) : 50,
-      suggestGear: suggest, countdown: this.countdown === null ? null : Math.ceil(this.countdown), coach: this.coachShown,
+      suggestGear: suggest, countdown: this.countdown === null ? null : Math.ceil(this.countdown), coach: this.coachShown, feed: this.feed.filter((f) => f.until > nowS).map((f) => ({ id: f.id, text: f.text })), clean: s ? Math.max(0, s.t - this.cleanSince) : 0,
       replay: this.replay ? { ...this.replay } : null, failed: s?.failed?.text ?? null, finished: !!s?.finished && this.finishT !== null,
     };
   }
