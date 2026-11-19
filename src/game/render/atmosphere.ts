@@ -7,7 +7,6 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
@@ -26,7 +25,7 @@ const PRESETS: Record<TimeOfDay, Preset> = {
 
 const GradeShader = {
   uniforms: {
-    tDiffuse: { value: null }, uTime: { value: 0 }, uWarm: { value: 1 }, uVignette: { value: 0.3 }, uGrain: { value: 0.03 },
+    tDiffuse: { value: null }, uTime: { value: 0 }, uWarm: { value: 1 }, uVignette: { value: 0.3 }, uGrain: { value: 0.018 },
     uSat: { value: 1.12 }, uContrast: { value: 1.06 }, uWet: { value: 0 }, uTilt: { value: 0 }, uFringe: { value: 0.0012 },
     uRes: { value: new THREE.Vector2(1, 1) }, uFlash: { value: 0 },
   },
@@ -64,7 +63,7 @@ const GradeShader = {
       c = mix(c, c * c * (3.0 - 2.0 * c), clamp((uContrast - 1.0) * 3.0, 0.0, 0.5));
       c = c * 0.97 + vec3(0.012, 0.014, 0.022);
       vec2 d = vUv - 0.5; c *= 1.0 - uVignette * dot(d, d) * 2.0;
-      c += (hash(vUv * uRes + fract(uTime) * 91.0) - 0.5) * uGrain;
+      c += (hash(vUv * uRes) - 0.5) * uGrain; // static grain: no per-frame shimmer
       c = mix(c, vec3(1.0), uFlash);
       gl_FragColor = vec4(c, 1.0);
     }`,
@@ -72,7 +71,6 @@ const GradeShader = {
 
 export class Atmosphere {
   composer: EffectComposer;
-  ao: GTAOPass | null = null;
   private bloom: UnrealBloomPass;
   private grade: ShaderPass;
   private renderPass: RenderPass;
@@ -95,18 +93,6 @@ export class Atmosphere {
     this.composer = new EffectComposer(renderer, rt);
     this.renderPass = new RenderPass(scene, camera);
     this.composer.addPass(this.renderPass);
-    // ambient occlusion: grounds every object (desktop only, half resolution)
-    {
-      const ao = new GTAOPass(scene, camera, size.x / 2, size.y / 2);
-      ao.output = GTAOPass.OUTPUT.Default;
-      ao.blendIntensity = 0.85;
-      ao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.4, thickness: 2.5, scale: 1.2, samples: 10, distanceFallOff: 1, screenSpaceRadius: false });
-      ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 12 });
-      const setSize = ao.setSize.bind(ao);
-      ao.setSize = (w: number, h: number) => setSize(Math.max(1, w / 2), Math.max(1, h / 2));
-      this.ao = ao;
-      this.composer.addPass(ao);
-    }
     // soft studio reflections for glossy paint and chrome (lit materials only)
     const pm = new THREE.PMREMGenerator(renderer);
     scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -120,7 +106,7 @@ export class Atmosphere {
     this.composer.addPass(this.grade);
 
     this.sky = new Sky();
-    this.sky.scale.setScalar(4000);
+    this.sky.scale.setScalar(2400); // stays inside the camera far plane
     (this.sky.material as THREE.ShaderMaterial).fog = false;
     scene.add(this.sky);
 
@@ -198,6 +184,8 @@ export class Atmosphere {
     f.far = this.weather === 'fog' ? 140 : this.weather === 'rain' ? p.fogFar * 0.55 : p.fogFar;
     this.scene.background = col.clone();
     this.sky.visible = this.weather !== 'fog';
+    // distant ridges turn into a flat fog-coloured wall when visibility drops — hide them then
+    this.scene.traverse((o) => { if (o.name === 'horizon') o.visible = this.weather === 'clear'; });
     if (this.weather !== 'clear') { this.sun.intensity = PRESETS[this.time].sunI * 0.45; this.hemi.intensity = PRESETS[this.time].hemiI * 0.9; }
   }
 

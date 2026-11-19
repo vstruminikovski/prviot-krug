@@ -391,9 +391,10 @@ function buildTrees(r: ReturnType<typeof rng>): THREE.Group {
 }
 
 export function buildHorizon(): THREE.Group {
-  const g = new THREE.Group();
+  const g = new THREE.Group(); g.name = 'horizon';
   // sky dome
   const sky = new THREE.Mesh(new THREE.SphereGeometry(2800, 24, 16), new THREE.MeshBasicMaterial({ map: T.skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false }));
+  sky.visible = false; // the atmosphere's physical sky replaces this dome (and 2.8 km exceeds the far plane)
   sky.position.set(240, 0, -130);
   sky.name = 'legacySky'; sky.visible = false; // replaced by the physical Sky in atmosphere.ts
   g.add(sky);

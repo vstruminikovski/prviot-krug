@@ -45,6 +45,8 @@ export function Menu({ engine }: { engine: GameEngine }) {
   const touch = matchMedia('(pointer: coarse)').matches;
   const goal = nextStamp(engine.store.history, touch);
   const go = () => { if (block) return; engine.store.settings.assist = assist; engine.persist(); engine.start({ env, mode, assist, time, weather }); };
+  // live preview: the 3D background shows the chosen time of day and weather right away
+  useEffect(() => { const a = engine.view.atmo; a.setTime(time); a.setWeather(weather); a.updateLamps(); }, [engine, time, weather]);
   // keyboard: Enter drives, ? opens help, G garage
   useEffect(() => {
     const k = (e: KeyboardEvent) => {

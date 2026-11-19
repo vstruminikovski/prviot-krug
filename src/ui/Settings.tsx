@@ -14,7 +14,7 @@ export function Settings({ engine, onClose }: { engine: GameEngine; onClose: () 
         <div className="set-row"><span>Квалитет</span>
           <Seg size="sm" value={s.quality} onChange={(q: Quality) => set({ quality: q })} options={[{ id: 'low', label: 'Брзо' }, { id: 'medium', label: 'Балансирано' }, { id: 'high', label: 'Најубаво' }]} />
         </div>
-        <p className="hint">{s.quality === 'low' ? 'Без ефекти, помала резолуција — за телефони и постари компјутери.' : s.quality === 'medium' ? 'Сјај и боја, без засенчување во аглите.' : 'Целосна слика: засенчување, сјај, мек фокус на рабовите.'}</p>
+        <p className="hint">{s.quality === 'low' ? 'Без ефекти, помала резолуција — за телефони и постари компјутери.' : s.quality === 'medium' ? 'Сјај и боја, помала резолуција и сенки.' : 'Целосна слика: сјај, боја, мек фокус на рабовите, остри сенки.'}</p>
         <Toggle on={s.motion} onChange={(v) => set({ motion: v })} label="Движење на камерата (тресење, брзина, фокус)" />
 
         <h3 className="sec">Звук</h3>

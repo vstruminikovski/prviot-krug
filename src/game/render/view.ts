@@ -82,7 +82,6 @@ export class View {
     const dpr = window.devicePixelRatio || 1;
     this.renderer.setPixelRatio(Math.min(dpr, q === 'low' ? 1 : q === 'medium' ? 1.5 : 2));
     this.atmo.enabled = q !== 'low';
-    if (this.atmo.ao) this.atmo.ao.enabled = q === 'high';
     const ms = q === 'high' ? 2048 : q === 'medium' ? 1536 : 1024;
     if (this.sun.shadow.mapSize.x !== ms) { this.sun.shadow.mapSize.set(ms, ms); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
     this.setSize(this.width, this.height);
@@ -96,7 +95,8 @@ export class View {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.camera = new THREE.PerspectiveCamera(62, 1, 0.08, 4200);
+    // near/far chosen for depth precision: 0.08…4200 made distant ground, roads and building bases z-fight
+    this.camera = new THREE.PerspectiveCamera(62, 1, 0.18, 2600);
     this.scene.fog = new THREE.Fog('#e8c39a', 120, 700);
     this.scene.background = new THREE.Color('#e8c39a');
     // late-1990s Balkan summer: warm low sun, dusky teal fill from the sky
@@ -525,8 +525,12 @@ export class View {
       this.shake *= Math.exp(-dt * 7);
     }
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
-    this.sun.target.position.set(p.x, z, -p.y);
-    this.sun.position.set(p.x - 85, z + 52, -p.y + 48);
+    // shadow camera snapped to its own texel grid: no shimmering shadow edges while driving
+    const sc = this.sun.shadow.camera as THREE.OrthographicCamera;
+    const texel = (sc.right - sc.left) / this.sun.shadow.mapSize.x * 2;
+    const sx = Math.round(p.x / texel) * texel, sy = Math.round(p.y / texel) * texel, sz = Math.round(z / texel) * texel;
+    this.sun.target.position.set(sx, sz, -sy);
+    this.sun.position.set(sx - 85, sz + 52, -sy + 48);
     this.layoutMirrors(glance);
     this.atmo.setTilt(!this.motion ? 0 : shot === 'high' ? 1 : shot === 'chase' ? 0.35 : shot === 'replay' ? 0.8 : shot === 'title' ? 0.7 : 0);
     // keep the car visible through tree crowns / eaves in the outside cameras

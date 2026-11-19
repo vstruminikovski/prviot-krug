@@ -18,7 +18,7 @@ export const BINDINGS: { keys: string; action: string }[] = [
   { keys: 'Q / E', action: 'Покажувач лево / десно' }, { keys: 'Backspace', action: 'Исклучи покажувач' }, { keys: 'B', action: 'Сите четири' },
   { keys: 'P', action: 'Рачна (крени / спушти)' }, { keys: 'R', action: 'Мотор: пали / гаси' },
   { keys: 'J / K', action: 'Лево / десно огледало' }, { keys: 'M', action: 'Внатрешно огледало' }, { keys: 'U / I', action: 'Поглед преку рамо лево / десно' },
-  { keys: 'F / G', action: 'Поглед лево / десно' }, { keys: 'V', action: 'Камера' }, { keys: 'H', action: 'Сирена' }, { keys: 'T', action: 'Постави на почеток (полигон)' },
+  { keys: 'F / G', action: 'Поглед лево / десно' }, { keys: 'V', action: 'Камера' }, { keys: 'H', action: 'Сирена' }, { keys: 'T', action: 'Заглавен? Врати назад (полигон: на почеток)' },
   { keys: '0', action: 'Звук' }, { keys: 'Esc', action: 'Пауза' },
 ];
 

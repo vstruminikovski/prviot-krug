@@ -138,6 +138,41 @@ export class Sim {
   }
 
   // ------------------------------------------------------------------ step
+  // ---- unstick: safe-spot history + automatic rewind when input produces no motion
+  private safe: { t: number; x: number; y: number; h: number }[] = [];
+  private safeT = 0; private stuckT = 0;
+  /** set when the sim rewound itself; the engine reads and clears it (message + camera reset) */
+  rewound = false;
+  private bodiesNow(): DynamicBody[] { return [...this.cars.filter((c) => !c.done), ...this.peds.filter((p) => !p.done), ...this.extraBodies()]; }
+  private trackUnstick(dt: number, c: Controls) {
+    const p = this.player;
+    this.safeT += dt;
+    if (this.safeT >= 0.5) {
+      this.safeT = 0;
+      if (p.penetration(p.pose, this.world, this.bodiesNow()) === 0) { this.safe.push({ t: this.t, x: p.x, y: p.y, h: p.h }); if (this.safe.length > 40) this.safe.shift(); }
+    }
+    // "stuck" = asking for drive (throttle, clutch engaged, no brakes) without moving, right after a contact
+    const trying = c.throttle > 0.3 && (p.assist === 'auto' || p.clutchPedal < p.def.clutch.biteHigh) && p.engine === 'running' && p.parkingBrake < 0.5 && p.gear !== 'N' && c.brake < 0.2;
+    const lastHit = this.contacts.length ? this.contacts[this.contacts.length - 1].t : -99;
+    const afterCrash = this.t - lastHit < 8 || (this.stuckT > 0 && p.penetration(p.pose, this.world, this.bodiesNow()) > 0);
+    this.stuckT = trying && afterCrash && Math.abs(p.vx) < 0.15 ? this.stuckT + dt : 0;
+    if (this.stuckT > 2.5) this.rewind();
+  }
+  /** Put the car back on the last safe spot about `back` seconds ago (falls back to the oldest one). */
+  rewind(back = 6) {
+    const p = this.player; this.stuckT = 0;
+    const bodies = this.bodiesNow();
+    const ok = (s: { x: number; y: number; h: number }) => p.penetration(s, this.world, bodies) === 0;
+    const cands = this.safe.filter((s) => s.t <= this.t - back).reverse().concat(this.safe.slice().reverse());
+    const spot = cands.find(ok);
+    if (!spot) return false;
+    p.x = spot.x; p.y = spot.y; p.h = spot.h; p.vx = 0; p.vy = 0; p.r = 0;
+    this.safe = this.safe.filter((s) => s.t <= spot.t);
+    this.rewound = true;
+    this.say('Возилото се заглави — вратено малку назад.', 2);
+    return true;
+  }
+
   step(dt: number, controls: Controls) {
     if (this.finished) return;
     this.t += dt;
@@ -150,6 +185,7 @@ export class Sim {
       if (!Number.isFinite(pl.omegaE)) pl.omegaE = 0;
     }
     for (const e of this.player.drainEvents()) this.onVehicleEvent(e);
+    this.trackUnstick(dt, controls);
     const ctx = { playerQuad: this.player.quad(this.player.pose, 0.3), playerPose: this.player.pose, cars: this.cars, peds: this.peds };
     for (const c of this.cars) c.update(dt, ctx);
     for (const s of this.strollers) s.update(dt);

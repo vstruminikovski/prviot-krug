@@ -158,7 +158,8 @@ export class GameEngine {
     this.view.setEnvironment(this.config.env, { vehicleLength: def.dims.L, debrisS: debris });
     const wetRoad = this.config.env === 'openRoad' && (sim.mission as OpenRoadMission).wet;
     this.view.atmo.setTime(this.config.time ?? 'golden');
-    this.view.atmo.setWeather(wetRoad ? 'rain' : this.config.weather ?? 'clear');
+    // the player's weather choice wins; a wet-road variation keeps its lower grip without forcing rain
+    this.view.atmo.setWeather(this.config.weather ?? 'clear'); void wetRoad;
     this.view.atmo.updateLamps();
     this.view.setPlayer(def, this.custom);
     this.view.resetShot();
@@ -203,7 +204,7 @@ export class GameEngine {
       case 'hazards': p.hazards = !p.hazards; break;
       case 'parkingBrake': this.input.parkingBrake = !this.input.parkingBrake; this.audio.ratchet(); break;
       case 'engine': msg = p.requestEngine(); break;
-      case 'reset': if (sim.config.env === 'polygon') { (sim.mission as PolygonMission).placeAtStart(sim); this.input.parkingBrake = true; } break;
+      case 'reset': if (sim.config.env === 'polygon') { (sim.mission as PolygonMission).placeAtStart(sim); this.input.parkingBrake = true; } else if (sim.rewind(3)) { this.view.resetInterp(); this.view.resetShot(); } else msg = 'Нема безбедно место за враќање.'; break;
     }
     if (msg) this.flash(msg, 'warn');
     this.emitHud();
@@ -262,6 +263,7 @@ export class GameEngine {
       v.render('garage', false);
     } else if (this.phase === 'menu' || !sim) {
       v.updateCamera(dt, 'title', { x: 60, y: 0, h: 0 }, 0, 0, null);
+      v.atmo.update(dt, null); // rain, lamps and grade keep living behind the menu
       v.render('world', false);
     } else if (this.phase === 'drive') {
       const p = sim.player;
@@ -284,6 +286,7 @@ export class GameEngine {
         }
         if (n === maxSteps) this.acc = 0;
         v.alpha = Math.min(1, this.acc * 60);
+        if (sim.rewound) { sim.rewound = false; this.view.resetInterp(); this.view.resetShot(); this.flash('Вратено на безбедно место', 'info'); }
         this.handleEvents(sim);
       } else v.alpha = 1;
       v.syncLive(sim, dt, blink);

@@ -407,6 +407,15 @@ export class Vehicle {
       world.knock?.(hit.id);
       hit = this.collide({ x: nx, y: ny, h: nh }, world, bodies);
     }
+    // already interpenetrating (hard crash, an NPC driving into us, a respawn)? Any move that reduces
+    // the overlap is allowed, so two cars can never fuse into a permanent lock.
+    if (hit && !hit.soft && this.collide(this.pose, world, bodies)) {
+      const now = this.penetration(this.pose, world, bodies), next = this.penetration({ x: nx, y: ny, h: nh }, world, bodies);
+      if (next < now - 1e-4) {
+        this.x = nx; this.y = ny; this.h = nh; this.vx = nvx * 0.6; this.vy = 0; this.r *= 0.5;
+        hit = null; (this as unknown as { freed: boolean }).freed = true;
+      }
+    }
     // glancing hits on kerbs and walls: slide along them instead of sticking (contact is still reported)
     let slid = false;
     if (hit && hit.kind !== 'vehicle' && hit.kind !== 'pedestrian') {
@@ -426,7 +435,8 @@ export class Vehicle {
         slid = true;
       }
     }
-    if (slid) { /* handled above */ } else if (!hit) {
+    const freed = (this as unknown as { freed?: boolean }).freed; (this as unknown as { freed?: boolean }).freed = false;
+    if (slid || freed) { /* handled above */ } else if (!hit) {
       this.x = nx; this.y = ny; this.h = nh; this.vx = nvx;
       this.odometer += Math.hypot(wx, wy) * dt;
     } else {
@@ -498,6 +508,23 @@ export class Vehicle {
     if (rpm > up && this.gear < 5) { this.gear = (this.gear + 1) as Gear; this.autoShiftCooldown = 0.8; this.locked = false; }
     else if (rpm < down && this.gear > 1 && this.vx > 0.5) { this.gear = (this.gear - 1) as Gear; this.autoShiftCooldown = 0.8; this.locked = false; }
     else if (this.vx < 0.3 && this.gear > 1) this.gear = 1;
+  }
+
+  /** How badly a pose overlaps the world: off-road sample points + approximate depth into other bodies. */
+  penetration(p: Pose, world: VehicleWorld, bodies: DynamicBody[]): number {
+    let bad = 0;
+    for (const s of obbSamples(p, this.L, this.W)) if (!world.isDrivable(s.x, s.y)) bad += 1;
+    const q = obbCorners(p, this.L, this.W);
+    const st = world.hitStatic(q); if (st && !st.soft) bad += 1;
+    const rSelf = Math.hypot(this.L, this.W) / 2;
+    for (const b of bodies) {
+      const bq = b.quad();
+      const cx = (bq[0].x + bq[2].x) / 2, cy = (bq[0].y + bq[2].y) / 2;
+      const rB = Math.hypot(bq[0].x - bq[2].x, bq[0].y - bq[2].y) / 2;
+      const dd = Math.hypot(cx - p.x, cy - p.y);
+      if (dd < rSelf + rB && quadsOverlap(q, bq)) bad += (rSelf + rB - dd);
+    }
+    return bad;
   }
 
   private collide(p: Pose, world: VehicleWorld, bodies: DynamicBody[]): { kind: string; id: string; soft?: boolean } | null {

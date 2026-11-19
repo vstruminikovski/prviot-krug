@@ -199,7 +199,7 @@ function PauseMenu({ engine, hud, onSettings }: { engine: GameEngine; hud: HudSt
           <button className="btn primary block" onClick={resume}><Icon name="play" size={18} />Продолжи<kbd>Esc</kbd></button>
           <button className="btn glass block" onClick={() => engine.retrySame()}><Icon name="retry" size={18} />Истата ситуација одново</button>
           <button className="btn glass block" onClick={() => engine.retryNew()}><Icon name="shuffle" size={18} />Нова варијација</button>
-          {hud.env === 'polygon' && <button className="btn glass block" onClick={() => { engine.command({ type: 'pause' }); engine.command({ type: 'reset' }); }}><Icon name="flag" size={18} />На почеток на вежбата</button>}
+          <button className="btn glass block" onClick={() => { engine.command({ type: 'pause' }); engine.command({ type: 'reset' }); }}><Icon name="flag" size={18} />{hud.env === 'polygon' ? 'На почеток на вежбата' : 'Врати на безбедно место'}<kbd>T</kbd></button>
           <button className="btn glass block" onClick={onSettings}><Icon name="sliders" size={18} />Поставки</button>
           <button className="btn ghost block" data-sound="back" onClick={() => engine.backToMenu()}><Icon name="home" size={18} />Главно мени</button>
         </div>
