@@ -58,7 +58,9 @@ export class View {
   private overlayCam = new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1);
   private mirrorPanels: THREE.Mesh[] = [];
   private mirrorFrame = 0; private mirrorFocus = -1;
-  private coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+  /** phones: where the HUD rows end (px from the top) — the mirrors go right under them */
+  hudRow = 54; hudTop = 120;
+  readonly coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   mirrorsOn = true;
   mirrorQuality: 'high' | 'low' = 'high';
   private noRearPanel: THREE.Mesh;
@@ -167,22 +169,31 @@ export class View {
   private layoutMirrors(glance: Glance) {
     const w = this.width, h = this.height;
     const touch = this.coarse;
-    const small = Math.min(1, w / 1100, h / 720) * (touch ? 0.8 : 1);
-    const sw = 150 * small + 30, sh = sw * 0.58;
-    const cw = 250 * small + 34, ch = cw * 0.28;
-    const sideY = touch ? h * 0.7 : h * 0.5; // phones: above the thumb controls
-    const base: [number, number, number, number][] = [
-      [sw / 2 + 16, sideY, sw, sh], // left
-      [w - sw / 2 - 16, sideY, sw, sh], // right
-      [w / 2, h - (touch ? 62 : 78) - ch / 2, cw, ch], // interior
-    ];
+    let base: [number, number, number, number][];
+    if (touch) {
+      // phones: always three mirrors where a driver expects them — interior top-centre, doors left/right.
+      // Chase / high cameras: a strip right under the message bar. Driver camera: door mirrors at eye height.
+      const portrait = this.portrait, driver = this.camMode === 'driver';
+      const sw = portrait ? Math.min(118, w * 0.27) : Math.min(124, w * 0.16), sh = sw / 1.64;
+      const cw = portrait ? Math.min(170, w * 0.38) : Math.min(190, w * 0.25), ch = cw / 3.2;
+      const top = this.hudTop + 6;
+      const cy = top + ch / 2;
+      const sideY = driver ? (portrait ? h * 0.44 : h * 0.47) : portrait ? top + sh / 2 : this.hudRow + 6 + sh / 2;
+      // (overlay y runs bottom-up)
+      base = [[sw / 2 + 10, h - sideY, sw, sh], [w - sw / 2 - 10, h - sideY, sw, sh], [w / 2, h - cy, cw, ch]];
+    } else {
+      const small = Math.min(1, w / 1100, h / 720);
+      const sw = 150 * small + 30, sh = sw * 0.58;
+      const cw = 250 * small + 34, ch = cw * 0.28;
+      base = [[sw / 2 + 16, h * 0.5, sw, sh], [w - sw / 2 - 16, h * 0.5, sw, sh], [w / 2, h - 78 - ch / 2, cw, ch]];
+    }
     const big = glance === 'mirrorL' ? 0 : glance === 'mirrorR' ? 1 : glance === 'mirrorC' ? 2 : -1;
     this.mirrorFocus = big;
     base.forEach(([x, y, pw, ph], i) => {
       const k = i === big ? 2.1 : 1;
       const p = this.mirrorPanels[i];
       const px = i === big ? (i === 0 ? Math.max(x, (pw * k) / 2 + 14) : i === 1 ? Math.min(x, w - (pw * k) / 2 - 14) : x) : x;
-      const py = i === big ? Math.min(y, h - (ph * k) / 2 - 60) : y;
+      const py = i === big ? (touch ? Math.min(h - (ph * k) / 2 - 8, Math.max(y, h * 0.38 + (ph * k) / 2)) : Math.min(y, h - (ph * k) / 2 - 60)) : y;
       p.position.set(px, py, 0); p.scale.set(pw * k, ph * k, 1);
       ((p.material as THREE.ShaderMaterial).uniforms.uSize.value as THREE.Vector2).set(pw * k, ph * k);
       if (i === 2) { this.noRearPanel.position.set(px, py, 0.01); this.noRearPanel.scale.set(pw * k, ph * k, 1); }
@@ -584,8 +595,6 @@ export class View {
       return;
     }
     this.atmo.render();
-    // phones: mirrors cost frame time and thumb space — only the one being looked at is shown
-    if (this.coarse) mirrors = mirrors && this.mirrorFocus >= 0;
     if (mirrors && this.mirrorsOn && pose) {
       this.mirrorFrame++;
       {
@@ -597,8 +606,11 @@ export class View {
         const focus = this.mirrorFocus;
         for (let i = 0; i < 3; i++) {
           if (i === 2 && !this.playerDef?.rearWindow) continue;
-          const due = this.mirrorFrame % (this.mirrorQuality === 'high' ? 3 : 6) === i;
-          if (this.coarse ? i !== focus : !due && i !== focus) continue;
+          // phones: one mirror per frame at most (≈20 Hz each; low quality ≈10 Hz) — the glanced one every frame
+          const stride = this.mirrorQuality === 'high' ? 3 : 6;
+          const due = this.mirrorFrame % stride === i;
+          if (!due && i !== focus) continue;
+          if (this.coarse && focus >= 0 && i !== focus) continue;
           // the interior mirror looks through the cabin: hide the car shell for it
           if (i === 2 && this.player) this.player.group.visible = false;
           r.setRenderTarget(this.mirrorRTs[i]); r.render(this.scene, this.mirrorCams[i]);
@@ -607,7 +619,7 @@ export class View {
         r.setRenderTarget(null); r.shadowMap.autoUpdate = shadow; this.scene.fog = prevFog;
         xrayUniforms.uXr.value.w = xrOn;
       }
-      for (let i = 0; i < 3; i++) this.mirrorPanels[i].visible = !this.coarse || i === this.mirrorFocus;
+      for (let i = 0; i < 3; i++) this.mirrorPanels[i].visible = true;
       r.autoClear = false; r.clearDepth(); r.render(this.overlay, this.overlayCam); r.autoClear = true;
     }
   }

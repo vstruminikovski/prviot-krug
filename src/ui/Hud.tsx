@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GameEngine, HudState } from '../game/engine';
 import { BINDINGS } from '../game/input';
 import { MODE_LABEL } from '../game/missions/types';
@@ -175,7 +175,37 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       <div className="feed">{hud.feed.map((f) => <div key={f.id} className="feed-item"><Icon name="check" size={14} />{f.text}</div>)}</div>
       {hud.mode !== 'exam' && <div key={hud.clean < 1 ? 'reset' : 'run'} className={`clean ${hud.clean < 1 ? 'broke' : ''}`} title="Време без казнени грешки"><Icon name="bolt" size={13} />Чисто {Math.floor(hud.clean / 60)}:{String(Math.floor(hud.clean % 60)).padStart(2, '0')}</div>}
       <TouchControls engine={engine} hud={hud} />
-      <div className="tspeed"><b>{Math.round(hud.speed)}</b><small>км/ч</small><span className={`tgear ${hud.gear === 'R' ? 'r' : ''}`}>{hud.gear === 'R' ? 'R' : hud.gear === 'N' ? 'N' : 'D'}</span><span className="tlimit">{hud.limit}</span></div>
+      <div className="tspeed"><b>{Math.round(hud.speed)}</b><small>км/ч</small>
+        <span className={`tgear ${hud.gear === 'R' ? 'r' : ''}`} aria-label={`Брзина ${hud.gear}`}>{hud.gear === 'R' || hud.gear === 'N' ? hud.gear : hud.assist === 'auto' ? <>D<sub>{hud.gear}</sub></> : hud.gear}</span>
+        {hud.parkingBrake && <span className="tpb" aria-label="Рачна сопирачка вклучена">P</span>}
+        <span className="tlimit">{hud.limit}</span></div>
+      <PhoneBar engine={engine} hud={hud} intro={intro} arrowCh={arrowCh} />
+    </div>
+  );
+}
+
+/** Phones: every message lives in one bar under the top buttons — the road stays clear. One message at a
+ *  time, most urgent first (warning → instructor → hint → praise). Also tells the view where the HUD ends,
+ *  so the mirrors sit right under it. */
+function PhoneBar({ engine, hud, intro, arrowCh }: { engine: GameEngine; hud: HudState; intro: boolean; arrowCh: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el || !engine.view.coarse) return;
+    const top = document.querySelector('.hud .topbar')?.getBoundingClientRect();
+    engine.view.hudRow = top ? top.bottom : 54;
+    engine.view.hudTop = el.offsetHeight ? el.getBoundingClientRect().bottom : engine.view.hudRow;
+  });
+  const feed = hud.feed.at(-1);
+  const msg = intro ? null
+    : hud.toast ? { key: hud.toast.text, cls: `t-${hud.toast.tone}`, icon: hud.toast.tone === 'ok' ? 'check' : hud.toast.tone === 'info' ? 'info' : 'warn', text: hud.toast.text }
+    : hud.say ? { key: hud.say.text, cls: 'say', icon: 'info', text: hud.say.text }
+    : hud.coach ? { key: hud.coach.id, cls: `coach ${hud.coach.tone}`, icon: hud.coach.tone === 'good' ? 'check' : 'info', text: hud.coach.text }
+    : hud.prompt ? { key: hud.prompt, cls: 'prompt', icon: 'info', text: hud.prompt }
+    : feed ? { key: String(feed.id), cls: 't-ok', icon: 'check', text: feed.text } : null;
+  return (
+    <div ref={ref} className={`mbar ${intro || hud.finished ? 'off' : ''}`} role="status" aria-live="polite">
+      {hud.task && <div className="mbar-task">{hud.task.nav && <span className="task-arrow">{arrowCh}</span>}<span className="mbar-tt">{hud.task.text}</span>{hud.task.nav?.dist ? <b>{hud.task.nav.dist} м</b> : null}{hud.task.progress && <i>{hud.task.progress}</i>}</div>}
+      {msg && <div key={msg.key} className={`mbar-msg ${msg.cls}`}><Icon name={msg.icon as 'info'} size={14} /><span>{msg.text}</span></div>}
     </div>
   );
 }
@@ -339,7 +369,10 @@ function TouchControls({ engine, hud }: { engine: GameEngine; hud: HudState }) {
         <div ref={steerRef} className="steer-pad" aria-label="Волан: лизгај лево-десно"><span className="steer-track" /><span ref={knob} className="steer-knob"><Icon name="wheel" size={24} /></span></div>
       </div>
       <div className="touch-right">
-        <button className={`tbtn dr ${reverse ? 'rev' : ''}`} onClick={() => cmd({ type: 'gear', gear: reverse ? 1 : 'R' })} aria-label="Напред / рикверц"><b className={!reverse ? 'on' : ''}>D</b><b className={reverse ? 'on' : ''}>R</b></button>
+        <div className="tcol">
+          <button className={`tbtn pb ${hud.parkingBrake ? 'on' : ''}`} onClick={() => cmd({ type: 'parkingBrake' })} aria-label="Рачна сопирачка" aria-pressed={hud.parkingBrake}><b>P</b><small>рачна</small></button>
+          <button className={`tbtn dr ${reverse ? 'rev' : ''}`} onClick={() => cmd({ type: 'gear', gear: reverse ? 1 : 'R' })} aria-label="Напред / рикверц"><b className={!reverse ? 'on' : ''}>D</b><b className={reverse ? 'on' : ''}>R</b></button>
+        </div>
         <div ref={bRef} className="tpedal brake"><i /><b>СОП</b></div>
         <div ref={gRef} className="tpedal gas"><i /><b>ГАС</b></div>
       </div>
