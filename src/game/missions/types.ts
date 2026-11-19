@@ -3,7 +3,7 @@ import type { Contact, VehicleEvent } from '../vehicles/vehicle';
 
 export type Mode = 'lesson' | 'practice' | 'challenge' | 'exam' | 'free';
 export const MODE_LABEL: Record<Mode, string> = {
-  lesson: 'Час со инструктор', practice: 'Слободна вежба', challenge: 'Краток предизвик', exam: 'Испитен предизвик', free: 'Слободно возење',
+  lesson: 'Часови', practice: 'Часови', challenge: 'Часови', exam: 'Полагање', free: 'Часови',
 };
 
 export interface NavHint { arrow: 'left' | 'right' | 'straight' | 'uturn' | 'stop' | 'park' | 'reverse'; dist: number | null }

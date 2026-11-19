@@ -8,6 +8,7 @@ import { kmh } from '../game/math';
 import { FullscreenButton, Icon } from './kit';
 import { Settings } from './Settings';
 import { ROUTE_WAYPOINTS } from '../game/content/debarMaalo';
+import { PLACE_BRIEFS } from '../game/content/briefs';
 
 const ASSIST_LABEL: Record<string, string> = { learn: 'Со помош', manual: 'Мануелно', exam: 'Испит', auto: 'Автоматски' };
 
@@ -168,7 +169,8 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       )}
       {hud.glance && <div className="glance-tag"><Icon name="eye" size={15} />{hud.glance.startsWith('mirror') ? `${hud.glance === 'mirrorC' ? 'Внатрешно' : hud.glance === 'mirrorL' ? 'Лево' : 'Десно'} огледало` : hud.glance.startsWith('shoulder') ? `Преку ${hud.glance === 'shoulderL' ? 'левото' : 'десното'} рамо` : hud.glance === 'lookL' ? 'Поглед лево' : 'Поглед десно'}</div>}
       {hud.bubbles.map((b) => b.y > -900 && <div key={b.id} className="bubble" style={{ left: b.x, top: b.y }}>{b.text}</div>)}
-      {hud.paused && !settings && <PauseMenu engine={engine} hud={hud} onSettings={() => setSettings(true)} />}
+      {hud.retry && <RetrySheet engine={engine} r={hud.retry} env={hud.env} />}
+      {hud.paused && !hud.retry && !settings && <PauseMenu engine={engine} hud={hud} onSettings={() => setSettings(true)} />}
       {settings && <Settings engine={engine} onClose={() => setSettings(false)} />}
       <Minimap engine={engine} />
       <div className="feed">{hud.feed.map((f) => <div key={f.id} className="feed-item"><Icon name="check" size={14} />{f.text}</div>)}</div>
@@ -188,7 +190,24 @@ function Intro({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       <div className="intro-card">
         <div className="intro-k">{MODE_LABEL[hud.mode]} · {TIME_LABEL[c.time ?? 'golden']} · {WEATHER_LABEL[c.weather ?? 'clear']}</div>
         <div className="intro-t">{ENV_INFO[hud.env].title}</div>
-        <div className="intro-s">{hud.task?.text ?? ''}</div>
+        <div className="intro-s">{PLACE_BRIEFS[hud.mode === 'exam' ? 'exam' : 'lesson'][hud.env] || hud.task?.text || ''}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Часови: a safety-critical mistake stopped the exercise — explain it and offer a repeat. */
+function RetrySheet({ engine, r, env }: { engine: GameEngine; r: NonNullable<HudState['retry']>; env: HudState['env'] }) {
+  return (
+    <div className="scrim">
+      <div className="sheet narrow retry-sheet">
+        <header className="sheet-h"><div><div className="kicker">Инструкторот запре</div><h2>{r.title}</h2></div></header>
+        <div className="sheet-b pause-list">
+          {r.say && <p className="retry-say">„{r.say}“</p>}
+          <p className="fine">{r.source}{r.status === 'needsInstructorReview' ? ' · класификацијата е за проверка од инструктор' : ''}</p>
+          <button className="btn primary block" onClick={() => engine.retryExercise()}><Icon name="retry" size={18} />{env === 'polygon' ? 'Повтори ја вежбата' : 'Повтори ја ситуацијата'}</button>
+          <button className="btn glass block" onClick={() => engine.continueLesson()}><Icon name="play" size={18} />Продолжи го часот<kbd>Esc</kbd></button>
+        </div>
       </div>
     </div>
   );

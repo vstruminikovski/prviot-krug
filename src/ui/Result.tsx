@@ -8,6 +8,8 @@ import { vehicleById } from '../game/vehicles/defs';
 import { challengeUrl, isHosted } from '../game/host';
 import { Sources } from './Sources';
 import { STAMPS, nextStamp } from '../game/career';
+import { TASK_BRIEFS } from '../game/content/briefs';
+import { ACTION_LABEL, MATRIX_CONFIG, type Action } from '../game/rules/matrix';
 import { CountUp, FullscreenButton, Icon, Seg } from './kit';
 
 const CAT: Record<RuleCategory, { label: string; cls: string }> = {
@@ -54,7 +56,8 @@ export function Result({ engine }: { engine: GameEngine }) {
             <h1>{r.config.env === 'city' && !r.failed ? 'Како го извози кругот?' : verdict.label}</h1>
             <span className={`verdict ${verdict.cls}`}><Icon name={verdict.icon} size={15} />{verdict.label}</span>
             {r.failed && <p className="fail-line">Причина: {r.failed.text}</p>}
-            {r.exam && <p className="exam-line">{r.exam.form}: <b className={r.exam.passed ? 'ok-t' : 'bad-t'}>{r.exam.total}</b> негативни поени (граница 50). <span className="muted">Игровна симулација, не официјален испит.</span></p>}
+            {r.exam && <p className="exam-line">{r.exam.form}: <b className={r.exam.passed && !r.failed ? 'ok-t' : 'bad-t'}>{r.exam.total}</b> негативни поени (граница {MATRIX_CONFIG.examThreshold[r.config.env === 'polygon' ? 'polygon' : 'city']}, Правилник Сл. весник 29/2025). <span className="muted">Игровна симулација, не официјален испит.</span></p>}
+            {r.config.mode === 'exam' && r.failed?.cls && <p className="exam-line">Причина: {r.failed.cls.source} — {r.failed.cls.why}</p>}
           </div>
         </header>
         {engine.newStamps.length > 0 && <div className="banner newstamp"><span className="stamp-mini">★</span><div><b>Нов печат во книшката</b><small>{engine.newStamps.map((id) => STAMPS.find((x) => x.id === id)?.title).join(' · ')}</small></div></div>}
@@ -69,7 +72,7 @@ export function Result({ engine }: { engine: GameEngine }) {
           {tab === 'items' && r.items.map((it, i) => (
             <div key={it.id} className={`item-row ${STATUS[it.status].cls}`} style={{ ['--i' as string]: i }}>
               <span className={`badge ${STATUS[it.status].cls}`}>{STATUS[it.status].label}{it.points !== undefined && it.max ? ` · ${it.points}/${it.max}` : it.points ? ` · ${it.points} нег.` : ''}</span>
-              <div className="item-t"><b>{it.title}</b><small>{it.detail}</small></div>
+              <div className="item-t"><b>{it.title}</b><small>{it.detail}</small>{TASK_BRIEFS[it.id] && (it.status === 'pass' || it.status === 'fail' || it.status === 'partial') && <small className={`debrief ${it.status === 'pass' ? 'ok' : 'bad'}`}>{it.status === 'pass' ? TASK_BRIEFS[it.id].pass : TASK_BRIEFS[it.id].fail}</small>}</div>
               {it.t0 !== undefined && <button className="btn icon glass sm" title="Погледни повторно" onClick={() => engine.startReplay((it.cueT ?? it.t0!) - 4, (it.t1 ?? it.t0! + 10) + 3, { title: it.title, detail: it.detail, status: it.status, cueT: it.cueT ?? null, decisionT: it.t1 ?? null, focus: it.focus ?? null })}><Icon name="play" size={16} /></button>}
             </div>
           ))}
@@ -81,7 +84,7 @@ export function Result({ engine }: { engine: GameEngine }) {
               <div key={i.id} className={`inc sev-${i.severity}`} style={{ ['--i' as string]: k }}>
                 <span className="inc-t">{fmt(i.t, t0)}</span>
                 <span className={`cat ${cat.cls}`}>{cat.label}</span>
-                <div className="inc-body"><b>{i.text}</b><small>{SEVERITY_LABEL[i.severity]}{rule?.source ? ` · ${rule.source.ref}` : ''}{rule?.status === 'needsInstructorReview' ? ' · за проверка од инструктор' : ''}{i.exam ? ` · ${i.exam.map((e) => `${e.form} ${e.item}: ${e.points}`).join(', ')}` : ''}{i.evidence ? ` · ${i.evidence}` : ''}</small></div>
+                <div className="inc-body"><b>{i.text}</b>{i.cls && <small className={`cls cls-${i.cls.action}`}>{ACTION_LABEL[i.cls.action as Action]} · {i.cls.source}{i.cls.status === 'needsInstructorReview' ? ' · за проверка од инструктор' : ' · потврдено'}</small>}<small>{SEVERITY_LABEL[i.severity]}{rule?.source ? ` · ${rule.source.ref}` : ''}{rule?.status === 'needsInstructorReview' ? ' · за проверка од инструктор' : ''}{i.exam ? ` · ${i.exam.map((e) => `${e.form} ${e.item}: ${e.points}`).join(', ')}` : ''}{i.evidence ? ` · ${i.evidence}` : ''}</small></div>
                 <span className="inc-p">{i.points ? `−${i.points}` : ''}</span>
                 <button className="btn icon glass sm" title="Погледни повторно" onClick={() => engine.startReplay(i.t - 6, i.t + 3, { title: i.text, detail: rule?.explain ?? '', status: i.severity, cueT: null, decisionT: i.t, focus: null })}><Icon name="play" size={16} /></button>
               </div>

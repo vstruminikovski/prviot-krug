@@ -20,19 +20,13 @@ const ASSISTS: { id: Assist; label: string; note: string }[] = [
   { id: 'manual', label: 'Мануелно', note: 'Ти ги менуваш брзините и го водиш кумплунгот.' },
   { id: 'auto', label: 'Автоматски', note: 'Пристапност: кумплунгот и брзините се автоматски. Резултатите се означени.' },
 ];
-const MODES: { id: Mode; note: string }[] = [
-  { id: 'lesson', note: 'Инструкторот води, советува и враќа кога треба.' },
-  { id: 'practice', note: 'Без притисок, без задолжителен рестарт.' },
-  { id: 'challenge', note: 'Кратко и строго — критична грешка го ресетира обидот.' },
-  { id: 'exam', note: 'Официјален оценувачки лист, без совети на екранот (над 50 нег. поени = не положено). Игра, не сертификат.' },
-];
 const ENV_ICON: Record<EnvId, IconName> = { polygon: 'flag', city: 'home', openRoad: 'wheel' };
 const TIME_ICON: Record<TimeOfDay, IconName> = { golden: 'sun', noon: 'sun', dusk: 'sun', night: 'moon' };
 const WEATHER_ICON: Record<Weather, IconName> = { clear: 'sun', rain: 'rain', fog: 'fog' };
 
 export function Menu({ engine }: { engine: GameEngine }) {
   const [env, setEnv] = useState<EnvId>(engine.config.env);
-  const [mode, setMode] = useState<Mode>(engine.config.mode === 'free' ? 'practice' : engine.config.mode);
+  const [mode, setMode] = useState<Mode>(engine.config.mode === 'exam' ? 'exam' : 'lesson'); // Часови | Полагање
   const [assist, setAssist] = useState<Assist>(engine.store.settings.assist === 'exam' ? 'manual' : engine.store.settings.assist);
   const [time, setTime] = useState<TimeOfDay>(engine.config.time ?? 'golden');
   const [weather, setWeather] = useState<Weather>(engine.config.weather ?? 'clear');
@@ -80,28 +74,38 @@ export function Menu({ engine }: { engine: GameEngine }) {
             </div>
           )}
           {goal && (
-            <button className="goal" onClick={() => { const g = STAMP_SETUP[goal.id]; setEnv(g.env); setMode(g.mode); if (g.assist) setAssist(g.assist); if (g.time) setTime(g.time); }}>
+            <button className="goal" onClick={() => { const g = STAMP_SETUP[goal.id]; setEnv(g.env); setMode(g.mode === 'exam' ? 'exam' : 'lesson'); if (g.assist) setAssist(g.assist); if (g.time) setTime(g.time); }}>
               <span className="goal-stamp">{STAMPS.indexOf(goal) + 1}</span>
               <span className="goal-t"><small>Следен печат · {stamps}/{STAMPS.length}</small><b>{goal.title}</b><span>{goal.how}</span></span>
               <span className="goal-go">Постави<Icon name="next" size={15} /></span>
             </button>
           )}
           <section>
-            <h3 className="sec">Каде возиш</h3>
-            <div className="env-grid">
-              {(Object.keys(ENV_INFO) as EnvId[]).map((e, i) => (
-                <button key={e} className={`env-tile env-${e} ${env === e ? 'on' : ''}`} style={{ ['--i' as string]: i }} onClick={() => setEnv(e)} aria-pressed={env === e}>
-                  <span className="env-ico"><Icon name={ENV_ICON[e]} size={22} /></span>
-                  <b>{ENV_INFO[e].title}</b>
-                  <small>{ENV_INFO[e].blurb}</small>
-                </button>
-              ))}
+            <h3 className="sec">Што возиш</h3>
+            <div className="mode-grid">
+              <button className={`mode-card ${mode !== 'exam' ? 'on' : ''}`} onClick={() => setMode('lesson')} aria-pressed={mode !== 'exam'}>
+                <span className="mode-ico"><Icon name="wheel" size={22} /></span>
+                <b>Часови</b>
+                <small>Инструкторот учи и исправа: предупредува, објаснува, запира кога е опасно и ти дава да повториш. Не е испит.</small>
+              </button>
+              <button className={`mode-card exam ${mode === 'exam' ? 'on' : ''}`} onClick={() => { setMode('exam'); if (env === 'openRoad') setEnv('city'); }} aria-pressed={mode === 'exam'}>
+                <span className="mode-ico"><Icon name="flag" size={22} /></span>
+                <b>Полагање</b>
+                <small>Строго, без совети. Се бодува само по официјалните листови (Образец бр. 1 и 4). Над 50 негативни поени = не положено.</small>
+              </button>
             </div>
           </section>
           <section>
-            <h3 className="sec">Режим</h3>
-            <Seg value={mode} onChange={setMode} options={MODES.map((m) => ({ id: m.id, label: MODE_LABEL[m.id], title: m.note }))} />
-            <p className="hint">{MODES.find((m) => m.id === mode)?.note}</p>
+            <h3 className="sec">Каде</h3>
+            <div className="env-grid">
+              {(Object.keys(ENV_INFO) as EnvId[]).filter((e) => mode !== 'exam' || e !== 'openRoad').map((e, i) => (
+                <button key={e} className={`env-tile env-${e} ${env === e ? 'on' : ''}`} style={{ ['--i' as string]: i }} onClick={() => setEnv(e)} aria-pressed={env === e}>
+                  <span className="env-ico"><Icon name={ENV_ICON[e]} size={22} /></span>
+                  <b>{ENV_INFO[e].title}</b>
+                  <small>{mode === 'exam' ? (e === 'polygon' ? 'Прв практичен дел: пет вежби по чл. 33, Образец бр. 1.' : 'Втор практичен дел во сообраќај, Образец бр. 4.') : ENV_INFO[e].blurb}</small>
+                </button>
+              ))}
+            </div>
           </section>
           {touch ? <p className="hint touch-note"><Icon name="info" size={14} />На телефон се вози со автоматски менувач. Рачниот менувач со кумплунг е на компјутер.</p> : (
             <section>

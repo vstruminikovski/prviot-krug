@@ -15,6 +15,7 @@ import { randomSeed } from './sim/seed';
 import { emitComplete } from './host';
 import { earnedStamps } from './career';
 import { coachTip, type CoachTip } from './coach';
+import { MATRIX_CONFIG, mistakeById } from './rules/matrix';
 import { kmh } from './math';
 import type { Gear } from './vehicles/vehicle';
 import type { EnvId } from './env/types';
@@ -38,6 +39,7 @@ export interface HudState {
   bubbles: Bubble[]; camMode: CamMode; muted: boolean; paused: boolean; glance: Glance;
   limit: number; suggestGear: number | null; countdown: number | null; coach: CoachTip | null;
   feed: { id: number; text: string }[]; clean: number;
+  retry: { title: string; say: string; source: string; status: string } | null;
   replay: ReplayState | null; failed: string | null; finished: boolean;
 }
 
@@ -70,6 +72,16 @@ export class GameEngine {
   private buzz(p: number | number[]) { try { if (this.coarse && 'vibrate' in navigator) navigator.vibrate(p); } catch { /* */ } }
   private coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   finishT: number | null = null;
+  /** Часови: a safety-critical mistake stopped the exercise — offer to repeat it */
+  private retryCard: HudState['retry'] = null;
+  retryExercise() {
+    const sim = this.sim; if (!sim) return;
+    if (sim.config.env === 'polygon') { (sim.mission as PolygonMission).placeAtStart(sim); this.input.parkingBrake = true; }
+    else sim.rewind(MATRIX_CONFIG.cityRetryRewind);
+    this.view.resetInterp(); this.view.resetShot();
+    this.retryCard = null; this.paused = false; this.input.clear(); this.emitHud();
+  }
+  continueLesson() { this.retryCard = null; this.paused = false; this.input.clear(); this.emitHud(); }
   /** per-frame UI hooks (minimap) — driven by the game loop, not their own timers */
   frameHooks = new Set<(dt: number) => void>();
   // ---- positive feedback (presentation only — scoring is unchanged)
@@ -79,7 +91,7 @@ export class GameEngine {
   private stopTrack = { from: 0, maxDecel: 0, prevV: 0 };
   private indOnSince = -1; private turnArmed = true;
   private good(key: string, text: string, cool = 8) {
-    const s = this.sim; if (!s) return;
+    const s = this.sim; if (!s || s.config.mode === 'exam') return;
     if ((this.goodCool.get(key) ?? -99) > s.t) return;
     this.goodCool.set(key, s.t + cool);
     this.feed.push({ id: ++this.feedId, text, until: performance.now() / 1000 + 2.6 });
@@ -191,7 +203,7 @@ export class GameEngine {
     if (why) { this.flash(why, 'warn'); return false; }
     const sim = createSim(this.config);
     this.sim = sim; this.result = null; this.replay = null; this.paused = false; this.auto = null; this.finishT = null;
-    this.feed = []; this.goodCool.clear(); this.cleanSince = 0; this.indOnSince = -1; this.turnArmed = true; this.stopTrack = { from: 0, maxDecel: 0, prevV: 0 };
+    this.retryCard = null; this.feed = []; this.goodCool.clear(); this.cleanSince = 0; this.indOnSince = -1; this.turnArmed = true; this.stopTrack = { from: 0, maxDecel: 0, prevV: 0 };
     const def = vehicleById(this.config.vehicle);
     const debris = this.config.env === 'openRoad' ? (sim.mission as OpenRoadMission).debrisS : undefined;
     this.view.setEnvironment(this.config.env, { vehicleLength: def.dims.L, debrisS: debris });
@@ -223,7 +235,7 @@ export class GameEngine {
 
   // ---------------------------------------------------------------- commands
   command(c: Command) {
-    if (c.type === 'pause') { if (this.phase === 'drive') { this.paused = !this.paused; this.input.clear(); this.emitHud(); } return; }
+    if (c.type === 'pause') { if (this.phase === 'drive' && this.retryCard) { this.continueLesson(); return; } if (this.phase === 'drive') { this.paused = !this.paused; this.input.clear(); this.emitHud(); } return; }
     if (c.type === 'mute') { this.toggleMute(); return; }
     if (c.type === 'camera') { this.toggleCamera(); return; }
     const sim = this.sim;
@@ -388,13 +400,20 @@ export class GameEngine {
   private handleEvents(sim: Sim) {
     for (const e of sim.drainEvents()) {
       if (e.type === 'say') this.sayQueue.push({ text: e.text, who: e.who ?? 'Инструктор', priority: e.priority, until: 0 });
+      else if (e.type === 'retryOffer') {
+        if (sim.config.mode !== 'exam') {
+          const c = e.incident.cls; const m = c ? mistakeById(c.mistake) : null;
+          this.retryCard = { title: e.incident.text, say: m?.say ?? '', source: c?.source ?? '', status: c?.status ?? 'confirmed' };
+          this.paused = true; this.input.clear();
+        }
+      }
       else if (e.type === 'contact') { this.audio.thud(e.contact.speed); this.view.kick(Math.min(1, e.contact.speed / 6)); this.view.jolt(Math.min(1.5, e.contact.speed / 4)); this.buzz(Math.min(120, 30 + e.contact.speed * 15)); }
       else if (e.type === 'incident') {
         const i = e.incident;
         if (i.severity === 'serious' || i.severity === 'critical') this.buzz([20, 50, 20]);
         if (i.severity !== 'note') this.cleanSince = sim.t;
-        if (i.severity !== 'note' || i.layer === 'mission') this.flash(`${i.text}${i.points ? ` −${i.points}` : ''}`, i.severity === 'note' ? 'ok' : i.severity === 'minor' ? 'warn' : 'bad', 2.8);
-        if (i.severity === 'critical' && sim.config.mode !== 'exam' && sim.config.mode !== 'challenge') this.sayQueue.push({ text: `Инструкторот интервенира: ${i.text}`, who: 'Инструктор', priority: 3, until: 0 });
+        // Полагање is silent: the examiner does not announce mistakes during the drive
+        if (sim.config.mode !== 'exam' && (i.severity !== 'note' || i.layer === 'mission')) this.flash(`${i.text}${i.points ? ` −${i.points}` : ''}`, i.severity === 'note' ? 'ok' : i.severity === 'minor' ? 'warn' : 'bad', 2.8);
       } else if (e.type === 'speech') this.bubbles.push({ id: ++this.bubbleId, text: e.text, wx: e.x, wy: e.y, x: -999, y: -999, until: performance.now() / 1000 + 4.2 });
       else if (e.type === 'vehicle') {
         if (e.e.type === 'stall') this.audio.stall();
@@ -442,10 +461,10 @@ export class GameEngine {
       indicator: p?.indicator ?? 'off', hazards: !!p?.hazards, blink: (this.blinkT % 0.66) < 0.36,
       assist: this.config.assist, mode: this.config.mode, env: this.config.env,
       task: s ? s.mission.task(s) : null, say: this.current && this.current.until > nowS ? this.current : null,
-      prompt: p && this.config.assist !== 'exam' ? p.whyNotMoving() : null, toast: this.toast,
+      prompt: p && this.config.assist !== 'exam' && this.config.mode !== 'exam' ? p.whyNotMoving() : null, toast: this.toast,
       bubbles: this.bubbles.map((b) => ({ ...b })), camMode: this.view.camMode, muted: this.audio.muted, paused: this.paused, glance: this.input.glance(),
       limit: s && p ? (p.def.family === 'truck' ? Math.min(80, s.world.speedLimitAt(p.x, p.y).kmh) : s.world.speedLimitAt(p.x, p.y).kmh) : 50,
-      suggestGear: suggest, countdown: this.countdown === null ? null : Math.ceil(this.countdown), coach: this.coachShown, feed: this.feed.filter((f) => f.until > nowS).map((f) => ({ id: f.id, text: f.text })), clean: s ? Math.max(0, s.t - this.cleanSince) : 0,
+      suggestGear: suggest, countdown: this.countdown === null ? null : Math.ceil(this.countdown), coach: this.coachShown, retry: this.retryCard, feed: this.feed.filter((f) => f.until > nowS).map((f) => ({ id: f.id, text: f.text })), clean: s ? Math.max(0, s.t - this.cleanSince) : 0,
       replay: this.replay ? { ...this.replay } : null, failed: s?.failed?.text ?? null, finished: !!s?.finished && this.finishT !== null,
     };
   }

@@ -2,6 +2,7 @@
 // One authoritative clock, vehicle, world, actors, rules monitor and mission per attempt.
 import { kmh, type Path, type Vec2 } from '../math';
 import { World } from './world';
+import { classify, examItemsFor, severityFor, actionFor, sourceLine, MATRIX_CONFIG, type Action } from '../rules/matrix';
 import { Vehicle, type Assist, type Contact, type Controls, type DynamicBody, type VehicleEvent, type Gear } from '../vehicles/vehicle';
 import { vehicleById, VEHICLE_DATA_VERSION } from '../vehicles/defs';
 import { NpcCar, Pedestrian, Stroller } from './actors';
@@ -40,6 +41,7 @@ export type SimEvent =
   | { type: 'note'; id: string; text: string }
   | { type: 'checkpoint'; index: number }
   | { type: 'fail'; incident: Incident }
+  | { type: 'retryOffer'; incident: Incident }
   | { type: 'finish' };
 
 export interface Glance { kind: 'mirrorL' | 'mirrorR' | 'mirrorC' | 'shoulderL' | 'shoulderR' | 'lookL' | 'lookR'; t0: number; t1: number }
@@ -104,6 +106,8 @@ export class Sim {
   emit(e: SimEvent) { this.events.push(e); }
   drainEvents() { const e = this.events; this.events = []; return e; }
   say(text: string, priority = 1, who = 'Инструктор') { this.emit({ type: 'say', text, priority, who }); }
+  /** coaching line — silent in Полагање (no hints during an exam attempt) */
+  coach(text: string, priority = 1) { if (this.config.mode !== 'exam') this.say(text, priority); }
   npcSpawned(id: string) { return this.spawned.has(id); }
 
   spawnCar(id: string, type: CarType, color: string, plate: string, path: Path, s0: number, v0: number, vTarget: number) {
@@ -125,10 +129,23 @@ export class Sim {
   observedSince(kinds: Glance['kind'][], since: number) { return this.glances.some((g) => kinds.includes(g.kind) && g.t1 >= since); }
 
   incident(key: string, o: Parameters<Ledger['add']>[2], debounce?: number) {
+    // mode-aware treatment from the mistake matrix (Часови teach; Полагање counts official items only)
+    const c = classify(key, [...o.ruleIds, ...(o.exam ?? [])], this.config.mode, this.env.id);
+    if (c) {
+      const items = examItemsFor(c, o.exam);
+      const action = actionFor(c, items);
+      o = { ...o, exam: items, severity: severityFor(c, items), cls: { mistake: c.m.id, action, exam: c.exam, source: sourceLine(c.m, { action, exam: items.length ? items : c.cell.exam }), status: c.m.status, why: c.m.why } };
+    } else if (this.config.mode !== 'exam') o = { ...o, exam: [] }; // a lesson is never an official exam
     const inc = this.ledger.add(this.t, key, { ...o, pos: o.pos ?? { x: this.player.x, y: this.player.y } }, debounce);
     if (inc) {
       this.emit({ type: 'incident', incident: inc });
-      if (inc.severity === 'critical' && (this.config.mode === 'exam' || this.config.mode === 'challenge') && !this.failed) {
+      if (c && !c.exam) {
+        const a = inc.cls!.action as Action;
+        if (c.m.say && a !== 'note' && a !== 'none' && a !== 'gameOnly') this.say(c.m.say, a === 'warn' ? 2 : 3);
+        else if (c.m.say && a === 'note') this.coach(c.m.say);
+        if (MATRIX_CONFIG.lessonRetry.includes(a)) this.emit({ type: 'retryOffer', incident: inc });
+      }
+      if (inc.severity === 'critical' && (this.config.mode === 'exam' || this.config.mode === 'challenge') && !this.failed && (this.config.mode !== 'exam' || MATRIX_CONFIG.examEndOnCritical)) {
         this.failed = inc;
         this.emit({ type: 'fail', incident: inc });
         this.finish();
@@ -201,7 +218,7 @@ export class Sim {
     this.emit({ type: 'contact', contact: c });
     const strict = this.config.mode === 'exam' || this.config.mode === 'challenge';
     if (c.kind === 'pedestrian' || (c.kind === 'vehicle' && c.speed > 1.5)) {
-      this.incident('contact-' + c.id, { layer: 'safety', severity: 'critical', ruleIds: ['law.speed.adapt'], text: c.kind === 'pedestrian' ? 'Удар во пешак — инструкторот интервенираше.' : 'Судир со возило — инструкторот интервенираше.', exam: ['exam4.1H'] }, 10);
+      this.incident((c.kind === 'pedestrian' ? 'contact-ped-' : 'contact-') + c.id, { layer: 'safety', severity: 'critical', ruleIds: ['law.speed.adapt'], text: c.kind === 'pedestrian' ? 'Удар во пешак — инструкторот интервенираше.' : 'Судир со возило — инструкторот интервенираше.', exam: ['exam4.1H'] }, 10);
     } else if (c.kind === 'vehicle') {
       this.incident('contact-' + c.id, { layer: 'safety', severity: 'serious', ruleIds: ['law.speed.adapt'], text: 'Допир со возило.', exam: ['exam4.1H'] }, 10);
     } else if (c.kind === 'curb') {
@@ -218,7 +235,7 @@ export class Sim {
     const tx = (key: string, sev: Incident['severity'], text: string, exam: string[] = [], rules: string[] = ['tech.smooth'], debounce = 5) =>
       this.incident(key, { layer: 'technique', severity: sev, ruleIds: rules, text, exam }, debounce);
     switch (e.type) {
-      case 'stall': tx('stall', 'minor', 'Изгасна моторот.', road ? ['exam4.1A'] : []); this.say('Изгасна моторот. Обезбеди го возилото и стартувај повторно.', 2); break;
+      case 'stall': tx('stall', 'minor', 'Изгасна моторот.', road ? ['exam4.1A'] : []); this.coach('Изгасна моторот. Обезбеди го возилото и стартувај повторно.', 2); break;
       case 'jerk': tx('jerk', 'minor', 'Нагло пуштање на кумплунгот.', road ? ['exam4.1A'] : []); break;
       case 'startInGear': tx('startInGear', 'minor', 'Палење со вклучена брзина.', road ? ['exam4.1Nj'] : []); break;
       case 'gearRefusedClutch': case 'gearRefusedSpeed': tx('gear', 'minor', e.type === 'gearRefusedSpeed' ? 'Обид за премала брзина при голема брзина.' : 'Менување брзина без кумплунг.', road ? ['exam4.1V'] : []); break;
@@ -292,7 +309,7 @@ export class Sim {
       gameScore: Math.max(0, Math.min(100, game)),
       layers: { safety, technique, mission },
       incidents: L.incidents, items: this.mission.items(this),
-      exam: form && this.config.mode === 'exam' ? { form, total, passed: total <= 50 } : null,
+      exam: form && this.config.mode === 'exam' ? { form, total, passed: total <= MATRIX_CONFIG.examThreshold[this.env.id === 'polygon' ? 'polygon' : 'city'] && !this.failed } : null,
       duration: this.t, odometer: this.player.odometer,
       versions: { content: CONTENT_VERSION, rules: RULES_VERSION, physics: PHYSICS_VERSION },
     };

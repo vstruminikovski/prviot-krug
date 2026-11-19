@@ -1,6 +1,7 @@
 // Полигон mission: the five category-B exercises of чл. 33 (Сл. весник 29/2025), scored with the
 // official negative points of Образец бр. 1 in exam mode (> 50 = not passed, чл. 36 ст. 2),
 // plus two clearly labelled practice extras. Exercises are linked by driving between start boxes.
+import { MATRIX_CONFIG } from '../rules/matrix';
 import { angleDiff, inRect, type Pose, type Vec2 } from '../math';
 import type { Sim } from '../sim/sim';
 import type { VehicleEvent, Contact } from '../vehicles/vehicle';
@@ -85,7 +86,7 @@ export class PolygonMission implements Mission {
     const official = e.official;
     const inc = sim.incident(key, { layer, severity: ruleId.endsWith('E') || ruleId.match(/1\.(1E|2B|4A|4D|4Gj|5B|5Gj|6A|6G)$/) ? 'serious' : 'significant', ruleIds: [ruleId], text, exam: official ? [ruleId] : [] }, 0.5);
     if (inc && official) e.pts += inc.exam?.reduce((a, x) => a + x.points, 0) ?? 0;
-    if (sim.config.mode === 'exam' && sim.ledger.examTotal('Образец бр. 1') > 50 && !sim.failed) {
+    if (sim.config.mode === 'exam' && sim.ledger.examTotal('Образец бр. 1') > MATRIX_CONFIG.examThreshold.polygon && !sim.failed) {
       sim.failed = sim.ledger.incidents[sim.ledger.incidents.length - 1];
       sim.say('Над 50 негативни поени — првиот практичен дел не е положен (чл. 36).', 3);
       this.done = true;
