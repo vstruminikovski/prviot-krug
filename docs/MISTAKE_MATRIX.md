@@ -72,6 +72,7 @@
 | `hardBrakingMps2` | 5.5 | m/s² | provisional | чл. 34 без број; не е детектирано |
 | `stopLineMaxDistanceM` | 1 | m | verified | Образец бр. 1, 1-Ж / 2-В / 6-Д: запирање „над 1 m“ пред линијата |
 | `hillRollbackLimitM` | 0.3 | m | needsInstructorVerification | Образец бр. 1, 6-В без мерка — 0,3 m е проценка |
+| `yieldMinGapSeconds` | 1.5 | s | provisional | чл. 41/42: возилото со првенство не смее да мора да ја менува брзината или правецот; 1,5 s (PET) е мерка за калибрација со инструктор |
 | `wheelspinMinSeconds` | 0.3 | s | provisional | игра — тастатурата не може да дозира гас |
 | `movingWithParkingBrakeSeconds` | 1.5 | s | provisional | игра |
 | `movingWithParkingBrakeSpeedMps` | 1 | m/s | provisional | игра |

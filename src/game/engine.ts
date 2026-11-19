@@ -64,14 +64,17 @@ export class GameEngine {
   private hudT = 0;
   // ---- navigation: reaching the marked point is confirmed the same instant (ping, burst, tick)
   private navAt: { x: number; y: number } | null = null; private arriveId = 0; private arriveUntil = 0;
-  private trackNav(at: { x: number; y: number } | null, p: { x: number; y: number; z: number }, nowS: number, heading?: number) {
+  private focusId: string | null = null; private navKind: 'yield' | undefined;
+  private trackNav(at: { x: number; y: number } | null, p: { x: number; y: number; z: number }, nowS: number, heading?: number, kind?: 'yield') {
     const prev = this.navAt;
+    const wasYield = this.navKind === 'yield'; this.navKind = kind;
     const moved = !at || !prev || Math.hypot(at.x - prev.x, at.y - prev.y) > 3;
-    if (prev && moved && Math.hypot(prev.x - p.x, prev.y - p.y) < 28 && !this.paused && this.countdown === null) {
+    // a give-way line is not a destination: no arrival chime when it goes away
+    if (prev && moved && !wasYield && Math.hypot(prev.x - p.x, prev.y - p.y) < 28 && !this.paused && this.countdown === null) {
       this.audio.ping(); this.buzz(14, 60); this.view.nav.burst(prev, p.z);
       this.arriveId++; this.arriveUntil = nowS + 0.7;
     }
-    if (moved) { this.navAt = at ? { x: at.x, y: at.y } : null; this.view.nav.setTarget(this.navAt, heading); }
+    if (moved || kind !== (wasYield ? 'yield' : undefined)) { this.navAt = at ? { x: at.x, y: at.y } : null; this.view.nav.setTarget(this.navAt, heading, kind); }
   }
   private glanceStart: { kind: Glance; t: number } | null = null;
   replay: ReplayState | null = null;
@@ -221,7 +224,7 @@ export class GameEngine {
     if (why) { this.flash(why, 'warn'); return false; }
     const sim = createSim(this.config);
     this.sim = sim; this.result = null; this.replay = null; this.paused = false; this.auto = null; this.finishT = null;
-    this.navAt = null; this.view.nav.setTarget(null); this.arriveUntil = 0; this.log = [];
+    this.navAt = null; this.focusId = null; this.navKind = undefined; this.view.nav.setTarget(null); this.arriveUntil = 0; this.log = [];
     this.retryCard = null; this.feed = []; this.goodCool.clear(); this.cleanSince = 0; this.indOnSince = -1; this.turnArmed = true; this.stopTrack = { from: 0, maxDecel: 0, prevV: 0 };
     const def = vehicleById(this.config.vehicle);
     const debris = this.config.env === 'openRoad' ? (sim.mission as OpenRoadMission).debrisS : undefined;
@@ -402,7 +405,13 @@ export class GameEngine {
       }
       v.render('world', false);
     }
-    if (this.phase !== 'replay') v.setHighlight(null, nowS);
+    if (this.phase !== 'replay') {
+      // live: mark the road user the player must give way to (lessons only — set by the mission's guidance)
+      const id = this.phase === 'drive' && this.sim ? this.focusId : null;
+      const car = id ? this.sim!.cars.find((c) => c.id === id && !c.done) : null;
+      const ped = id && !car ? this.sim!.peds.find((d) => d.id === id && !d.done) : null;
+      v.setHighlight(car ? { x: car.pose.x, y: car.pose.y } : ped ? { x: ped.pos.x, y: ped.pos.y } : null, nowS);
+    }
     for (const b of this.bubbles) { const s = v.project(b.wx, b.wy, 1.9); b.x = s.x; b.y = s.visible ? s.y : -999; }
     this.bubbles = this.bubbles.filter((b) => b.until > nowS);
     // instructor queue: higher priority interrupts, otherwise each line stays readable
@@ -483,7 +492,7 @@ export class GameEngine {
     }
     const nowS = performance.now() / 1000;
     const task = s ? s.mission.task(s) : null;
-    if (s && p && this.phase === 'drive') this.trackNav(task?.nav?.at ?? null, p, nowS, task?.nav?.heading);
+    if (s && p && this.phase === 'drive') { this.trackNav(task?.nav?.at ?? null, p, nowS, task?.nav?.heading, task?.nav?.kind); this.focusId = task?.nav?.focus ?? null; }
     return {
       phase: this.phase,
       speed: p ? kmh(Math.abs(p.vx)) : 0, rpm: p ? p.rpm : 0, redline: def?.engine.redline ?? 6000, gear: p ? String(p.gear) : 'N', engine: p?.engine ?? 'off',

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { Vec2 } from '../math';
 
 const AMBER = new THREE.Color('#ffc65a');
+const RED = new THREE.Color('#ff4b3e');
 
 /** Vertical light curtain: opaque at the ground, fading upward, gently scrolling. */
 function curtainMaterial() {
@@ -24,7 +25,7 @@ export class NavMarker {
   private ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   private arrow: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>;
   private burstRing: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
-  private t = 0; private show = 0; private burstT = -1;
+  private t = 0; private show = 0; private burstT = -1; private yieldMode = false;
   private at: Vec2 | null = null;
   /** required direction at the gate (polygon starts): an arrow painted inside the ring */
   private headArrow: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>;
@@ -50,8 +51,11 @@ export class NavMarker {
     this.group.visible = false;
   }
 
-  setTarget(at: Vec2 | null, heading?: number) {
+  setTarget(at: Vec2 | null, heading?: number, kind?: 'yield') {
     this.at = at ? { x: at.x, y: at.y } : null;
+    // give-way line: red light, and no guide chevron pulling the car into the junction
+    const c = kind === 'yield' ? RED : AMBER;
+    this.curtain.material.uniforms.uC.value = c; this.ring.material.color.copy(c); this.yieldMode = kind === 'yield';
     this.headArrow.visible = !!at && heading !== undefined;
     if (heading !== undefined) this.headArrow.rotation.set(-Math.PI / 2, 0, heading);
   }
@@ -86,7 +90,7 @@ export class NavMarker {
     const ahead = driverCam ? 10 : 8, lift = 0.35; // just above the road: every camera looks down on it
     const ax = car.x + Math.cos(car.h) * ahead, ay = car.y + Math.sin(car.h) * ahead;
     const bearing = Math.atan2(y - car.y, x - car.x);
-    this.arrow.visible = dist > 7;
+    this.arrow.visible = dist > 7 && !this.yieldMode;
     this.arrow.position.set(ax, heightAt(ax, ay) + lift + Math.sin(this.t * 2.4) * 0.05, -ay);
     this.arrow.scale.setScalar(driverCam ? 1.1 : 1.3);
     this.arrow.rotation.set(-Math.PI / 2, 0, bearing);

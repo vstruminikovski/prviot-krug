@@ -8,6 +8,7 @@ import type { Contact } from '../vehicles/vehicle';
 import { SCENARIOS, type ScenarioId } from '../content/scenarios';
 import { JUNCTIONS, TIHA_NARROW, CROSSINGS, SIGNS } from '../content/debarMaalo';
 import type { Sim } from './sim';
+import { DETECT } from './params';
 
 export type Outcome = 'pending' | 'pass' | 'fail' | 'fail-route' | 'fail-signal' | 'collision' | 'missed';
 
@@ -31,6 +32,13 @@ export interface ScenarioResult {
 
 export interface RetrySetup { pose: Pose; v: number }
 
+/** A rule decides the next metres: where to stop, whom to wait for, and how to say it. */
+export interface YieldCue {
+  dist: number; stopAt: Vec2; heading: number; actorId: string; visible: boolean;
+  /** Часови: names the rule and the road user */ lesson: string;
+  /** Полагање: only what a sign or the road itself tells you */ exam: string;
+}
+
 export abstract class ScenarioRuntime {
   abstract id: ScenarioId;
   abstract retry: RetrySetup;
@@ -50,6 +58,8 @@ export abstract class ScenarioRuntime {
 
   get def() { return SCENARIOS.find((s) => s.id === this.id)!; }
   abstract update(sim: Sim, dt: number): void;
+  /** null while the way is clear (or the situation is over) */
+  yieldCue(_sim: Sim): YieldCue | null { return null; }
   onContact(_sim: Sim, _c: Contact) { /* optional */ }
 
   protected cue(sim: Sim, visible: boolean, pos: Vec2) {
@@ -124,7 +134,34 @@ export class S1 extends ScenarioRuntime {
   maxApproach = 0;
   private entered = false;
 
-  init() { super.init(); this.npc = null; this.committed = false; this.maxApproach = 0; this.entered = false; }
+  init() { super.init(); this.npc = null; this.committed = false; this.maxApproach = 0; this.entered = false; this.warned = false; }
+  private warned = false;
+
+  /** Conflict math (constant speeds): when would the priority car reach the player's lane, when
+   *  would the player have left the priority car's lane, and the gap between the two (PET). */
+  gap(sim: Sim): { cleared: boolean; eta: number; tClear: number; margin: number } {
+    const p = sim.player, npc = this.npc;
+    if (!npc || npc.done) return { cleared: true, eta: Infinity, tClear: 0, margin: Infinity };
+    const npcFrontY = npc.pose.y + npc.L / 2, npcRearY = npc.pose.y - npc.L / 2;
+    if (npcRearY > 0.3) return { cleared: true, eta: Infinity, tClear: 0, margin: Infinity };
+    const eta = npcFrontY >= -3.5 ? 0 : (-3.5 - npcFrontY) / Math.max(npc.v, 0.1);
+    // the priority car's lane: x ≈ 240.6 ± half its width (+0.3 m clearance)
+    const laneFar = 240.6 + 1.0 + 0.3;
+    const rear = p.x - Math.cos(p.h) * p.L / 2;
+    const tClear = Math.max(0, laneFar - rear) / Math.max(p.v, 0.5);
+    return { cleared: false, eta, tClear, margin: eta - tClear };
+  }
+
+  yieldCue(sim: Sim): YieldCue | null {
+    if (!this.armed || this.res.outcome !== 'pending' || !this.npc || this.gap(sim).cleared) return null;
+    const p = sim.player;
+    const dBox = JUNCTIONS.J1.x0 - (p.x + Math.cos(p.h) * p.L / 2);
+    if (dBox > 70 || dBox < -1) return null;
+    const visible = this.res.cueT !== null;
+    return { dist: dBox, stopAt: { x: JUNCTIONS.J1.x0 - 2.2 - p.L / 2, y: -1.75 }, heading: 0, actorId: this.npc.id, visible,
+      lesson: visible ? 'Возило од десно има предност — запри пред крстосницата' : 'Крстосница без знаци за првенство — гледај десно, предност има десниот',
+      exam: 'Знак: крстосување на патишта од иста важност' };
+  }
 
   update(sim: Sim, dt: number) {
     const p = sim.player;
@@ -142,7 +179,6 @@ export class S1 extends ScenarioRuntime {
     const front = p.x + Math.cos(p.h) * sim.player.L / 2;
     const dBox = box.x0 - front;
     const npcFrontY = npc.pose.y + npc.L / 2;
-    const npcRearY = npc.pose.y - npc.L / 2;
     // Adapt the other car's arrival until the player commits (30 m out)
     if (!this.committed && this.res.outcome === 'pending') {
       if (dBox < 30 || npcFrontY > -12) this.committed = true;
@@ -154,17 +190,23 @@ export class S1 extends ScenarioRuntime {
     }
     // the other driver has priority but brakes rather than crash
     this.cue(sim, !npc.done && sim.world.los(p.pose, npc.pose) && Math.hypot(npc.pose.x - p.x, npc.pose.y - p.y) < 85 && npc.pose.y < -3.5, npc.pose);
+    // Часови: the instructor names the danger the moment it can be seen
+    if (this.res.cueT !== null && !this.warned && this.res.outcome === 'pending' && sim.config.mode !== 'exam') {
+      this.warned = true;
+      sim.say('Од десно доаѓа возило — тоа има предност. Запри пред крстосницата и пропушти го.', 2);
+    }
     if (dBox < 15 && dBox > 0) this.maxApproach = Math.max(this.maxApproach, kmh(p.v));
 
     if (this.res.outcome === 'pending') {
       const inBox = front >= box.x0 && p.y > box.y0 - 0.5 && p.y < box.y1 + 0.5 && p.x < box.x1 + 3;
       if (inBox && !this.entered) {
         this.entered = true;
-        const cleared = npc.done || npcRearY > 0.3;
-        let eta = Infinity;
-        if (!cleared) eta = npcFrontY >= -3.5 ? 0 : (-3.5 - npcFrontY) / Math.max(npc.v, 0.1);
-        this.res.did = cleared ? 'Влезе откако возилото од десно помина.' : eta <= 3 ? `Влезе додека возилото од десно беше ${eta < 0.2 ? 'веќе во крстосницата' : `на ${eta.toFixed(1)} с`}.` : 'Влезе додека возилото од десно беше далеку.';
-        this.finish(sim, cleared || eta > 3 ? 'pass' : 'fail');
+        const g = this.gap(sim);
+        const ok = g.cleared || g.margin >= DETECT.yieldMinGapSeconds;
+        this.res.did = g.cleared ? 'Влезе откако возилото од десно помина.'
+          : g.eta < 0.2 ? 'Влезе додека возилото од десно беше веќе во крстосницата.'
+          : `Возилото од десно ќе стигнеше за ${g.eta.toFixed(1)} с, а ти ќе ја ослободеше неговата лента за ${g.tClear.toFixed(1)} с — разлика ${g.margin.toFixed(1)} с (потребно ≥ ${DETECT.yieldMinGapSeconds} с).`;
+        this.finish(sim, ok ? 'pass' : 'fail');
       } else if (npc.done && p.x > box.x1 + 10) {
         this.finish(sim, 'pass');
       } else if (p.x < 100 || p.y > 40 || p.y < -40) {
@@ -210,6 +252,31 @@ export class S2 extends ScenarioRuntime {
 
   init() { super.init(); this.npc = null; this.committed = false; this.entered = false; this.stoppedBefore = false; }
 
+  /** Oncoming car vs the narrow part: is it already out, or will it be in it before the player gets through? */
+  private meet(sim: Sim) {
+    const p = sim.player, npc = this.npc!, np = npc.pose;
+    const onTiha = Math.abs(np.x - 478.6) < 1.5 && np.y < 259;
+    const npcFrontY = onTiha ? np.y - npc.L / 2 : Infinity, npcRearY = onTiha ? np.y + npc.L / 2 : Infinity;
+    const front = p.y + Math.sin(p.h) * p.L / 2;
+    const exited = npc.done || (npcRearY < this.y0 && onTiha) || (!onTiha && np.y < 200);
+    const npcIn = npcFrontY <= this.y1;
+    const etaN = npcIn ? 0 : (npcFrontY - this.y1) / Math.max(npc.v, 0.5);
+    const clearT = (this.y1 + p.L - front) / Math.max(p.v, 4);
+    return { exited, npcIn, etaN, clearT, front, onTiha };
+  }
+
+  yieldCue(sim: Sim): YieldCue | null {
+    if (!this.armed || this.res.outcome !== 'pending' || !this.npc) return null;
+    const m = this.meet(sim);
+    const d = this.y0 - m.front;
+    if (m.exited || d > 70 || d < -0.5) return null;
+    if (!m.npcIn && m.etaN >= m.clearT + 0.5 && !m.onTiha) return null; // nobody coming yet
+    const p = sim.player, visible = this.res.cueT !== null;
+    return { dist: d, stopAt: { x: 481.4, y: this.y0 - 2 - p.L / 2 }, heading: Math.PI / 2, actorId: this.npc.id, visible,
+      lesson: visible ? 'Пречката е на твојата страна — почекај го возилото од спротивно' : 'Тесен дел со пречка на твојата страна — ти чекаш',
+      exam: 'Тесен дел од улицата' };
+  }
+
   update(sim: Sim, dt: number) {
     const p = sim.player;
     if (!this.armed) {
@@ -226,7 +293,6 @@ export class S2 extends ScenarioRuntime {
     const np = npc.pose;
     const onTiha = Math.abs(np.x - 478.6) < 1.5 && np.y < 259;
     const npcFrontY = onTiha ? np.y - npc.L / 2 : Infinity; // heading south
-    const npcRearY = onTiha ? np.y + npc.L / 2 : Infinity;
     const npcSFor = (y: number) => npc.path.project({ x: 478.6, y }, npc.s, 400);
 
     if (!this.committed && this.res.outcome === 'pending') {
@@ -248,12 +314,9 @@ export class S2 extends ScenarioRuntime {
     if (this.res.outcome === 'pending') {
       if (front >= this.y0 && !this.entered && Math.abs(p.x - 480) < 3) {
         this.entered = true;
-        const exited = npc.done || (npcRearY < this.y0 && onTiha) || (!onTiha && np.y < 200);
+        const { exited, npcIn, etaN, clearT } = this.meet(sim);
         if (exited) { this.res.did = 'Влезе откако возилото од спротивно помина.'; this.finish(sim, 'pass'); }
         else {
-          const npcIn = npcFrontY <= this.y1;
-          const etaN = npcIn ? 0 : (npcFrontY - this.y1) / Math.max(npc.v, 0.5);
-          const clearT = (this.y1 + sim.player.L - front) / Math.max(p.v, 4);
           if (npcIn) { this.res.did = 'Влезе во тесниот дел додека другото возило веќе беше во него.'; this.finish(sim, 'fail'); }
           else if (etaN < clearT + 0.5) { this.res.did = `Влезе, а возилото од спротивно стигнуваше за ${etaN.toFixed(1)} с — пред ти да излезеш.`; this.finish(sim, 'fail'); }
           else { this.res.did = 'Влезе кога возилото од спротивно беше доволно далеку.'; this.finish(sim, 'pass'); }
@@ -297,6 +360,21 @@ export class S3 extends ScenarioRuntime {
   readonly cx = CROSSINGS[0];
 
   init() { super.init(); this.ped = null; this.walkStarted = false; this.crossed = false; this.stopFrontX = null; }
+
+  yieldCue(sim: Sim): YieldCue | null {
+    const ped = this.ped;
+    if (!this.armed || this.res.outcome !== 'pending' || !ped || !this.walkStarted) return null;
+    const p = sim.player;
+    const front = p.x + Math.cos(p.h) * p.L / 2, d = front - this.cx.x1;
+    if (d > 70 || d < -0.5) return null;
+    // she has priority from the moment she is at the kerb until she has left the player's lane
+    const near = ped.state === 'wait' || (ped.state === 'cross' && ped.pos.y >= 259) || (ped.state === 'walk' && ped.markers.curb - ped.s < 8);
+    if (!near) return null;
+    const visible = this.res.cueT !== null;
+    return { dist: d, stopAt: { x: this.cx.x1 + 1.5 + p.L / 2, y: 261.75 }, heading: Math.PI, actorId: ped.id, visible,
+      lesson: visible ? 'Пешачка на преминот — запри пред зебрата' : 'Пешачки премин — намали, некој може да стапне',
+      exam: 'Пешачки премин' };
+  }
 
   update(sim: Sim, dt: number) {
     const p = sim.player;

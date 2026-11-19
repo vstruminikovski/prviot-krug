@@ -65,6 +65,48 @@ describe('play-test regressions', () => {
     expect(Math.hypot(sim.player.x - m.ex[0].start.x, sim.player.y - m.ex[0].start.y)).toBeLessThan(0.5);
     expect(sim.finished).toBe(false);
   });
+  it('city junction without signs: the guidance warns to give way in time and never points through the junction', () => {
+    for (const mode of ['lesson', 'exam'] as const) {
+      const sim = createSim({ v: CONTENT_VERSION, env: 'city', mission: 'city', mode, seed: 7, vehicle: 'vardarka', assist: 'auto', load: 0 });
+      sim.player.parkingBrake = 0;
+      const ap = new Autopilot({ mode: 'lawful', signal: true }, sim.player.pose);
+      const seen: { text: string; kind?: string; at?: { x: number } }[] = [];
+      while (!sim.finished && sim.t < 90 && sim.player.x < 260) {
+        sim.step(DT, { ...ap.input(sim), parkingBrake: false });
+        const t = sim.mission.task(sim);
+        if (t && sim.player.x > 180 && sim.player.x < 237) seen.push({ text: t.text, kind: t.nav?.kind, at: t.nav?.at });
+      }
+      expect(seen.length).toBeGreaterThan(0);
+      if (mode === 'lesson') {
+        // before the junction: a give-way line in front of it, never a gate beyond it
+        expect(seen.some((x) => x.kind === 'yield')).toBe(true);
+        const firstYield = seen.findIndex((x) => x.kind === 'yield');
+        expect(seen.slice(firstYield).filter((x) => x.kind !== 'yield' && x.at && x.at.x > 237 && /право/.test(x.text)).length, 'pointed through while the car had priority').toBeLessThan(seen.length - firstYield);
+        for (const x of seen.filter((v) => v.kind === 'yield')) expect(x.at!.x).toBeLessThan(237);
+      } else {
+        // exam: the sign is named, nobody is told whom to let through
+        expect(seen.some((x) => /иста важност/.test(x.text))).toBe(true);
+        expect(seen.some((x) => /десно|предност/.test(x.text))).toBe(false);
+      }
+      const s1 = (sim.mission as unknown as { scenarios: { id: string; res: { outcome: string } }[] }).scenarios.find((x) => x.id === 's1')!;
+      expect(s1.res.outcome, mode).toBe('pass');
+    }
+  });
+  it('every give-way situation in the city (right-of-way, narrow street, zebra) is announced with a stop line, and a lawful driver passes all three', () => {
+    const sim = createSim({ v: CONTENT_VERSION, env: 'city', mission: 'city', mode: 'lesson', seed: 7, vehicle: 'vardarka', assist: 'auto', load: 0 });
+    sim.player.parkingBrake = 0;
+    const ap = new Autopilot({ mode: 'lawful', signal: true }, sim.player.pose);
+    const texts = new Set<string>();
+    while (!sim.finished && sim.t < 300) {
+      sim.step(DT, { ...ap.input(sim), parkingBrake: false });
+      const t = sim.mission.task(sim);
+      if (t?.nav?.kind === 'yield') texts.add(t.text);
+    }
+    const all = [...texts].join(' | ');
+    expect(all).toMatch(/десно/); expect(all).toMatch(/спротивно|чекаш/); expect(all).toMatch(/зебра|премин/);
+    const sc = (sim.mission as unknown as { scenarios: { id: string; res: { outcome: string } }[] }).scenarios;
+    for (const id of ['s1', 's2', 's3']) expect(sc.find((x) => x.id === id)!.res.outcome, id).toBe('pass');
+  });
   it('crossing the STOP line is explained as crossing the STOP line, not as leaving the lane', () => {
     const c = classify('lane-exam1.1E-stopover-0', ['exam1.1E'], 'lesson', 'polygon');
     expect(c?.m.id).toBe('poly.stopover');

@@ -162,6 +162,12 @@ export class CityMission implements Mission {
     const p = sim.player;
     const cp = this.checkpoint;
     if (this.retry) return { text: SCENARIOS.find((d) => d.id === this.retry)?.objective ?? '' };
+    // a rule decides the next metres: the guidance says so instead of pointing through it
+    const y = this.scenarios.map((sc) => sc.yieldCue(sim)).find((c) => c);
+    if (y) {
+      if (sim.config.mode === 'exam') return { text: y.exam, nav: { arrow: 'straight', dist: Math.max(0, Math.round(y.dist)) } };
+      return { text: y.lesson, nav: { arrow: 'stop', dist: Math.max(0, Math.round(y.dist)), at: y.stopAt, heading: y.heading, kind: 'yield', focus: y.visible ? y.actorId : undefined } };
+    }
     if (cp < CHECKPOINTS.length - 1) { const nav = this.navigate(sim); if (nav) return nav; }
     if (cp >= CHECKPOINTS.length - 1) return { text: 'Запри кај кафичот', nav: { arrow: 'park', dist: Math.round(Math.hypot(70 - p.x, -2 - p.y) / 10) * 10, at: { x: 70, y: -2 } } };
     const h = [...ROUTE_HINTS].reverse().find((x) => x.afterCheckpoint <= cp);

@@ -39,6 +39,9 @@ export const DETECT = {
   hardBrakingMps2: 5.5,
   stopLineMaxDistanceM: 1,
   hillRollbackLimitM: 0.3,
+  /** right of way: the priority car must reach your path at least this long after you have left it
+   *  (post-encroachment time) — otherwise it would have to slow down, which the law forbids */
+  yieldMinGapSeconds: 1.5,
   /** wheelspin must last this long to count (a keyboard launch chirp is not a mistake) */
   wheelspinMinSeconds: 0.3,
   movingWithParkingBrakeSeconds: 1.5,
@@ -73,6 +76,7 @@ export const PARAM_INFO: Record<keyof typeof PHYSICS | keyof typeof DETECT, Para
   hardBrakingMps2: { unit: 'm/s²', status: 'provisional', basis: 'чл. 34 без број; не е детектирано' },
   stopLineMaxDistanceM: { unit: 'm', status: 'verified', basis: 'Образец бр. 1, 1-Ж / 2-В / 6-Д: запирање „над 1 m“ пред линијата' },
   wheelspinMinSeconds: { unit: 's', status: 'provisional', basis: 'игра — тастатурата не може да дозира гас' },
+  yieldMinGapSeconds: { unit: 's', status: 'provisional', basis: 'чл. 41/42: возилото со првенство не смее да мора да ја менува брзината или правецот; 1,5 s (PET) е мерка за калибрација со инструктор' },
   hillRollbackLimitM: { unit: 'm', status: 'needsInstructorVerification', basis: 'Образец бр. 1, 6-В без мерка — 0,3 m е проценка' },
   movingWithParkingBrakeSeconds: { unit: 's', status: 'provisional', basis: 'игра' },
   movingWithParkingBrakeSpeedMps: { unit: 'm/s', status: 'provisional', basis: 'игра' },
