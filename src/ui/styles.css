@@ -284,8 +284,8 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
 .task-d { margin-left: 8px; font-family: var(--f-display); font-weight: 600; color: var(--amber); font-variant-numeric: tabular-nums; }
 .task-s { font-size: 12px; color: var(--text-2); margin-top: 2px; }
 .task-p { font-size: 11.5px; font-weight: 800; color: var(--text-2); padding: 3px 8px; border-radius: 8px; background: rgba(255,255,255,.07); white-space: nowrap; }
-.say { position: absolute; left: 50%; bottom: calc(max(12px, var(--safe-b)) + 190px); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: min(720px, 84vw); text-align: center; animation: sayIn var(--t3) var(--ease); }
-.say > span:last-child { font-size: 17px; font-weight: 600; line-height: 1.4; color: #fff; padding: 8px 16px; border-radius: 12px; background: rgba(6,12,11,.62); backdrop-filter: blur(8px); text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.say { position: absolute; left: 50%; bottom: calc(max(12px, var(--safe-b)) + 208px); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: min(620px, 80vw); text-align: center; animation: sayIn var(--t3) var(--ease); }
+.say > span:last-child { font-size: 15px; font-weight: 600; line-height: 1.4; color: #fff; padding: 8px 16px; border-radius: 12px; background: rgba(6,12,11,.62); backdrop-filter: blur(8px); text-shadow: 0 1px 2px rgba(0,0,0,.4); }
 .say-who { font-size: 10.5px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--amber); }
 @keyframes sayIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .prompt { position: absolute; left: 50%; bottom: calc(max(12px, var(--safe-b)) + 150px); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--r-pill); background: var(--amber); color: #2a1a04; font-weight: 800; font-size: 14px; box-shadow: 0 8px 24px rgba(242,169,59,.35); animation: sayIn var(--t2) var(--ease); white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
@@ -511,3 +511,14 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
 .next-goal { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; font-size: 13px; color: var(--text-2); } .next-goal b { color: var(--text); }
 @media (max-height: 560px) { .goal-t span { display: none; } .goal { padding: 8px 12px; } }
 .touch-note { display: flex; gap: 6px; align-items: center; }
+
+/* live coach */
+.coach { position: absolute; left: 50%; bottom: calc(max(12px, var(--safe-b)) + 150px); transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 10px; border-radius: var(--r-pill); background: rgba(12,22,21,.82); backdrop-filter: blur(10px); border: 1px solid rgba(242,169,59,.55); box-shadow: 0 10px 28px rgba(0,0,0,.35); animation: sayIn var(--t2) var(--ease); max-width: 92vw; pointer-events: none; }
+.coach.warn { border-color: rgba(239,90,67,.7); } .coach.good { border-color: rgba(63,191,127,.6); }
+.coach-keys { display: flex; align-items: center; gap: 4px; flex: none; }
+.coach-keys i { font-style: normal; color: var(--text-3); margin: 0 3px; font-weight: 800; }
+.coach-keys kbd { font-size: 14px; padding: 4px 10px; border-radius: 8px; background: var(--amber); color: #2a1a04; border-color: rgba(0,0,0,.25); border-bottom-width: 3px; animation: keyPulse 1.2s ease-in-out infinite; }
+.coach.warn .coach-keys kbd { background: #ff8a73; } .coach.good .coach-keys kbd { background: #8fe3b6; }
+@keyframes keyPulse { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+.coach-t { font-size: 14.5px; font-weight: 700; color: var(--text); }
+@media (pointer: coarse) { .coach { top: calc(max(10px, var(--safe-t)) + 98px); bottom: auto; padding: 5px 12px 5px 6px; } .coach-t { font-size: 12px; } .coach-keys kbd { font-size: 11px; padding: 2px 7px; } }

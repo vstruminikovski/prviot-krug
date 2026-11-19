@@ -13,10 +13,12 @@ export interface Settings {
   /** camera shake, speed FOV, tilt-shift */
   motion: boolean;
   quality: Quality; volume: number; hud: 'S' | 'M' | 'L'; steerSens: number;
+  /** live key hints while driving (never in exams) */
+  coach: boolean;
 }
 export const coarse = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 export function defaultSettings(): Settings {
-  return { assist: 'learn', camera: 'chase', muted: false, mirrors: coarse() ? 'low' : 'high', legend: true, motion: true, quality: coarse() ? 'low' : 'high', volume: 0.8, hud: 'M', steerSens: 1 };
+  return { assist: 'learn', camera: 'chase', muted: false, mirrors: coarse() ? 'low' : 'high', legend: true, motion: true, quality: coarse() ? 'low' : 'high', volume: 0.8, hud: 'M', steerSens: 1, coach: true };
 }
 export interface GarageChoice { vehicle: string; paint: string; finish: 'solid' | 'metallic'; trims: string[]; plate: string; layout: PlateLayout; interior: string; mirrorAdj: number; load: number }
 export interface AttemptRecord { at: string; env: EnvId; mode: Mode; seed: number; vehicle: string; assist: Assist; score: number; passed: boolean | null; failed: string | null; skills: Record<string, number>; mission?: number; time?: string; weather?: string }

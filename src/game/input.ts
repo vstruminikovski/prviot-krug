@@ -115,7 +115,8 @@ export class Input {
       this.clutch = Math.max(0, this.clutch - dt * (inBite ? slow : 3.2));
     }
     const steer = Math.abs(this.touch.steer) > 0.02 ? this.touch.steer : this.steerKb;
-    if (this.touchMode && this.parkingBrake && this.touch.throttle > 0.05) this.parkingBrake = false;
+    // phones and the automatic profile: the handbrake releases itself when the driver asks for throttle
+    if ((this.touchMode || this.assist === 'auto') && this.parkingBrake && Math.max(this.throttle, this.touch.throttle) > 0.05) this.parkingBrake = false;
     return {
       throttle: Math.max(this.throttle, this.touch.throttle),
       brake: Math.max(this.brake, this.touch.brake),

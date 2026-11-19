@@ -468,6 +468,15 @@ export class Vehicle {
   private autoClutch(_dt: number) {
     const d = this.def;
     if (this.gear === 'N') return 1;
+    const lo = d.clutch.biteLow, hi = d.clutch.biteHigh, range = hi - lo;
+    // holding the brake at a stop: decoupled (no creep fighting the brake)
+    if (this.brake > 0.2 && Math.abs(this.vx) < 0.5) return 1;
+    if (this.throttle < 0.05) {
+      // torque-converter creep: rolls at walking pace with no pedals — parking and slow manoeuvres
+      if (Math.abs(this.vx) < 1.6) return hi - 0.38 * range;
+      // coasting: soft coupling, gentle engine braking instead of a first-gear lurch
+      return lo + 0.85 * range;
+    }
     const rpm = this.rpm;
     const launch = clamp((rpm - d.engine.idle * 0.95) / 900, 0, 1);
     const pedalFromRpm = d.clutch.biteHigh - launch * (d.clutch.biteHigh - d.clutch.biteLow);
@@ -482,8 +491,10 @@ export class Vehicle {
     }
     if (this.gear === 'N' || this.gear === 'R' || this.autoShiftCooldown > 0) return;
     const rpm = this.rpm, d = this.def;
-    const up = d.engine.diesel ? d.engine.redline * 0.62 : d.engine.redline * 0.5;
-    const down = d.engine.idle * 1.45;
+    // light throttle shifts early and quietly, full throttle holds the gear longer
+    const hiUp = d.engine.diesel ? d.engine.redline * 0.62 : d.engine.redline * 0.55;
+    const up = Math.min(hiUp, d.engine.idle * 2.3 + this.throttle * (hiUp - d.engine.idle * 2.3));
+    const down = d.engine.idle * 1.3;
     if (rpm > up && this.gear < 5) { this.gear = (this.gear + 1) as Gear; this.autoShiftCooldown = 0.8; this.locked = false; }
     else if (rpm < down && this.gear > 1 && this.vx > 0.5) { this.gear = (this.gear - 1) as Gear; this.autoShiftCooldown = 0.8; this.locked = false; }
     else if (this.vx < 0.3 && this.gear > 1) this.gear = 1;

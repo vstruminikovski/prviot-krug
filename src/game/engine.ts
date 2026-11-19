@@ -14,6 +14,7 @@ import { load, save, type Save, type GarageChoice } from './store';
 import { randomSeed } from './sim/seed';
 import { emitComplete } from './host';
 import { earnedStamps } from './career';
+import { coachTip, type CoachTip } from './coach';
 import { kmh } from './math';
 import type { Gear } from './vehicles/vehicle';
 import type { EnvId } from './env/types';
@@ -35,7 +36,7 @@ export interface HudState {
   assist: string; mode: Mode; env: EnvId;
   task: TaskInfo | null; say: Say | null; prompt: string | null; toast: { text: string; tone: 'bad' | 'warn' | 'ok' | 'info' } | null;
   bubbles: Bubble[]; camMode: CamMode; muted: boolean; paused: boolean; glance: Glance;
-  limit: number; suggestGear: number | null; countdown: number | null;
+  limit: number; suggestGear: number | null; countdown: number | null; coach: CoachTip | null;
   replay: ReplayState | null; failed: string | null; finished: boolean;
 }
 
@@ -68,6 +69,18 @@ export class GameEngine {
   private buzz(p: number | number[]) { try { if (this.coarse && 'vibrate' in navigator) navigator.vibrate(p); } catch { /* */ } }
   private coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   finishT: number | null = null;
+  // coach hysteresis: a tip must hold 0.35 s to appear and lingers 0.5 s after its condition ends
+  private coachShown: CoachTip | null = null; private coachCand: CoachTip | null = null; private coachT = 0;
+  private updateCoach(dt: number) {
+    const s = this.sim;
+    const cand = s && this.phase === 'drive' && !this.paused && this.countdown === null && this.finishT === null && this.store.settings.coach && this.config.mode !== 'exam' ? coachTip(s.player, this.coarse) : null;
+    if ((cand?.id ?? null) !== (this.coachCand?.id ?? null)) { this.coachCand = cand; this.coachT = 0; }
+    this.coachT += dt;
+    if ((cand?.id ?? null) !== (this.coachShown?.id ?? null)) {
+      if (cand && this.coachT > 0.35) this.coachShown = cand;
+      else if (!cand && this.coachT > 0.5) this.coachShown = null;
+    }
+  }
   onFatal: ((msg: string) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -316,6 +329,7 @@ export class GameEngine {
       const nx = this.sayQueue[0];
       if (!this.current || nx.priority > this.current.priority) { this.current = { ...nx, until: nowS + Math.max(3.2, nx.text.length / 14) }; this.sayQueue.shift(); }
     }
+    this.updateCoach(dt);
     this.hudT += dt;
     if (this.hudT > 1 / 15) { this.hudT = 0; this.emitHud(); }
   }
@@ -386,7 +400,7 @@ export class GameEngine {
       prompt: p && this.config.assist !== 'exam' ? p.whyNotMoving() : null, toast: this.toast,
       bubbles: this.bubbles.map((b) => ({ ...b })), camMode: this.view.camMode, muted: this.audio.muted, paused: this.paused, glance: this.input.glance(),
       limit: s && p ? (p.def.family === 'truck' ? Math.min(80, s.world.speedLimitAt(p.x, p.y).kmh) : s.world.speedLimitAt(p.x, p.y).kmh) : 50,
-      suggestGear: suggest, countdown: this.countdown === null ? null : Math.ceil(this.countdown),
+      suggestGear: suggest, countdown: this.countdown === null ? null : Math.ceil(this.countdown), coach: this.coachShown,
       replay: this.replay ? { ...this.replay } : null, failed: s?.failed?.text ?? null, finished: !!s?.finished && this.finishT !== null,
     };
   }

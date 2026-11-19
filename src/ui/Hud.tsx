@@ -142,7 +142,12 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
         </div>
       )}
       {hud.say && !intro && <div key={hud.say.text} className="say"><span className="say-who">{hud.say.who}</span><span>{hud.say.text}</span></div>}
-      {hud.prompt && !intro && <div key={hud.prompt} className="prompt"><Icon name="info" size={16} />{hud.prompt}</div>}
+      {hud.coach && !intro ? (
+        <div key={hud.coach.id} className={`coach ${hud.coach.tone}`}>
+          <span className="coach-keys">{hud.coach.keys.map((k, i) => <span key={k}>{i > 0 && <i>+</i>}<kbd>{k}</kbd></span>)}</span>
+          <span className="coach-t">{hud.coach.text}</span>
+        </div>
+      ) : hud.prompt && !intro && <div key={hud.prompt} className="prompt"><Icon name="info" size={16} />{hud.prompt}</div>}
       {hud.toast && <div key={hud.toast.text} className={`toast ${hud.toast.tone}`}><Icon name={hud.toast.tone === 'ok' ? 'check' : hud.toast.tone === 'info' ? 'info' : 'warn'} size={16} />{hud.toast.text}</div>}
       {intro && <Intro engine={engine} hud={hud} />}
       {hud.finished && <div className={`finish-card ${hud.failed ? 'bad' : ''}`}><div className="intro-k">{hud.failed ? 'Обидот заврши' : 'Крај'}</div><div className="finish-t">{hud.failed ? hud.failed : hud.env === 'city' ? 'Кругот е готов' : 'Вежбата е готова'}</div></div>}

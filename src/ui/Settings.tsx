@@ -22,6 +22,7 @@ export function Settings({ engine, onClose }: { engine: GameEngine; onClose: () 
         <Slider label="Јачина" value={s.volume} min={0} max={1} step={0.05} onChange={(v) => set({ volume: v })} fmt={(v) => `${Math.round(v * 100)}%`} />
 
         <h3 className="sec">Возење</h3>
+        <Toggle on={s.coach} onChange={(v) => set({ coach: v })} label="Совети со копчиња при возење (не на испит)" />
         <Slider label="Брзина на воланот" value={s.steerSens} min={0.6} max={1.6} step={0.05} onChange={(v) => set({ steerSens: v })} fmt={(v) => `${v.toFixed(2)}×`} />
 
         <h3 className="sec">Приказ</h3>
