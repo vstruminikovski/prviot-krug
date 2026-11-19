@@ -233,7 +233,7 @@ export function signTexture(code: SignCode, opts: { arrow?: 'left' | 'right'; te
   const k = `sign-${code}-${opts.arrow ?? ''}-${opts.text ?? ''}`;
   if (cache.has(k)) return cache.get(k)!;
   const S = 256;
-  const wide = code === '305.1' || code === 'plaque';
+  const wide = code === '305.1' || code === 'plaque' || code === 'place';
   const { c, g } = canvas(wide ? S * 2 : S, wide ? (code === 'plaque' ? S * 0.5 : S * 0.75) : S);
   g.clearRect(0, 0, c.width, c.height);
   if (code === '102') {
@@ -267,6 +267,42 @@ export function signTexture(code: SignCode, opts: { arrow?: 'left' | 'right'; te
     g.fillStyle = WHITE; g.fillRect(0, 0, W, H);
     g.fillStyle = BLUE; g.fillRect(8, 8, W - 16, H - 16);
     g.fillStyle = WHITE; arrowPath(g, W / 2, H / 2, W * 0.78, 32, 96, 90, opts.arrow === 'left' ? Math.PI : 0);
+  } else if (['103.1', '103.2', '106', '107', '111.1', '115', '121.1', '123'].includes(code)) {
+    // warning triangle (white field, red border) with an original pictogram
+    const tri = (pad: number) => { g.beginPath(); g.moveTo(S / 2, pad + 6); g.lineTo(S - pad, S - pad - 26); g.lineTo(pad, S - pad - 26); g.closePath(); };
+    g.fillStyle = WHITE; tri(4); g.fill(); g.fillStyle = RED; tri(10); g.fill(); g.fillStyle = WHITE; tri(40); g.fill();
+    g.fillStyle = BLACK; g.strokeStyle = BLACK; g.lineCap = 'round'; g.lineJoin = 'round';
+    const cx = S / 2, cy = S * 0.6;
+    if (code === '103.1' || code === '103.2') {
+      const d = code === '103.1' ? -1 : 1;
+      g.lineWidth = 14; g.beginPath(); g.moveTo(cx - d * 10, cy + 40); g.quadraticCurveTo(cx - d * 10, cy - 10, cx + d * 22, cy - 30); g.stroke();
+      g.beginPath(); g.moveTo(cx + d * 30, cy - 38); g.lineTo(cx + d * 8, cy - 40); g.lineTo(cx + d * 24, cy - 16); g.closePath(); g.fill();
+    } else if (code === '106' || code === '107') {
+      g.beginPath(); g.moveTo(cx - 52, cy + 38); g.lineTo(cx + 52, cy + 38); g.lineTo(code === '106' ? cx - 52 : cx + 52, cy - 20); g.closePath(); g.fill();
+      g.font = '700 26px Arial'; g.textAlign = 'center'; g.fillText('10%', code === '106' ? cx + 14 : cx - 14, cy - 2);
+    } else if (code === '111.1') {
+      g.fillRect(cx - 52, cy + 34, 104, 8); g.lineWidth = 6; g.beginPath(); g.moveTo(cx + 40, cy + 34); g.lineTo(cx + 40, cy - 40); g.stroke();
+      for (const [x, y, r] of [[cx + 18, cy - 20, 9], [cx + 4, cy + 4, 11], [cx - 16, cy + 22, 9], [cx + 22, cy + 14, 7]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+    } else if (code === '115') {
+      g.beginPath(); g.arc(cx - 6, cy - 34, 9, 0, Math.PI * 2); g.fill();
+      g.lineWidth = 10; g.beginPath(); g.moveTo(cx - 8, cy - 22); g.lineTo(cx - 14, cy + 6); g.lineTo(cx - 28, cy + 34); g.moveTo(cx - 14, cy + 6); g.lineTo(cx + 2, cy + 34); g.moveTo(cx - 10, cy - 14); g.lineTo(cx + 22, cy + 2); g.stroke();
+      g.beginPath(); g.moveTo(cx + 14, cy + 34); g.lineTo(cx + 46, cy + 34); g.lineTo(cx + 30, cy + 14); g.closePath(); g.fill();
+    } else if (code === '121.1') {
+      g.fillRect(cx - 20, cy - 46, 40, 92);
+      for (const [y, col] of [[cy - 30, '#d0281c'], [cy, '#e8b51a'], [cy + 30, '#2a9a4a']] as [number, string][]) { g.fillStyle = col; g.beginPath(); g.arc(cx, y, 12, 0, Math.PI * 2); g.fill(); }
+    } else if (code === '123') {
+      pedestrian(g, cx, cy + 20, 1.1);
+    }
+  } else if (code === 'limit') {
+    g.fillStyle = WHITE; g.beginPath(); g.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2); g.fill();
+    g.fillStyle = RED; g.beginPath(); g.arc(S / 2, S / 2, S / 2 - 6, 0, Math.PI * 2); g.fill();
+    g.fillStyle = WHITE; g.beginPath(); g.arc(S / 2, S / 2, S / 2 - 34, 0, Math.PI * 2); g.fill();
+    g.fillStyle = BLACK; g.font = '700 100px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(opts.text ?? '60', S / 2, S / 2 + 6);
+  } else if (code === 'place') {
+    const W2 = c.width, H2 = c.height;
+    g.fillStyle = '#f4f1e8'; g.fillRect(0, 0, W2, H2); g.strokeStyle = BLACK; g.lineWidth = 10; g.strokeRect(8, 8, W2 - 16, H2 - 16);
+    g.fillStyle = BLACK; g.font = '700 58px "Trebuchet MS", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(opts.text ?? '', W2 / 2, H2 / 2 + 2);
+    if (opts.arrow === 'right') { g.strokeStyle = RED; g.lineWidth = 10; g.beginPath(); g.moveTo(20, H2 - 20); g.lineTo(W2 - 20, 20); g.stroke(); }
   } else if (code === 'plaque') {
     const W = c.width, H = c.height;
     g.fillStyle = '#f4f1e8'; g.fillRect(0, 0, W, H);

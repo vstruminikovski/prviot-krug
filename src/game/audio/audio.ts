@@ -10,7 +10,7 @@ export class GameAudio {
   private hornGain!: GainNode;
   private noiseBuf!: AudioBuffer;
   muted = false;
-  private engineOn = false;
+  engineOn = false;
   private nextBird = 3;
   private nextClink = 2;
 
@@ -132,15 +132,31 @@ export class GameAudio {
     }
   }
 
+  grind() { if (!this.ctx) return; const t = this.ctx.currentTime; this.noiseBurst(t, 0.35, 1800, 3, 0.5, 'bandpass'); const o = this.tone(t, 160, 0.3, 0.12, 'sawtooth'); o.frequency.linearRampToValueAtTime(110, t + 0.3); }
+  ratchet() { if (!this.ctx) return; const t = this.ctx.currentTime; for (let i = 0; i < 5; i++) this.noiseBurst(t + i * 0.035, 0.02, 2600, 8, 0.35, 'bandpass', -0.2); }
+  stall() { if (!this.ctx) return; const t = this.ctx.currentTime; const o = this.tone(t, 70, 0.5, 0.25, 'sawtooth'); o.frequency.exponentialRampToValueAtTime(25, t + 0.45); this.noiseBurst(t, 0.3, 300, 2, 0.4, 'lowpass'); this.engineOn = false; }
+  started() { this.engineOn = true; }
+  private sirenOsc: OscillatorNode | null = null; private sirenGain: GainNode | null = null;
+
   /** Called every frame. */
-  update(dt: number, s: { revs: number; throttle: number; speed: number; horn: boolean; cafeProximity: number; cafePan: number; running: boolean }) {
+  update(dt: number, s: { revs: number; throttle: number; speed: number; horn: boolean; cafeProximity: number; cafePan: number; running: boolean; siren?: boolean; diesel?: boolean; load?: number; slip?: number }) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    const run = s.running && this.engineOn;
-    const base = 34 + s.revs * 95;
+    const run = s.running;
+    if (s.running) this.engineOn = true;
+    // siren (emergency vehicle behind)
+    if (s.siren && !this.sirenOsc) {
+      this.sirenOsc = this.ctx.createOscillator(); this.sirenOsc.type = 'triangle'; this.sirenGain = this.ctx.createGain(); this.sirenGain.gain.value = 0.05;
+      this.sirenOsc.connect(this.sirenGain).connect(this.master); this.sirenOsc.start();
+    }
+    if (this.sirenOsc) {
+      if (!s.siren) { this.sirenGain!.gain.setTargetAtTime(0, t, 0.2); this.sirenOsc.stop(t + 0.6); this.sirenOsc = null; }
+      else this.sirenOsc.frequency.setTargetAtTime((t % 1.4) < 0.7 ? 760 : 980, t, 0.05);
+    }
+    const base = (s.diesel ? 26 : 34) + s.revs * (s.diesel ? 70 : 95);
     this.engOsc1.frequency.setTargetAtTime(base, t, 0.08);
     this.engOsc2.frequency.setTargetAtTime(base / 2, t, 0.08);
-    this.engFilter.frequency.setTargetAtTime(300 + s.throttle * 900 + s.revs * 400, t, 0.1);
+    this.engFilter.frequency.setTargetAtTime(300 + s.throttle * 900 + s.revs * 400 + (s.load ?? 0) * 300 + (s.slip ?? 0) * 500, t, 0.1);
     this.engGain.gain.setTargetAtTime(run ? 0.07 + s.throttle * 0.08 + Math.min(s.speed, 15) * 0.002 : 0, t, run ? 0.12 : 0.6);
     this.hornGain.gain.setTargetAtTime(s.horn ? 0.09 : 0, t, 0.015);
     this.murmurGain.gain.setTargetAtTime(s.cafeProximity * 0.5, t, 0.3);

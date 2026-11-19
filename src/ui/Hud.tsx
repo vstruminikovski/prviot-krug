@@ -1,158 +1,212 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameEngine, HudState } from '../game/engine';
+import { BINDINGS } from '../game/input';
+import { MODE_LABEL } from '../game/missions/types';
 
-/** Original analogue speedometer: sun-faded cream face, petrol rim, enamel-red needle. */
-export function Dial({ speed, indicator, blink, gear, revs }: { speed: number; indicator: string; blink: boolean; gear: string; revs: number }) {
-  const max = 140;
-  const a0 = -225, a1 = 45; // degrees
+const ASSIST_LABEL: Record<string, string> = { learn: 'Помош при учење', manual: 'Мануелно', exam: 'Испит', auto: 'Автоматски (пристапност)' };
+
+function Gauge({ value, max, ticks, label, red, unit, size = 150 }: { value: number; max: number; ticks: number; label: string; red?: number; unit: string; size?: number }) {
+  const a0 = -225, a1 = 45;
   const ang = (v: number) => ((a0 + ((a1 - a0) * Math.min(v, max)) / max) * Math.PI) / 180;
   const pt = (v: number, r: number) => [80 + Math.cos(ang(v)) * r, 80 + Math.sin(ang(v)) * r];
-  const ticks = [];
-  for (let v = 0; v <= max; v += 10) {
-    const [x1, y1] = pt(v, 62), [x2, y2] = pt(v, v % 20 === 0 ? 52 : 57);
-    ticks.push(<line key={v} x1={x1} y1={y1} x2={x2} y2={y2} stroke={v === 50 ? '#b3342b' : '#1f3b3a'} strokeWidth={v % 20 === 0 ? 2.4 : 1.4} />);
-    if (v % 20 === 0) { const [tx, ty] = pt(v, 42); ticks.push(<text key={'t' + v} x={tx} y={ty + 3.5} textAnchor="middle" fontSize="10" fill="#1f3b3a" fontWeight={700}>{v}</text>); }
+  const els = [];
+  for (let v = 0; v <= max; v += max / ticks) {
+    const major = Math.round(v / (max / ticks)) % 2 === 0;
+    const [x1, y1] = pt(v, 62), [x2, y2] = pt(v, major ? 51 : 57);
+    els.push(<line key={v} x1={x1} y1={y1} x2={x2} y2={y2} stroke={red !== undefined && v >= red ? '#b3342b' : '#1f3b3a'} strokeWidth={major ? 2.4 : 1.3} />);
+    if (major) { const [tx, ty] = pt(v, 41); els.push(<text key={'t' + v} x={tx} y={ty + 3.5} textAnchor="middle" fontSize="10" fill="#1f3b3a" fontWeight={700}>{unit === 'rpm' ? Math.round(v / 1000) : Math.round(v)}</text>); }
   }
-  const [nx, ny] = pt(speed, 56);
-  const revA = (-200 + revs * 120) * Math.PI / 180;
+  if (red !== undefined) { const [ax, ay] = pt(red, 66), [bx, by] = pt(max, 66); els.push(<path key="red" d={`M ${ax} ${ay} A 66 66 0 0 1 ${bx} ${by}`} stroke="#b3342b" strokeWidth="5" fill="none" />); }
+  const [nx, ny] = pt(value, 57);
   return (
-    <svg className="dial" viewBox="0 0 160 160" aria-label={`Брзина ${Math.round(speed)} км/ч`}>
-      <circle cx="80" cy="80" r="76" fill="#1f3b3a" />
-      <circle cx="80" cy="80" r="70" fill="#efe3c8" stroke="#c9b48a" strokeWidth="2" />
-      {ticks}
-      <path d={`M ${pt(50, 66)[0]} ${pt(50, 66)[1]} A 66 66 0 0 1 ${pt(52, 66)[0]} ${pt(52, 66)[1]}`} stroke="#b3342b" strokeWidth="4" fill="none" />
-      <text x="80" y="58" textAnchor="middle" fontSize="7" fill="#6b5a3a" letterSpacing="1">км/ч</text>
-      <g transform="translate(0,6)">
-        <path d="M58 98 l-9 -6 v12 z" fill={indicator === 'left' && blink ? '#3fd16b' : '#9fae96'} />
-        <path d="M102 98 l9 -6 v12 z" fill={indicator === 'right' && blink ? '#3fd16b' : '#9fae96'} />
-        <text x="80" y="103" textAnchor="middle" fontSize="13" fontWeight={800} fill={gear === 'R' ? '#b3342b' : '#1f3b3a'}>{gear}</text>
-      </g>
-      <text x="80" y="128" textAnchor="middle" fontSize="15" fontWeight={800} fill="#1f3b3a">{Math.round(speed)}</text>
-      <line x1="80" y1="80" x2={80 + Math.cos(revA) * 12} y2={80 + Math.sin(revA) * 12} stroke="#c58a2a" strokeWidth="1.5" opacity="0.6" />
+    <svg className="gauge" viewBox="0 0 160 160" width={size} height={size} aria-label={`${label} ${Math.round(value)}`}>
+      <circle cx="80" cy="80" r="77" fill="#1f3b3a" />
+      <circle cx="80" cy="80" r="71" fill="#efe3c8" stroke="#c9b48a" strokeWidth="2" />
+      {els}
+      <text x="80" y="60" textAnchor="middle" fontSize="7.5" fill="#6b5a3a" letterSpacing="1">{label}</text>
       <line x1="80" y1="80" x2={nx} y2={ny} stroke="#b3342b" strokeWidth="3" strokeLinecap="round" />
       <circle cx="80" cy="80" r="6" fill="#1f3b3a" />
     </svg>
   );
 }
 
-function HintArrow({ arrow, angle }: { arrow: string; angle: number }) {
-  if (arrow === 'left') return <span className="hint-arrow">↰</span>;
-  if (arrow === 'straight') return <span className="hint-arrow">↑</span>;
-  return <span className="hint-arrow compass" style={{ transform: `rotate(${-angle}rad)` }}>➤</span>;
+function Lamps({ h }: { h: HudState }) {
+  const blink = h.blink;
+  const lamp = (on: boolean, col: string, txt: string, title: string) => <span className={`lamp ${on ? 'on' : ''}`} style={{ ['--c' as string]: col }} title={title}>{txt}</span>;
+  return (
+    <div className="lamps">
+      {lamp((h.indicator === 'left' || h.hazards) && blink, '#3fd16b', '◀', 'Лев покажувач')}
+      {lamp(h.parkingBrake, '#e5402e', 'P', 'Рачна')}
+      {lamp(h.engine !== 'running', '#e5402e', '⏻', 'Мотор')}
+      {lamp(h.hazards && blink, '#e5402e', '△', 'Сите четири')}
+      {lamp((h.indicator === 'right' || h.hazards) && blink, '#3fd16b', '▶', 'Десен покажувач')}
+    </div>
+  );
+}
+
+function Pedals({ h }: { h: HudState }) {
+  const bar = (v: number, cls: string, label: string, bite?: [number, number]) => (
+    <div className={`pedal-bar ${cls}`}>
+      <div className="pb-track">
+        {bite && <div className="pb-bite" style={{ bottom: `${bite[0] * 100}%`, height: `${(bite[1] - bite[0]) * 100}%` }} />}
+        <div className="pb-fill" style={{ height: `${v * 100}%` }} />
+      </div>
+      <span>{label}</span>
+    </div>
+  );
+  return (
+    <div className="pedals" aria-label="Педали">
+      {bar(h.clutch, 'c', 'К', h.assist === 'learn' ? h.bite : undefined)}
+      {bar(h.brake, 'b', 'С')}
+      {bar(h.throttle, 'g', 'Г')}
+    </div>
+  );
+}
+
+function Gate({ gear, suggest }: { gear: string; suggest: number | null }) {
+  const pos: Record<string, [number, number]> = { 1: [12, 10], 2: [12, 50], 3: [36, 10], 4: [36, 50], 5: [60, 10], R: [60, 50], N: [36, 30] };
+  const [x, y] = pos[gear] ?? pos.N;
+  return (
+    <svg className="gate" viewBox="0 0 72 60" aria-label={`Брзина ${gear}`}>
+      <path d="M12 10 V50 M36 10 V50 M60 10 V50 M12 30 H60" stroke="#c9b48a" strokeWidth="4" fill="none" strokeLinecap="round" />
+      {Object.entries(pos).filter(([k]) => k !== 'N').map(([k, [px, py]]) => <text key={k} x={px} y={py < 30 ? py - 2 : py + 9} textAnchor="middle" fontSize="8" fill={String(suggest) === k ? '#e8a33a' : '#efe3c8'} fontWeight={700}>{k}</text>)}
+      <circle cx={x} cy={y} r="6" fill="#b3342b" stroke="#efe3c8" strokeWidth="1.5" />
+    </svg>
+  );
 }
 
 export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
-  const [confirmRestart, setConfirmRestart] = useState(false);
-  const driving = hud.phase === 'drive' || hud.phase === 'retry';
+  const [legend, setLegend] = useState(engine.store.settings.legend);
+  const driving = hud.phase === 'drive';
+  if (!driving) return null;
+  const arrow = hud.task?.nav?.arrow;
+  const arrowCh = arrow === 'left' ? '↰' : arrow === 'right' ? '↱' : arrow === 'park' ? 'P' : arrow === 'stop' ? '■' : arrow === 'reverse' ? '↓' : '↑';
   return (
     <>
-      {driving && (
-        <div className="hud-dial"><Dial speed={hud.speed} indicator={hud.indicator} blink={hud.blink} gear={hud.gear} revs={hud.revs} /></div>
-      )}
-      {driving && hud.hint && (
-        <div className="hint" role="status">
-          <HintArrow arrow={hud.hint.arrow} angle={hud.hint.angle} />
-          <span>{hud.hint.text}{hud.hint.dist !== null && hud.hint.arrow !== 'straight' ? ` · ${hud.hint.dist} м` : ''}</span>
+      <div className="instruments">
+        <Gauge value={hud.speed} max={hud.env === 'openRoad' ? 140 : 120} ticks={hud.env === 'openRoad' ? 14 : 12} label="км/ч" unit="kmh" />
+        <div className="gearbox">
+          <div className={`gear-big ${hud.gear === 'R' ? 'r' : ''}`}>{hud.gear === 'N' ? 'N' : hud.gear}</div>
+          {hud.suggestGear && <div className="gear-sug">→ {hud.suggestGear}</div>}
+          <Gate gear={hud.gear} suggest={hud.suggestGear} />
+          <div className="limit" title="Важечко ограничување">{hud.limit}</div>
         </div>
-      )}
-      {hud.toast && driving && <div className="toast">{hud.toast}</div>}
-      {hud.countdown !== null && <div className="countdown">{hud.countdown}</div>}
-      {hud.retryId && driving && <div className="retry-tag">Повторување</div>}
-      {driving && (
-        <div className="topbar">
-          <button className="icon-btn" onClick={() => engine.toggleCamera()} title="Камера (C)">{hud.camMode === 'chase' ? '🚗 Возач' : '🎥 Зад колата'}</button>
-          <button className="icon-btn" onClick={() => engine.toggleMute()} title="Звук (M)" aria-pressed={hud.muted}>{hud.muted ? '🔇' : '🔊'}</button>
-          <button className="icon-btn" onClick={() => { engine.paused = true; setConfirmRestart(false); }} title="Пауза (Esc)">❚❚</button>
-        </div>
-      )}
-      {driving && hud.paused && (
-        <div className="modal-back">
-          <div className="card pause">
-            <h2>Пауза</h2>
-            {!confirmRestart ? (
-              <>
-                <button className="btn primary" onClick={() => { engine.paused = false; }}>Продолжи</button>
-                <button className="btn" onClick={() => setConfirmRestart(true)}>Почни одново</button>
-                {hud.retryId && <button className="btn" onClick={() => engine.backToReview()}>Назад кон резултатите</button>}
-                <button className="btn" onClick={() => engine.toggleMute()}>{hud.muted ? 'Вклучи звук' : 'Исклучи звук'}</button>
-                <button className="btn" onClick={() => engine.toggleCamera()}>Камера: {hud.camMode === 'chase' ? 'зад колата' : 'од возачот'}</button>
-              </>
-            ) : (
-              <>
-                <p>Да почнеме нов круг од кафичот?</p>
-                <button className="btn primary" onClick={() => { hud.retryId ? engine.startRetry(hud.retryId) : engine.restart(); }}>Да, од почеток</button>
-                <button className="btn" onClick={() => setConfirmRestart(false)}>Не</button>
-              </>
-            )}
+        <Gauge value={hud.rpm} max={Math.ceil(hud.redline / 1000 + 1) * 1000} ticks={Math.ceil(hud.redline / 1000 + 1) * 2} label="×1000 вртежи" unit="rpm" red={hud.redline} />
+        <Lamps h={hud} />
+        <Pedals h={hud} />
+      </div>
+      {hud.task && (
+        <div className="task" role="status">
+          {hud.task.nav && <span className="task-arrow">{arrowCh}</span>}
+          <div>
+            <div className="task-t">{hud.task.text}{hud.task.nav?.dist ? <b> · {hud.task.nav.dist} м</b> : null}</div>
+            {hud.task.sub && <div className="task-s">{hud.task.sub}</div>}
           </div>
+          {hud.task.progress && <span className="task-p">{hud.task.progress}</span>}
         </div>
       )}
-      {hud.subtitle && (hud.phase === 'intro' || hud.phase === 'outro' || hud.phase === 'drive') && (
-        <div className="subtitle"><b>{hud.subtitle.who}:</b> „{hud.subtitle.text}“</div>
+      {hud.say && <div className="say"><b>{hud.say.who}:</b> {hud.say.text}</div>}
+      {hud.prompt && <div className="prompt">{hud.prompt}</div>}
+      {hud.toast && <div className={`toast ${hud.toast.tone}`}>{hud.toast.text}</div>}
+      {hud.countdown !== null && <div className="countdown">{hud.countdown}</div>}
+      <div className="mode-tag">{MODE_LABEL[hud.mode]} · {ASSIST_LABEL[hud.assist]}</div>
+      <div className="topbar">
+        <button className="icon-btn" onClick={() => engine.toggleCamera()} title="Камера (V)">{hud.camMode === 'chase' ? '🚗 Од возачот' : '🎥 Зад колата'}</button>
+        <button className="icon-btn" onClick={() => engine.toggleMute()} title="Звук (0)">{hud.muted ? '🔇' : '🔊'}</button>
+        <button className="icon-btn" onClick={() => { setLegend(!legend); engine.store.settings.legend = !legend; engine.persist(); }} title="Контроли">⌨</button>
+        <button className="icon-btn" onClick={() => engine.command({ type: 'pause' })} title="Пауза (Esc)">❚❚</button>
+      </div>
+      {legend && (
+        <div className="legend">
+          {BINDINGS.slice(0, 15).map((b) => <div key={b.keys}><kbd>{b.keys}</kbd> {b.action}</div>)}
+          <div className="legend-more">J/K/M огледала · U/I рамо · V камера · T почеток · Esc</div>
+        </div>
       )}
-      {hud.phase === 'intro' && <button className="btn skip" onClick={() => engine.skipIntro()}>Прескокни ›</button>}
-      {driving && hud.bubbles.map((b) => b.y > -900 && (
-        <div key={b.id} className="bubble" style={{ left: b.x, top: b.y }}>{b.text}</div>
-      ))}
-      {driving && <TouchControls engine={engine} hud={hud} />}
+      {hud.glance && hud.glance.startsWith('mirror') && <div className="glance-tag">Поглед во {hud.glance === 'mirrorC' ? 'внатрешното' : hud.glance === 'mirrorL' ? 'левото' : 'десното'} огледало</div>}
+      {hud.glance && hud.glance.startsWith('shoulder') && <div className="glance-tag">Поглед преку {hud.glance === 'shoulderL' ? 'левото' : 'десното'} рамо</div>}
+      {hud.bubbles.map((b) => b.y > -900 && <div key={b.id} className="bubble" style={{ left: b.x, top: b.y }}>{b.text}</div>)}
+      {hud.paused && <PauseMenu engine={engine} hud={hud} />}
+      <TouchControls engine={engine} hud={hud} />
     </>
   );
 }
 
-function useHold(onChange: (v: boolean) => void) {
-  const ref = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const down = (e: PointerEvent) => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or stale pointer */ } el.classList.add('held'); onChange(true); };
-    const up = (e: PointerEvent) => { e.preventDefault(); el.classList.remove('held'); onChange(false); };
-    el.addEventListener('pointerdown', down);
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', up);
-    el.addEventListener('lostpointercapture', up);
-    return () => { el.removeEventListener('pointerdown', down); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.removeEventListener('lostpointercapture', up); };
-  }, [onChange]);
-  return ref;
-}
-
-/** Landscape touch layout: steering on the left thumb, pedals on the right. */
-function TouchControls({ engine, hud }: { engine: GameEngine; hud: HudState }) {
-  const t = engine.input.touch;
-  const left = useRef(false), right = useRef(false);
-  const applySteer = () => { t.steer = (left.current ? 1 : 0) - (right.current ? 1 : 0); };
-  const lRef = useHold(useCallbackStable((v: boolean) => { left.current = v; applySteer(); }));
-  const rRef = useHold(useCallbackStable((v: boolean) => { right.current = v; applySteer(); }));
-  const gRef = useHold(useCallbackStable((v: boolean) => { t.throttle = v ? 1 : 0; }));
-  const bRef = useHold(useCallbackStable((v: boolean) => { t.brake = v ? 1 : 0; }));
-  const hRef = useHold(useCallbackStable((v: boolean) => { t.horn = v; }));
-  useEffect(() => () => { t.steer = 0; t.throttle = 0; t.brake = 0; t.horn = false; }, [t]);
+function PauseMenu({ engine, hud }: { engine: GameEngine; hud: HudState }) {
   return (
-    <div className="touch">
-      <div className="touch-left">
-        <div className="ind-row">
-          <button className={`tbtn ind ${hud.indicator === 'left' ? 'on' : ''}`} onClick={() => engine.toggleIndicator('left')} aria-label="Лев покажувач">⇦</button>
-          <button className={`tbtn ind ${hud.indicator === 'right' ? 'on' : ''}`} onClick={() => engine.toggleIndicator('right')} aria-label="Десен покажувач">⇨</button>
-        </div>
-        <div className="steer-row">
-          <button ref={lRef} className="tbtn steer" aria-label="Лево">◀</button>
-          <button ref={rRef} className="tbtn steer" aria-label="Десно">▶</button>
-        </div>
-      </div>
-      <div className="touch-right">
-        <button ref={hRef} className="tbtn horn" aria-label="Сирена">📯</button>
-        <div className="pedal-row">
-          <button ref={bRef} className="tbtn pedal brake" aria-label="Сопирачка / назад">СОП<small>држи за R</small></button>
-          <button ref={gRef} className="tbtn pedal gas" aria-label="Гас">ГАС</button>
-        </div>
+    <div className="modal-back">
+      <div className="card pause">
+        <h2>Пауза</h2>
+        <button className="btn primary" onClick={() => engine.command({ type: 'pause' })}>Продолжи</button>
+        <button className="btn" onClick={() => engine.retrySame()}>Истата ситуација одново</button>
+        <button className="btn" onClick={() => engine.retryNew()}>Нова варијација</button>
+        {hud.env === 'polygon' && <button className="btn" onClick={() => { engine.command({ type: 'pause' }); engine.command({ type: 'reset' }); }}>Постави на почеток на вежбата</button>}
+        <button className="btn ghost" onClick={() => engine.backToMenu()}>Главно мени</button>
       </div>
     </div>
   );
 }
 
-// stable callback helper without re-binding listeners each render
-function useCallbackStable<T extends (...a: never[]) => void>(fn: T): T {
-  const r = useRef(fn);
-  r.current = fn;
-  const stable = useRef(((...a: never[]) => r.current(...a)) as T);
-  return stable.current;
+function useHold(onChange: (v: boolean) => void) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const cb = useRef(onChange); cb.current = onChange;
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const down = (e: PointerEvent) => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch { /* */ } el.classList.add('held'); cb.current(true); };
+    const up = (e: PointerEvent) => { e.preventDefault(); el.classList.remove('held'); cb.current(false); };
+    el.addEventListener('pointerdown', down); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    return () => { el.removeEventListener('pointerdown', down); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); el.removeEventListener('lostpointercapture', up); };
+  }, []);
+  return ref;
+}
+
+/** Landscape touch: left thumb steers, right thumb pedals; clutch has hold + latched slider. */
+function TouchControls({ engine, hud }: { engine: GameEngine; hud: HudState }) {
+  const t = engine.input.touch;
+  const lr = useRef({ l: false, r: false });
+  const apply = () => { t.steer = (lr.current.l ? 1 : 0) - (lr.current.r ? 1 : 0); };
+  const lRef = useHold((v) => { lr.current.l = v; apply(); });
+  const rRef = useHold((v) => { lr.current.r = v; apply(); });
+  const gRef = useHold((v) => { t.throttle = v ? 1 : 0; });
+  const bRef = useHold((v) => { t.brake = v ? 1 : 0; });
+  const cRef = useHold((v) => { t.clutchHeld = v; if (v) t.clutchLatch = null; });
+  const mlRef = useHold((v) => { t.glance = v ? 'mirrorL' : null; });
+  const mrRef = useHold((v) => { t.glance = v ? 'mirrorR' : null; });
+  const slRef = useHold((v) => { t.glance = v ? 'shoulderL' : null; });
+  useEffect(() => () => { t.steer = 0; t.throttle = 0; t.brake = 0; t.clutchHeld = false; t.clutchLatch = null; t.horn = false; t.glance = null; }, [t]);
+  const cmd = (c: Parameters<GameEngine['command']>[0]) => engine.command(c);
+  return (
+    <div className="touch">
+      <div className="touch-left">
+        <div className="t-row">
+          <button className={`tbtn sm ${hud.indicator === 'left' ? 'on' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'left' })}>⇦</button>
+          <button className={`tbtn sm ${hud.indicator === 'right' ? 'on' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'right' })}>⇨</button>
+          <button ref={mlRef} className="tbtn sm">◧</button>
+          <button ref={slRef} className="tbtn sm">↶</button>
+          <button ref={mrRef} className="tbtn sm">◨</button>
+        </div>
+        <div className="t-row">
+          <button ref={lRef} className="tbtn steer">◀</button>
+          <button ref={rRef} className="tbtn steer">▶</button>
+        </div>
+      </div>
+      <div className="touch-right">
+        <div className="t-row">
+          <button className="tbtn sm" onClick={() => cmd({ type: 'engine' })}>⏻</button>
+          <button className={`tbtn sm ${hud.parkingBrake ? 'on-red' : ''}`} onClick={() => cmd({ type: 'parkingBrake' })}>P</button>
+          <button className="tbtn sm" onClick={() => cmd({ type: 'gearDown' })}>−</button>
+          <button className="tbtn sm" onClick={() => cmd({ type: 'gear', gear: 'N' })}>N</button>
+          <button className="tbtn sm" onClick={() => cmd({ type: 'gearUp' })}>+</button>
+        </div>
+        <div className="t-row">
+          <div className="clutch-col">
+            <input className="clutch-slider" type="range" min={0} max={100} value={Math.round(hud.clutch * 100)} aria-label="Кумплунг (задржано)"
+              onChange={(e) => { t.clutchLatch = Number(e.target.value) / 100; }} />
+            <button ref={cRef} className="tbtn pedal clutch">КУМ<small>држи</small></button>
+          </div>
+          <button ref={bRef} className="tbtn pedal brake">СОП</button>
+          <button ref={gRef} className="tbtn pedal gas">ГАС</button>
+        </div>
+      </div>
+    </div>
+  );
 }

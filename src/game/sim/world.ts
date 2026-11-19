@@ -1,76 +1,86 @@
-// Static collision and visibility queries for the simulation.
-import { inRect, obbCorners, quadsOverlap, segmentHitsRect, type Rect, type Vec2 } from '../math';
-import { DRIVABLE, SIGNS } from '../content/debarMaalo';
-import { generate, CAR_DIMS } from '../content/generate';
+// Static collision, terrain and visibility queries for any environment.
+import { quadsOverlap, segmentHitsRect, type Rect, type Vec2 } from '../math';
+import { pointInPoly, type EnvData, type StaticObs } from '../env/types';
 
-export interface StaticObstacle { id: string; kind: 'parked' | 'pole'; quad: Vec2[]; cx: number; cy: number; r: number }
+const CELL = 20;
 
-const CELL = 24;
+interface PolyRec { poly: Vec2[]; x0: number; y0: number; x1: number; y1: number }
+interface ObsRec { o: StaticObs; cx: number; cy: number; r: number }
 
 export class World {
-  drivable: Rect[] = DRIVABLE;
+  env: EnvData;
   blockers: Rect[];
-  obstacles: StaticObstacle[] = [];
-  private grid = new Map<string, StaticObstacle[]>();
+  knocked = new Set<string>();
+  private polyGrid = new Map<string, PolyRec[]>();
+  private obsGrid = new Map<string, ObsRec[]>();
 
-  constructor() {
-    const g = generate();
-    this.blockers = g.blockers;
-    for (const p of g.parked) {
-      const d = CAR_DIMS[p.type];
-      this.add({ id: p.id, kind: 'parked', quad: obbCorners(p.pose, d.L, d.W), cx: p.pose.x, cy: p.pose.y, r: d.L / 2 + 0.2 });
+  constructor(env: EnvData) {
+    this.env = env;
+    this.blockers = env.blockers;
+    for (const poly of env.drivable) {
+      const xs = poly.map((p) => p.x), ys = poly.map((p) => p.y);
+      const rec: PolyRec = { poly, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+      this.insert(this.polyGrid, rec, rec.x0, rec.y0, rec.x1, rec.y1);
     }
-    for (const s of SIGNS) {
-      if (s.code === 'plaque') continue;
-      const q = obbCorners({ x: s.x, y: s.y, h: 0 }, 0.12, 0.12);
-      this.add({ id: s.id, kind: 'pole', quad: q, cx: s.x, cy: s.y, r: 0.2 });
+    for (const o of env.obstacles) {
+      const xs = o.quad.map((p) => p.x), ys = o.quad.map((p) => p.y);
+      const cx = xs.reduce((a, b) => a + b) / xs.length, cy = ys.reduce((a, b) => a + b) / ys.length;
+      const r = Math.max(...o.quad.map((p) => Math.hypot(p.x - cx, p.y - cy)));
+      this.insert(this.obsGrid, { o, cx, cy, r }, cx - r, cy - r, cx + r, cy + r);
     }
   }
 
-  private add(o: StaticObstacle) {
-    this.obstacles.push(o);
-    const x0 = Math.floor((o.cx - o.r) / CELL), x1 = Math.floor((o.cx + o.r) / CELL);
-    const y0 = Math.floor((o.cy - o.r) / CELL), y1 = Math.floor((o.cy + o.r) / CELL);
-    for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) {
+  private insert<T>(grid: Map<string, T[]>, v: T, x0: number, y0: number, x1: number, y1: number) {
+    for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(y0 / CELL); j <= Math.floor(y1 / CELL); j++) {
       const k = `${i},${j}`;
-      if (!this.grid.has(k)) this.grid.set(k, []);
-      this.grid.get(k)!.push(o);
+      let l = grid.get(k); if (!l) grid.set(k, (l = []));
+      l.push(v);
     }
   }
 
   isDrivable(x: number, y: number): boolean {
-    for (const r of this.drivable) if (inRect(r, x, y)) return true;
+    const l = this.polyGrid.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`);
+    if (!l) return false;
+    for (const r of l) if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1 && pointInPoly(r.poly, x, y)) return true;
     return false;
   }
 
-  /** First static obstacle overlapping the quad, if any. */
-  hitStatic(quad: Vec2[]): StaticObstacle | null {
+  heightAt(x: number, y: number) { return this.env.heightAt(x, y); }
+  gripAt(x: number, y: number) { return this.env.gripAt ? this.env.gripAt(x, y) : 1; }
+
+  /** First obstacle overlapping the quad (knocked soft obstacles are ignored). */
+  hitStatic(quad: Vec2[]): { id: string; kind: string; soft?: boolean } | null {
     let cx = 0, cy = 0;
     for (const q of quad) { cx += q.x; cy += q.y; }
     cx /= quad.length; cy /= quad.length;
-    const k = `${Math.floor(cx / CELL)},${Math.floor(cy / CELL)}`;
-    const seen = new Set<StaticObstacle>();
+    const seen = new Set<ObsRec>();
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
-      const list = this.grid.get(`${Math.floor(cx / CELL) + i},${Math.floor(cy / CELL) + j}`);
-      if (!list) continue;
-      for (const o of list) {
-        if (seen.has(o)) continue;
-        seen.add(o);
-        if (Math.hypot(o.cx - cx, o.cy - cy) > o.r + 3.5) continue;
-        if (quadsOverlap(quad, o.quad)) return o;
+      const l = this.obsGrid.get(`${Math.floor(cx / CELL) + i},${Math.floor(cy / CELL) + j}`);
+      if (!l) continue;
+      for (const rec of l) {
+        if (seen.has(rec)) continue;
+        seen.add(rec);
+        if (this.knocked.has(rec.o.id)) continue;
+        if (Math.hypot(rec.cx - cx, rec.cy - cy) > rec.r + 6) continue;
+        if (quadsOverlap(quad, rec.o.quad)) return { id: rec.o.id, kind: rec.o.kind, soft: rec.o.soft };
       }
     }
-    void k;
     return null;
   }
 
-  /** Line of sight between two ground points, blocked only by building footprints. */
+  knock(id: string) { this.knocked.add(id); }
+
+  /** Line of sight between two ground points, blocked only by building/terrain footprints. */
   los(a: Vec2, b: Vec2): boolean {
     for (const r of this.blockers) {
-      // quick reject on bounding boxes
       if (Math.max(a.x, b.x) < r.x0 || Math.min(a.x, b.x) > r.x1 || Math.max(a.y, b.y) < r.y0 || Math.min(a.y, b.y) > r.y1) continue;
       if (segmentHitsRect(a, b, r)) return false;
     }
     return true;
+  }
+
+  speedLimitAt(x: number, y: number): { kmh: number; ruleId: string } {
+    for (const z of this.env.speedZones) if (pointInPoly(z.poly, x, y)) return { kmh: z.limit, ruleId: z.ruleId };
+    return this.env.defaultLimit;
   }
 }

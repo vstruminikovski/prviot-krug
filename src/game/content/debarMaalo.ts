@@ -7,7 +7,7 @@
 
 import { rect, type Rect, type Vec2, type Pose } from '../math';
 
-export type SignCode = '102' | '205' | '302.1' | '305' | '305.1' | 'plaque';
+export type SignCode = '102' | '205' | '302.1' | '305' | '305.1' | 'plaque' | '103.1' | '103.2' | '106' | '107' | '111.1' | '115' | '121.1' | 'limit' | 'place' | '123';
 
 export interface Street {
   id: string;

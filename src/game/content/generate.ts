@@ -4,7 +4,7 @@
 import { rng, rect, type Rect, type Vec2, type Pose } from '../math';
 import { FRONTAGES, RESERVED, SIDEWALK, PARKING, TIHA_NARROW, SHOPS, type Frontage } from './debarMaalo';
 
-export type CarType = 'yugo' | 'stojadin' | 'hatch' | 'sedan' | 'compact' | 'van';
+export type CarType = 'yugo' | 'stojadin' | 'hatch' | 'sedan' | 'compact' | 'van' | 'estate' | 'coupe' | 'suv' | 'truck';
 
 export const CAR_DIMS: Record<CarType, { L: number; W: number; H: number }> = {
   yugo: { L: 3.49, W: 1.54, H: 1.39 },
@@ -13,6 +13,10 @@ export const CAR_DIMS: Record<CarType, { L: number; W: number; H: number }> = {
   sedan: { L: 4.32, W: 1.68, H: 1.42 },
   compact: { L: 4.06, W: 1.74, H: 1.49 },
   van: { L: 4.38, W: 1.76, H: 1.84 },
+  estate: { L: 4.46, W: 1.69, H: 1.48 },
+  coupe: { L: 4.12, W: 1.68, H: 1.30 },
+  suv: { L: 4.26, W: 1.80, H: 1.76 },
+  truck: { L: 7.2, W: 2.36, H: 3.2 },
 };
 
 export interface ParkedCar {

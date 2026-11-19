@@ -330,27 +330,28 @@ function addBuilding(b: Batcher, bd: Building, r: ReturnType<typeof rng>) {
   }
 }
 
-function addSign(b: Batcher, s: SignDef) {
+export function addSign(b: Batcher, s: SignDef, base = 0) {
   const isPlaque = s.code === 'plaque';
   const wide = s.code === '305.1';
   // Sizes are slightly generous for screen readability; official dimensions are listed as unverified in the README.
-  const w = isPlaque ? 1.0 : wide ? 1.25 : s.code === '102' ? 1.05 : 0.78;
-  const h = isPlaque ? 0.25 : wide ? 0.47 : w;
+  const isPlace = s.code === 'place';
+  const w = isPlaque ? 1.0 : isPlace ? (s.text && s.text.length > 12 ? 6 : 1.6) : wide ? 1.25 : ['102', '103.1', '103.2', '106', '107', '111.1', '115', '121.1', '123'].includes(s.code) ? 1.05 : 0.78;
+  const h = isPlaque ? 0.25 : isPlace ? (s.text && s.text.length > 12 ? 0.9 : 0.5) : wide ? 0.47 : w;
   const centerY = isPlaque ? 2.9 : (s.height ?? 2.3);
   const rot = faceRot(s.face);
   const n = { x: Math.cos(s.face), y: Math.sin(s.face) };
   if (!isPlaque) {
     const pole = new THREE.CylinderGeometry(0.035, 0.035, centerY + h / 2, 6);
-    pole.translate(s.x, (centerY + h / 2) / 2, -s.y);
+    pole.translate(s.x, base + (centerY + h / 2) / 2, -s.y);
     b.add(pole, 'signpole', () => lambert({ color: '#8e938f' }));
     const back = new THREE.PlaneGeometry(w * 0.98, h * 0.98);
     back.rotateY(rot + Math.PI);
-    back.translate(s.x - n.x * 0.045, centerY, -(s.y - n.y * 0.045));
+    back.translate(s.x - n.x * 0.045, base + centerY, -(s.y - n.y * 0.045));
     b.add(back, 'signback', () => lambert({ color: '#9aa09c', side: THREE.FrontSide }), undefined, false);
   }
   const face = new THREE.PlaneGeometry(w, h);
   face.rotateY(rot);
-  face.translate(s.x + n.x * 0.04, centerY, -(s.y + n.y * 0.04));
+  face.translate(s.x + n.x * 0.04, base + centerY, -(s.y + n.y * 0.04));
   b.add(face, `sign-${s.code}-${s.arrow ?? ''}-${s.text ?? ''}`, () => new THREE.MeshBasicMaterial({ map: T.signTexture(s.code, { arrow: s.arrow, text: s.text }), transparent: true, alphaTest: 0.4, toneMapped: false }), undefined, true);
 }
 
@@ -389,7 +390,7 @@ function buildTrees(r: ReturnType<typeof rng>): THREE.Group {
   return g;
 }
 
-function buildHorizon(): THREE.Group {
+export function buildHorizon(): THREE.Group {
   const g = new THREE.Group();
   // sky dome
   const sky = new THREE.Mesh(new THREE.SphereGeometry(2800, 24, 16), new THREE.MeshBasicMaterial({ map: T.skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false }));

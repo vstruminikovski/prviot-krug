@@ -1,9 +1,9 @@
 // Records vehicle positions, inputs and actor states for the end-of-run replay.
 import { lerp, wrapAngle } from '../math';
 
-export interface PlayerFrame { x: number; y: number; h: number; v: number; steer: number; thr: number; brk: number; ind: 0 | 1 | 2; gear: 0 | 1 }
+export interface PlayerFrame { x: number; y: number; h: number; v: number; steer: number; thr: number; brk: number; ind: 0 | 1 | 2; gear: 0 | 1; g?: string; rpm?: number; clu?: number; pb?: number; z?: number; eng?: string }
 export interface ActorFrame { id: string; k: 'car' | 'ped'; x: number; y: number; h: number; ind: 0 | 1 | 2; brk: boolean; ph?: number }
-export interface Frame { t: number; p: PlayerFrame; a: ActorFrame[] }
+export interface Frame { t: number; p: PlayerFrame; a: ActorFrame[]; x?: Record<string, number | string> }
 
 export const REC_HZ = 15;
 

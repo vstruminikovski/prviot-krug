@@ -76,7 +76,7 @@ export class NpcCar {
     if (this.s >= this.path.length - this.L / 2) {
       this.s = this.path.length - this.L / 2;
       if (this.despawnAtEnd) this.done = true;
-      else this.v = 0;
+      else if (this.vTarget <= 0) this.v = 0; // parked/stationary actors stay put; drivers get a new path from their owner
     }
   }
 }

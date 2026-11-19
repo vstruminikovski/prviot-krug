@@ -1,17 +1,21 @@
 // Host-platform integration: a small completion event and the optional friend challenge link.
-import type { RunSummary } from './sim/sim';
+import type { AttemptResult } from './sim/sim';
 
 export const EPISODE_ID = 'debar-maalo-1';
 
 export interface CompletionPayload {
   type: 'krug:complete';
   episode: string;
+  env: string; mode: string; vehicle: string; assist: string; seed: number;
   score: number; // game score 0–100 (not a legal assessment)
   maxScore: 100;
   finished: boolean;
-  scenarios: { id: string; outcome: string; points: number; reactionSec: number | null; scored: boolean }[];
-  speedingEpisodes: number;
-  contacts: number;
+  failed: string | null;
+  layers: { safety: number; technique: number; mission: number };
+  exam: { form: string; total: number; passed: boolean } | null;
+  items: { id: string; status: string }[];
+  incidents: { rule: string; severity: string; t: number }[];
+  versions: { content: number; rules: string; physics: string };
   completedAt: string;
 }
 
@@ -26,11 +30,12 @@ export interface HostOptions {
 let hostOptions: HostOptions = {};
 export const setHostOptions = (o: HostOptions) => { hostOptions = { ...hostOptions, ...o }; };
 
-export function emitComplete(sum: RunSummary) {
+export function emitComplete(r: AttemptResult) {
   const payload: CompletionPayload = {
-    type: 'krug:complete', episode: EPISODE_ID, score: sum.score, maxScore: 100, finished: sum.finished,
-    scenarios: sum.scenarios.map((s) => ({ id: s.id, outcome: s.outcome, points: s.points, reactionSec: s.reaction === null ? null : Math.round(s.reaction * 10) / 10, scored: s.id !== 'x1' })),
-    speedingEpisodes: sum.speeding.length, contacts: sum.contacts.length, completedAt: new Date().toISOString(),
+    type: 'krug:complete', episode: EPISODE_ID, env: r.config.env, mode: r.config.mode, vehicle: r.config.vehicle, assist: r.config.assist, seed: r.config.seed,
+    score: r.gameScore, maxScore: 100, finished: r.finished, failed: r.failed?.text ?? null, layers: r.layers, exam: r.exam,
+    items: r.items.map((i) => ({ id: i.id, status: i.status })), incidents: r.incidents.map((i) => ({ rule: i.ruleIds[0], severity: i.severity, t: Math.round(i.t * 10) / 10 })),
+    versions: r.versions, completedAt: new Date().toISOString(),
   };
   try { window.dispatchEvent(new CustomEvent('krug:complete', { detail: payload })); } catch { /* ignore */ }
   try { if (window.parent && window.parent !== window) window.parent.postMessage(payload, '*'); } catch { /* ignore */ }
@@ -45,18 +50,13 @@ export function isHosted(): boolean {
   return /^https?:$/.test(location.protocol) && !['localhost', '127.0.0.1', '[::1]', ''].includes(location.hostname);
 }
 
-export function challengeUrl(score: number): string {
+export function challengeUrl(code: string): string {
   const base = hostOptions.shareUrl ?? `${location.origin}${location.pathname}`;
   const u = new URL(base, location.href);
-  u.searchParams.set('route', EPISODE_ID);
-  u.searchParams.set('challenge', String(score));
+  u.searchParams.set('c', code);
   return u.toString();
 }
 
-export function incomingChallenge(): number | null {
-  const q = new URLSearchParams(location.search);
-  const c = q.get('challenge');
-  if (!c || q.get('route') !== EPISODE_ID) return null;
-  const n = Number(c);
-  return Number.isFinite(n) && n >= 0 && n <= 100 ? Math.round(n) : null;
+export function incomingChallenge(): string | null {
+  return new URLSearchParams(location.search).get('c');
 }

@@ -4,7 +4,7 @@
 // first visible cue, and evaluates only predicates that can be observed reliably.
 import { Path, angleDiff, clamp, inRect, kmh, rect, type Pose, type Vec2 } from '../math';
 import { NpcCar, Pedestrian } from './actors';
-import { PLAYER, type Contact } from './vehicle';
+import type { Contact } from '../vehicles/vehicle';
 import { SCENARIOS, type ScenarioId } from '../content/scenarios';
 import { JUNCTIONS, TIHA_NARROW, CROSSINGS, SIGNS } from '../content/debarMaalo';
 import type { Sim } from './sim';
@@ -81,6 +81,19 @@ export abstract class ScenarioRuntime {
     this.res.outcome = outcome;
     this.res.decisionT = sim.t;
     sim.emit({ type: 'scenario', id: this.id, outcome });
+    // feed the safety layer of the shared ledger with the sourced rule
+    const MAP: Record<string, [string, string[], string]> = {
+      s1: ['law.priority.right', ['exam4.2B'], 'Не го пропушти возилото од десно.'],
+      s2: ['law.meeting.obstacle', ['exam4.2T'], 'Не го пропушти возилото од спротивно кај пречката.'],
+      s3: ['law.ped.crossing', ['exam4.2Gj'], 'Не ја пропушти пешачката на преминот.'],
+      's4-route': ['law.signs', ['exam4.2O'], 'Влезе спротивно во еднонасочна улица.'],
+      's4-signal': ['law.signalling', ['exam4.2K'], 'Свртувањето налево не беше навреме најавено.'],
+    };
+    const key = this.id === 's4' ? (outcome === 'fail-route' ? 's4-route' : 's4-signal') : this.id;
+    if (outcome === 'fail' || outcome === 'collision' || outcome === 'fail-route' || outcome === 'fail-signal') {
+      const m = MAP[key];
+      if (m) sim.incident('scn-' + key, { layer: 'safety', severity: outcome === 'fail-signal' ? 'significant' : 'serious', ruleIds: [m[0]], text: m[2], exam: m[1] }, 60);
+    }
   }
 
   protected close(sim: Sim, after = 2) {
@@ -126,7 +139,7 @@ export class S1 extends ScenarioRuntime {
       return;
     }
     const npc = this.npc!;
-    const front = p.x + Math.cos(p.h) * PLAYER.L / 2;
+    const front = p.x + Math.cos(p.h) * sim.player.L / 2;
     const dBox = box.x0 - front;
     const npcFrontY = npc.pose.y + npc.L / 2;
     const npcRearY = npc.pose.y - npc.L / 2;
@@ -209,7 +222,7 @@ export class S2 extends ScenarioRuntime {
       return;
     }
     const npc = this.npc!;
-    const front = p.y + Math.sin(p.h) * PLAYER.L / 2;
+    const front = p.y + Math.sin(p.h) * sim.player.L / 2;
     const np = npc.pose;
     const onTiha = Math.abs(np.x - 478.6) < 1.5 && np.y < 259;
     const npcFrontY = onTiha ? np.y - npc.L / 2 : Infinity; // heading south
@@ -225,7 +238,7 @@ export class S2 extends ScenarioRuntime {
       }
     }
     // Opposing driver will not enter the narrow part while the player is in it
-    const playerInSection = p.y > this.y0 - 1 && p.y < this.y1 + PLAYER.L && Math.abs(p.x - 480) < 3;
+    const playerInSection = p.y > this.y0 - 1 && p.y < this.y1 + sim.player.L && Math.abs(p.x - 480) < 3;
     npc.holdAtS = playerInSection && npcFrontY > this.y1 ? npcSFor(this.y1 + 2.5) : null;
 
     this.cue(sim, onTiha && sim.world.los(p.pose, np) && Math.hypot(np.x - p.x, np.y - p.y) < 190, np);
@@ -240,7 +253,7 @@ export class S2 extends ScenarioRuntime {
         else {
           const npcIn = npcFrontY <= this.y1;
           const etaN = npcIn ? 0 : (npcFrontY - this.y1) / Math.max(npc.v, 0.5);
-          const clearT = (this.y1 + PLAYER.L - front) / Math.max(p.v, 4);
+          const clearT = (this.y1 + sim.player.L - front) / Math.max(p.v, 4);
           if (npcIn) { this.res.did = 'Влезе во тесниот дел додека другото возило веќе беше во него.'; this.finish(sim, 'fail'); }
           else if (etaN < clearT + 0.5) { this.res.did = `Влезе, а возилото од спротивно стигнуваше за ${etaN.toFixed(1)} с — пред ти да излезеш.`; this.finish(sim, 'fail'); }
           else { this.res.did = 'Влезе кога возилото од спротивно беше доволно далеку.'; this.finish(sim, 'pass'); }
@@ -303,7 +316,7 @@ export class S3 extends ScenarioRuntime {
       return;
     }
     const ped = this.ped!;
-    const front = p.x + Math.cos(p.h) * PLAYER.L / 2;
+    const front = p.x + Math.cos(p.h) * sim.player.L / 2;
     const dLine = front - line;
     const eta = dLine / Math.max(p.v, 5);
     const curbS = ped.markers.curb, farS = ped.markers.far;
@@ -317,6 +330,8 @@ export class S3 extends ScenarioRuntime {
       }
     }
     if (ped.state === 'walk') {
+      // keep adapting her pace until the driver commits (30 m out), so the meeting stays fair at any speed
+      if (dLine > 30) ped.speed = clamp((curbS - ped.s) / Math.max(eta - 3.6, 2.5), 0.75, 1.6);
       ped.advance(dt);
       if (ped.s >= curbS - 0.05) ped.state = 'wait';
     } else if (ped.state === 'wait') {
@@ -326,7 +341,7 @@ export class S3 extends ScenarioRuntime {
       if (!tooClose && !blocked) { ped.state = 'cross'; ped.onRoad = true; ped.speed = 0.92; }
     } else if (ped.state === 'cross') {
       // she pauses if a car is inside the crossing in front of her
-      const carIn = Math.abs(p.x - 330.6) < PLAYER.L / 2 + 0.8 && p.y < ped.pos.y && p.y > ped.pos.y - 3;
+      const carIn = Math.abs(p.x - 330.6) < sim.player.L / 2 + 0.8 && p.y < ped.pos.y && p.y > ped.pos.y - 3;
       if (!carIn) ped.advance(dt);
       if (ped.s >= farS) { ped.state = 'after'; ped.onRoad = false; }
     } else if (ped.state === 'after') {

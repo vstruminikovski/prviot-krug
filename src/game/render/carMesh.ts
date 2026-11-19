@@ -7,7 +7,7 @@ import type { Batcher } from './batcher';
 
 interface Profile {
   belt: number; hoodFront: number; wsBase: number; roofFront: number; roofRear: number; backBase: number; tailTop: number;
-  wheelR: number; wb: number; kind: 'hatch' | 'sedan' | 'van'; bumper: 'black' | 'chrome'; bevel: number;
+  wheelR: number; wb: number; kind: 'hatch' | 'sedan' | 'van' | 'truck'; bumper: 'black' | 'chrome'; bevel: number; bottom?: number;
 }
 
 const PROFILES: Record<CarType, Profile> = {
@@ -17,7 +17,14 @@ const PROFILES: Record<CarType, Profile> = {
   sedan: { belt: 0.86, hoodFront: 0.78, wsBase: 0.95, roofFront: 0.30, roofRear: -0.96, backBase: -1.48, tailTop: 0.90, wheelR: 0.30, wb: 2.55, kind: 'sedan', bumper: 'chrome', bevel: 0.03 },
   compact: { belt: 0.93, hoodFront: 0.86, wsBase: 1.02, roofFront: 0.12, roofRear: -1.58, backBase: -1.98, tailTop: 1.02, wheelR: 0.31, wb: 2.55, kind: 'hatch', bumper: 'black', bevel: 0.06 },
   van: { belt: 0.96, hoodFront: 0.92, wsBase: 1.30, roofFront: 0.74, roofRear: -2.15, backBase: -2.17, tailTop: 1.80, wheelR: 0.31, wb: 2.70, kind: 'van', bumper: 'black', bevel: 0.03 },
+  estate: { belt: 0.86, hoodFront: 0.78, wsBase: 0.98, roofFront: 0.32, roofRear: -2.06, backBase: -2.19, tailTop: 0.96, wheelR: 0.30, wb: 2.56, kind: 'hatch', bumper: 'black', bevel: 0.03 },
+  coupe: { belt: 0.80, hoodFront: 0.72, wsBase: 0.74, roofFront: -0.02, roofRear: -0.9, backBase: -1.78, tailTop: 0.86, wheelR: 0.30, wb: 2.42, kind: 'sedan', bumper: 'chrome', bevel: 0.035 },
+  suv: { belt: 1.14, hoodFront: 1.04, wsBase: 1.04, roofFront: 0.42, roofRear: -1.98, backBase: -2.1, tailTop: 1.16, wheelR: 0.36, wb: 2.5, kind: 'hatch', bumper: 'black', bevel: 0.05, bottom: 0.42 },
+  truck: { belt: 1.6, hoodFront: 1.5, wsBase: 3.35, roofFront: 3.2, roofRear: 1.55, backBase: 1.5, tailTop: 2.6, wheelR: 0.48, wb: 4.0, kind: 'truck', bumper: 'black', bevel: 0.04, bottom: 0.62 },
 };
+
+/** Which mesh profile a vehicle definition uses (procedural fallback for the Blender assets). */
+export const MESH_FOR: Record<string, CarType> = { vardarka: 'yugo', pelister: 'sedan', shar: 'estate', ohrid: 'coupe', korab: 'suv', bistra: 'van', jakupica: 'truck' };
 
 export type CarMat = 'body' | 'glass' | 'black' | 'tire' | 'hub' | 'chrome' | 'head' | 'tail' | 'indL' | 'indR' | 'plate' | 'rust' | 'interior';
 export interface CarPart { geom: THREE.BufferGeometry; mat: CarMat }
@@ -46,17 +53,22 @@ function plateGeom(atlas: PlateAtlas, text: string, x: number, y: number, front:
   return g;
 }
 
-export function carParts(type: CarType, plate: string, atlas: PlateAtlas, condition = 0, seed = 1): CarPart[] {
+export function carParts(type: CarType, plate: string, atlas: PlateAtlas, condition = 0, seed = 1, trims: string[] = []): CarPart[] {
   const { L, W, H } = CAR_DIMS[type];
   const p = PROFILES[type];
+  if (p.kind === 'truck') return truckParts(L, W, H, p, plate, atlas, trims);
   const parts: CarPart[] = [];
   const hl = L / 2;
   const bodyD = W - 2 * p.bevel;
+  const bottom = p.bottom ?? 0.24;
   // lower body
   const top = Math.max(p.belt, p.kind === 'van' ? p.belt : p.tailTop);
   parts.push({ mat: 'body', geom: extrude([
-    [-hl, 0.24], [hl, 0.24], [hl, p.hoodFront - 0.14], [hl - 0.10, p.hoodFront], [p.wsBase, p.belt], [-hl + 0.04, top], [-hl, top - 0.12],
+    [-hl, bottom], [hl, bottom], [hl, p.hoodFront - 0.14], [hl - 0.10, p.hoodFront], [p.wsBase, p.belt], [-hl + 0.04, top], [-hl, top - 0.12],
   ], bodyD, p.bevel) });
+  // under-body shadow line and sills so the body reads grounded
+  parts.push({ mat: 'black', geom: box(L * 0.82, 0.08, W - 0.08, 0, bottom + 0.02, 0) });
+  for (const tr of trims) parts.push(...trimParts(tr, type, L, W, H, p));
   if (p.kind === 'van') {
     const split = p.roofFront - 0.85;
     parts.push({ mat: 'glass', geom: extrude([[p.wsBase, p.belt], [p.roofFront, H - 0.02], [split, H - 0.02], [split, p.belt]], W - 0.14, 0.01) });
@@ -119,6 +131,66 @@ export function carParts(type: CarType, plate: string, atlas: PlateAtlas, condit
   return parts;
 }
 
+/** Optional original trims (garage): roof rack, spare wheel, stripes, chrome caps, bull bar. */
+function trimParts(tr: string, type: CarType, L: number, W: number, H: number, p: Profile): CarPart[] {
+  const out: CarPart[] = [];
+  if (tr === 'Кровен носач' || tr === 'Кровни шини') {
+    for (const z of [-1, 1]) out.push({ mat: 'chrome', geom: box(Math.abs(p.roofFront - p.roofRear) * 0.9, 0.05, 0.05, (p.roofFront + p.roofRear) / 2, H + 0.06, z * (W / 2 - 0.15)) });
+    for (let i = 0; i < 3; i++) out.push({ mat: 'black', geom: box(0.05, 0.04, W - 0.25, p.roofRear + (p.roofFront - p.roofRear) * (0.2 + i * 0.3), H + 0.09, 0) });
+  } else if (tr === 'Резервно на врата') {
+    const t = new THREE.CylinderGeometry(p.wheelR * 0.95, p.wheelR * 0.95, 0.22, 14); t.rotateZ(Math.PI / 2); t.translate(-L / 2 - 0.13, p.belt - 0.05, 0);
+    out.push({ mat: 'tire', geom: t });
+  } else if (tr === 'Спорт ленти') {
+    out.push({ mat: 'interior', geom: box(L * 0.72, 0.06, 0.012, 0, p.belt - 0.2, W / 2 + 0.006) });
+    out.push({ mat: 'interior', geom: box(L * 0.72, 0.06, 0.012, 0, p.belt - 0.2, -W / 2 - 0.006) });
+  } else if (tr === 'Рамка напред') {
+    out.push({ mat: 'chrome', geom: box(0.06, 0.5, W * 0.8, L / 2 + 0.16, 0.62, 0) });
+    out.push({ mat: 'chrome', geom: box(0.18, 0.05, W * 0.8, L / 2 + 0.08, 0.86, 0) });
+  } else if (tr === 'Хром лајсни' || tr === 'Странична лајсна') {
+    for (const z of [-1, 1]) out.push({ mat: 'chrome', geom: box(L * 0.8, 0.03, 0.012, 0, (p.bottom ?? 0.24) + 0.2, z * (W / 2 + 0.006)) });
+  }
+  void type;
+  return out;
+}
+
+/** Rigid truck: cab-over, chassis, cargo box (or tilt), twin rear wheels. */
+function truckParts(L: number, W: number, H: number, p: Profile, plate: string, atlas: PlateAtlas, trims: string[]): CarPart[] {
+  const parts: CarPart[] = [];
+  const hl = L / 2;
+  const cabL = 1.9, cabX = hl - cabL / 2;
+  const cabH = 2.75;
+  // cab with a sloped windscreen
+  parts.push({ mat: 'body', geom: extrude([[hl - cabL, 0.95], [hl - 0.05, 0.95], [hl, 1.25], [hl, 1.55], [hl - 0.25, cabH - 0.05], [hl - cabL, cabH]], W - 0.1, 0.04) });
+  parts.push({ mat: 'glass', geom: extrude([[hl - 0.02, 1.62], [hl - 0.24, cabH - 0.18], [hl - 0.6, cabH - 0.18], [hl - 0.6, 1.62]], W - 0.18, 0.01) });
+  parts.push({ mat: 'glass', geom: box(0.7, 0.62, W - 0.04, hl - 0.95, 2.05, 0) });
+  parts.push({ mat: 'black', geom: box(0.06, 0.5, W * 0.7, hl + 0.01, 1.2, 0) }); // grille
+  parts.push({ mat: 'black', geom: box(0.18, 0.28, W + 0.02, hl + 0.05, 0.72, 0) }); // bumper
+  // chassis rails
+  for (const z of [-0.45, 0.45]) parts.push({ mat: 'black', geom: box(L - 0.3, 0.22, 0.12, -0.15, 0.78, z) });
+  // cargo
+  const boxL = L - cabL - 0.25, boxX = -hl + boxL / 2;
+  const tilt = trims.includes('Цирада');
+  parts.push({ mat: tilt ? 'interior' : 'body', geom: box(boxL, H - 1.0, W, boxX, 1.0 + (H - 1.0) / 2, 0) });
+  if (!tilt) for (let i = 1; i < 6; i++) parts.push({ mat: 'chrome', geom: box(0.04, H - 1.1, W + 0.01, -hl + (boxL * i) / 6, 1.0 + (H - 1.0) / 2, 0) });
+  // wheels: single front, twin rear
+  const r = p.wheelR;
+  const wheel = (x: number, z: number) => { const t = new THREE.CylinderGeometry(r, r, 0.3, 16); t.rotateX(Math.PI / 2); t.translate(x, r, z); parts.push({ mat: 'tire', geom: t }); const h = new THREE.CylinderGeometry(r * 0.55, r * 0.55, 0.32, 10); h.rotateX(Math.PI / 2); h.translate(x, r, z); parts.push({ mat: 'hub', geom: h }); };
+  const fx = hl - 1.25, rx = fx - p.wb;
+  for (const z of [-1, 1]) { wheel(fx, z * (W / 2 - 0.2)); wheel(rx, z * (W / 2 - 0.2)); wheel(rx, z * (W / 2 - 0.52)); }
+  for (const z of [-1, 1]) {
+    parts.push({ mat: 'head', geom: box(0.04, 0.16, 0.32, hl + 0.06, 0.9, z * (W / 2 - 0.3)) });
+    parts.push({ mat: z < 0 ? 'indL' : 'indR', geom: box(0.04, 0.1, 0.12, hl + 0.06, 0.9, z * (W / 2 - 0.08)) });
+    parts.push({ mat: 'tail', geom: box(0.04, 0.16, 0.3, -hl - 0.01, 0.95, z * (W / 2 - 0.3)) });
+    parts.push({ mat: z < 0 ? 'indL' : 'indR', geom: box(0.04, 0.16, 0.12, -hl - 0.01, 0.95, z * (W / 2 - 0.08)) });
+    // big West-Coast mirrors
+    parts.push({ mat: 'black', geom: box(0.08, 0.42, 0.2, hl - 0.35, 2.05, z * (W / 2 + 0.28)) });
+  }
+  parts.push({ mat: 'plate', geom: plateGeom(atlas, plate, hl + 0.16, 0.72, true) });
+  parts.push({ mat: 'plate', geom: plateGeom(atlas, plate, -hl - 0.04, 0.72, false) });
+  void cabX;
+  return parts;
+}
+
 // ---------------------------------------------------------------------------
 const fade = (hex: string, condition: number) => {
   const c = new THREE.Color(hex);
@@ -165,19 +237,23 @@ export interface CarRig {
   setReverse(on: boolean): void;
   wheels: THREE.Object3D[];
   body: THREE.Group;
+  /** live paint change: updates the material only, never rebuilds geometry or physics */
+  setPaint(hex: string, finish: 'solid' | 'metallic'): void;
+  setHazardsLamp?(on: boolean): void;
 }
 
 /** Dynamic car with its own light materials (player and moving traffic). */
-export function buildCarRig(type: CarType, color: string, plate: string, atlas: PlateAtlas, condition = 0): CarRig {
+export function buildCarRig(type: CarType, color: string, plate: string, atlas: PlateAtlas, condition = 0, opts: { trims?: string[]; finish?: 'solid' | 'metallic' } = {}): CarRig {
   const group = new THREE.Group();
   const body = new THREE.Group();
   group.add(body);
-  const bodyMat = new THREE.MeshStandardMaterial({ color: fade(color, condition), metalness: 0.18, roughness: 0.42 });
+  const metallic = opts.finish === 'metallic';
+  const bodyMat = new THREE.MeshStandardMaterial({ color: fade(color, condition), metalness: metallic ? 0.55 : 0.12, roughness: metallic ? 0.32 : 0.48 });
   const indL = new THREE.MeshLambertMaterial({ color: '#c9861c', emissive: '#1a0e00' });
   const indR = indL.clone();
   const tail = new THREE.MeshLambertMaterial({ color: '#7a1410', emissive: '#2a0000' });
   const wheels: THREE.Object3D[] = [];
-  for (const part of carParts(type, plate, atlas, condition, 3)) {
+  for (const part of carParts(type, plate, atlas, condition, 3, opts.trims ?? [])) {
     const mat = part.mat === 'body' ? bodyMat : part.mat === 'indL' ? indL : part.mat === 'indR' ? indR : part.mat === 'tail' ? tail : sharedCarMaterial(part.mat, atlas);
     const mesh = new THREE.Mesh(part.geom, mat);
     mesh.castShadow = part.mat === 'body' || part.mat === 'glass';
@@ -192,6 +268,7 @@ export function buildCarRig(type: CarType, color: string, plate: string, atlas: 
     },
     setBrake(on) { tail.emissive.set(on ? '#ff1a10' : '#2a0000'); tail.color.set(on ? '#ff4030' : '#7a1410'); },
     setReverse(_on) { /* reverse lamp folded into tail cluster for simplicity */ },
+    setPaint(hex, finish) { bodyMat.color.set(hex); bodyMat.metalness = finish === 'metallic' ? 0.55 : 0.12; bodyMat.roughness = finish === 'metallic' ? 0.32 : 0.48; },
   };
 }
 
