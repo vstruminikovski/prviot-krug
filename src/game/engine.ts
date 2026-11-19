@@ -352,7 +352,7 @@ export class GameEngine {
       v.syncLive(sim, dt, blink);
       const ip = v.playerPose(sim);
       v.updateCamera(dt, this.finishT !== null ? 'finish' : v.camMode, ip, p.vx, p.steer, this.finishT !== null ? null : glance);
-      v.render('world', this.finishT === null, ip);
+      v.render('world', this.finishT === null && this.countdown === null, ip); // no mirrors over the opening shot
       this.audio.setDuck(this.paused ? 0.35 : 1); // paused: the street goes quiet, the menu stays clear
       this.audio.update(dt, { revs: p.rpm / p.def.engine.redline, throttle: p.throttle, speed: this.paused ? 0 : Math.abs(p.vx), horn: !!p.horn && !this.paused, cafeProximity: 0, cafePan: 0, running: p.engine === 'running' && !this.paused, siren: sim.extraState.siren === 1, diesel: !!p.def.engine.diesel, load: p.engineLoad, slip: !p.locked && p.clutchEff > 0.05 && p.clutchEff < 0.95 && p.gear !== 'N' ? 1 : 0, rpm: p.rpm, tyre: this.paused ? 0 : Math.max(Math.min(1, Math.max(0, Math.abs(p.vy) - 0.8) * 0.6), p.wheelspinning ? 0.8 : 0, p.brake > 0.85 && Math.abs(p.vx) > 9 && sim.world.gripAt(p.x, p.y) < 0.9 ? 0.6 : 0) });
       // finish beat: a slow orbit and a title card before the results screen

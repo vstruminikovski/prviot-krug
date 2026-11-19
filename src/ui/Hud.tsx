@@ -361,20 +361,20 @@ function TouchControls({ engine, hud }: { engine: GameEngine; hud: HudState }) {
   return (
     <div className="touch">
       <div className="touch-top">
-        <button className={`tbtn ${(hud.indicator === 'left' || hud.hazards) && hud.blink ? 'blink' : hud.indicator === 'left' ? 'armed' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'left' })} aria-label="Лев покажувач">◀</button>
-        <button ref={lookRef} className="tbtn look" aria-label="Погледни: огледало, подолго — преку рамо"><Icon name="eye" size={18} /></button>
-        <button className={`tbtn ${(hud.indicator === 'right' || hud.hazards) && hud.blink ? 'blink' : hud.indicator === 'right' ? 'armed' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'right' })} aria-label="Десен покажувач">▶</button>
+        <button className={`tbtn ind ${(hud.indicator === 'left' || hud.hazards) && hud.blink ? 'blink' : hud.indicator === 'left' ? 'armed' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'left' })} aria-label="Лев покажувач"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M14 6l-6 6 6 6" /></svg></button>
+        <button ref={lookRef} className="tbtn look" aria-label="Погледни: огледало, подолго — преку рамо"><Icon name="eye" size={19} /></button>
+        <button className={`tbtn ind ${(hud.indicator === 'right' || hud.hazards) && hud.blink ? 'blink' : hud.indicator === 'right' ? 'armed' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'right' })} aria-label="Десен покажувач"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M10 6l6 6-6 6" /></svg></button>
       </div>
       <div className="touch-left">
-        <div ref={steerRef} className="steer-pad" aria-label="Волан: лизгај лево-десно"><span className="steer-track" /><span ref={knob} className="steer-knob"><Icon name="wheel" size={24} /></span></div>
+        <div ref={steerRef} className="steer-pad" aria-label="Волан: лизгај лево-десно"><span className="steer-track" /><span ref={knob} className="steer-knob"><Icon name="wheel" size={26} /></span></div>
       </div>
       <div className="touch-right">
         <div className="tcol">
-          <button className={`tbtn pb ${hud.parkingBrake ? 'on' : ''}`} onClick={() => cmd({ type: 'parkingBrake' })} aria-label="Рачна сопирачка" aria-pressed={hud.parkingBrake}><b>P</b><small>рачна</small></button>
-          <button className={`tbtn dr ${reverse ? 'rev' : ''}`} onClick={() => cmd({ type: 'gear', gear: reverse ? 1 : 'R' })} aria-label="Напред / рикверц"><b className={!reverse ? 'on' : ''}>D</b><b className={reverse ? 'on' : ''}>R</b></button>
+          <button className={`tbtn pb ${hud.parkingBrake ? 'on' : ''}`} onClick={() => cmd({ type: 'parkingBrake' })} aria-label="Рачна сопирачка" aria-pressed={hud.parkingBrake}><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden><circle cx="12" cy="12" r="6.2" /><path d="M10.4 15V9h2.1a1.8 1.8 0 010 3.6h-2.1" /><path d="M4.6 7.4a8.6 8.6 0 000 9.2M19.4 7.4a8.6 8.6 0 010 9.2" /></svg></button>
+          <button className={`tbtn dr ${reverse ? 'rev' : ''}`} onClick={() => cmd({ type: 'gear', gear: reverse ? 1 : 'R' })} aria-label={reverse ? 'Рикверц — допри за напред' : 'Напред — допри за рикверц'}><b className={!reverse ? 'on' : ''}>D</b><b className={reverse ? 'on' : ''}>R</b></button>
         </div>
-        <div ref={bRef} className="tpedal brake"><i /><b>СОП</b></div>
-        <div ref={gRef} className="tpedal gas"><i /><b>ГАС</b></div>
+        <div ref={bRef} className="tpedal brake" aria-label="Сопирачка"><i /><svg viewBox="0 0 40 40" aria-hidden><path d="M9 14h22M9 20h22M9 26h22" /></svg></div>
+        <div ref={gRef} className="tpedal gas" aria-label="Гас"><i /><svg viewBox="0 0 40 60" aria-hidden><path d="M14 14v32M20 14v32M26 14v32" /></svg></div>
       </div>
     </div>
   );

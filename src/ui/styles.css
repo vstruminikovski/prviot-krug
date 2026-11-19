@@ -633,3 +633,47 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
   .tcol { order: -1; width: 100%; flex-direction: row; }
   .tcol .tbtn.pb { width: 54px; height: 40px; } .tcol .tbtn.dr { flex: 1; width: auto; }
 }
+
+/* ---------- phone controls: quiet glass, icons not words (one visual language) ---------- */
+@media (pointer: coarse) {
+  .hud { --glass-c: rgba(28,30,32,.42); --glass-b: rgba(255,255,255,.16); --glass-on: rgba(255,255,255,.9); }
+  .tbtn, .steer-pad, .tpedal, .mbar, .tspeed { background: var(--glass-c); border: .5px solid var(--glass-b); backdrop-filter: blur(22px) saturate(170%); -webkit-backdrop-filter: blur(22px) saturate(170%); box-shadow: 0 8px 24px rgba(0,0,0,.22); }
+  .tbtn { width: 46px; height: 46px; border-radius: 23px; color: rgba(255,255,255,.92); transition: transform .12s var(--ease), background .15s; }
+  .tbtn:active, .tbtn.held { transform: scale(.94); }
+  .tbtn svg path, .tbtn svg circle { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .tbtn.look { width: 46px; }
+  .tbtn.ind.armed { color: #7ee2a8; } .tbtn.ind.blink { background: #34c759; color: #fff; border-color: transparent; }
+  .tbtn.held { background: var(--glass-on); color: #111; }
+  /* (P) parking brake — the dashboard symbol, red when applied */
+  .tbtn.pb { width: 46px; height: 46px; } .tbtn.pb.on { background: #ff3b30; color: #fff; border-color: transparent; }
+  /* D/R: an iOS segmented switch */
+  .tbtn.dr { width: 46px; height: 64px; border-radius: 23px; flex-direction: column; gap: 4px; font-family: var(--f-text); font-size: 15px; font-weight: 700; margin: 0; }
+  .tbtn.dr b { opacity: .38; transition: opacity .15s, color .15s; } .tbtn.dr b.on { opacity: 1; color: #fff; } .tbtn.dr.rev { border-color: rgba(255,59,48,.6); } .tbtn.dr.rev b.on { color: #ff6b61; }
+  .tcol { gap: 10px; }
+  /* steering: a slim track and a white puck */
+  .steer-pad { border-radius: 40px; }
+  .steer-track { height: 3px; background: rgba(255,255,255,.18); }
+  .steer-knob { background: #f5f5f7; color: #1d1d1f; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+  /* pedals: they look and move like pedals — tilt away under the thumb, no labels */
+  .tpedal { border-radius: 16px; transform: perspective(240px) rotateX(10deg); transform-origin: 50% 100%; transition: transform .12s var(--ease), background .15s; color: rgba(255,255,255,.7); }
+  .tpedal svg { position: relative; width: 60%; height: auto; } .tpedal svg path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; opacity: .55; }
+  .tpedal i { top: auto; bottom: 0; height: calc(var(--d) * 100%); background: currentColor; }
+  .tpedal.held { transform: perspective(240px) rotateX(24deg) translateY(2px); background: rgba(40,42,44,.6); }
+  .tpedal.held i { opacity: .22; }
+  .tpedal.brake { width: 78px; height: 100px; } .tpedal.gas { width: 58px; height: 124px; border-radius: 14px; }
+  .tpedal.gas, .tpedal.brake { color: rgba(255,255,255,.72); }
+  .tpedal.brake.held { color: #ff6b61; border-color: rgba(255,107,97,.7); } .tpedal.gas.held { color: #63e6a0; border-color: rgba(99,230,160,.7); }
+  /* read-out and message bar: type, not decoration */
+  .tspeed { border-radius: 22px; } .tspeed small { font-weight: 600; letter-spacing: .02em; }
+  .tgear { background: none; color: #fff; font-family: var(--f-text); font-size: 14px; } .tgear.r { color: #ff6b61; }
+  .tpb { border-width: 1.5px; border-color: #ff3b30; color: #ff3b30; font-family: var(--f-text); }
+  .mbar { border-radius: 16px; padding: 7px 12px; }
+  .mbar-task { font-weight: 600; } .mbar-task .task-arrow { background: none; color: #fff; width: 20px; }
+  .mbar-task + .mbar-msg { border-top: .5px solid rgba(255,255,255,.12); }
+  .mbar-msg { color: rgba(255,255,255,.75); }
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  .tcol .tbtn.pb { width: 46px; height: 42px; } .tcol .tbtn.dr { height: 42px; flex-direction: row; gap: 22px; }
+  .tpedal.brake { width: 76px; height: 104px; } .tpedal.gas { width: 60px; height: 124px; }
+  .steer-pad { height: 76px; }
+}
