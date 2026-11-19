@@ -24,9 +24,15 @@ export default function App() {
     window.__krug = eng;
     setEngine(eng);
     const unsub = eng.subscribe(setHud);
-    const resize = () => { const el = wrapRef.current!; eng.view.setSize(el.clientWidth, el.clientHeight); };
+    const resize = () => { const el = wrapRef.current; if (!el) return; const w = el.clientWidth, h = el.clientHeight; if (w > 0 && h > 0 && (w !== eng.view.width || h !== eng.view.height)) eng.view.setSize(w, h); };
     resize();
     const ro = new ResizeObserver(resize); ro.observe(wrapRef.current!);
+    // phones settle their size late after a rotation, fullscreen change or toolbar collapse: measure again
+    const timers: number[] = [];
+    const settle = () => { resize(); requestAnimationFrame(resize); for (const ms of [120, 350, 700]) timers.push(window.setTimeout(resize, ms)); };
+    const sizeEvents: [EventTarget, string][] = [[window, 'resize'], [window, 'orientationchange'], [document, 'fullscreenchange'], [document, 'webkitfullscreenchange'], [document, 'visibilitychange']];
+    if (window.visualViewport) sizeEvents.push([window.visualViewport, 'resize']);
+    for (const [t, ev] of sizeEvents) t.addEventListener(ev, settle);
     // GPU reset / driver hiccup: pause, then rebuild cleanly when the context comes back
     const cv = canvasRef.current!;
     const lost = (e: Event) => { e.preventDefault(); setError('Графичката картичка го ресетираше прикажувањето. Се обидуваме повторно…'); };
@@ -50,7 +56,7 @@ export default function App() {
       eng.audio.ui(b.classList.contains('primary') || b.classList.contains('go') ? 'confirm' : b.dataset.sound === 'back' ? 'back' : 'tick');
     };
     window.addEventListener('click', click, true);
-    return () => { unsub(); ro.disconnect(); clearTimeout(hard); window.removeEventListener('click', click, true); cv.removeEventListener('webglcontextlost', lost); cv.removeEventListener('webglcontextrestored', restored); eng.dispose(); };
+    return () => { unsub(); ro.disconnect(); for (const [t, ev] of sizeEvents) t.removeEventListener(ev, settle); timers.forEach(clearTimeout); clearTimeout(hard); window.removeEventListener('click', click, true); cv.removeEventListener('webglcontextlost', lost); cv.removeEventListener('webglcontextrestored', restored); eng.dispose(); };
   }, []);
 
   const phase = hud?.phase ?? 'menu';

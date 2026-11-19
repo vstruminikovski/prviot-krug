@@ -320,12 +320,13 @@ function TouchControls({ engine, hud }: { engine: GameEngine; hud: HudState }) {
   const lookRef = useHold((v) => {
     window.clearTimeout(lookTimer.current);
     if (!v) { t.glance = null; return; }
+    engine.buzz(6, 40);
     const ind = engine.sim?.player.indicator ?? 'off';
     t.glance = ind === 'left' ? 'mirrorL' : ind === 'right' ? 'mirrorR' : 'mirrorC';
     lookTimer.current = window.setTimeout(() => { const i = engine.sim?.player.indicator ?? 'off'; t.glance = i === 'right' ? 'shoulderR' : 'shoulderL'; }, 900);
   });
   useEffect(() => () => { window.clearTimeout(lookTimer.current); t.steer = 0; t.throttle = 0; t.brake = 0; t.clutchHeld = false; t.clutchLatch = null; t.horn = false; t.glance = null; }, [t]);
-  const cmd = (c: Parameters<GameEngine['command']>[0]) => engine.command(c);
+  const cmd = (c: Parameters<GameEngine['command']>[0]) => { engine.buzz(c.type === 'gear' ? 14 : 8, 40); engine.command(c); };
   const reverse = hud.gear === 'R';
   return (
     <div className="touch">

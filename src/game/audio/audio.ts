@@ -14,13 +14,31 @@ export class GameAudio {
   private nextBird = 3;
   private nextClink = 2;
 
+  /** Page hidden (app switched, screen locked): stop the audio thread; resume when it comes back. */
+  private hidden = false;
+  private onVis = () => {
+    this.hidden = document.visibilityState === 'hidden';
+    if (!this.ctx) return;
+    if (this.hidden) void this.ctx.suspend().catch(() => {}); else void this.ctx.resume().catch(() => {});
+  };
+  /** iOS can leave the context 'interrupted' (call, Siri, another app): the next touch revives it. */
+  private revive = () => { if (this.ctx && !this.hidden && this.ctx.state !== 'running') void this.ctx.resume().catch(() => {}); };
+  /** quieter while paused or in menus (0…1 of the set volume) */
+  private duck = 1;
+  setDuck(d: number) {
+    if (Math.abs(d - this.duck) < 0.01) return;
+    this.duck = d;
+    if (this.ctx && !this.muted) this.master.gain.setTargetAtTime(this.volume * d, this.ctx.currentTime, 0.12);
+  }
   init() {
-    if (this.ctx) { void this.ctx.resume(); return; }
+    if (this.ctx) { this.revive(); return; }
     const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
-    const ctx = new AC();
+    const ctx = new AC({ latencyHint: 'interactive' });
     this.ctx = ctx;
-    this.master = ctx.createGain(); this.master.gain.value = this.muted ? 0 : this.volume; this.master.connect(ctx.destination);
+    document.addEventListener('visibilitychange', this.onVis);
+    for (const ev of ['pointerdown', 'touchend', 'keydown'] as const) window.addEventListener(ev, this.revive, { capture: true, passive: true });
+    this.master = ctx.createGain(); this.master.gain.value = this.muted ? 0 : this.volume * this.duck; this.master.connect(ctx.destination);
     // noise
     const len = ctx.sampleRate * 2;
     this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -86,16 +104,16 @@ export class GameAudio {
   volume = 0.8;
   setMuted(m: boolean) {
     this.muted = m;
-    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : this.volume, this.ctx.currentTime, 0.05);
+    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : this.volume * this.duck, this.ctx.currentTime, 0.05);
   }
   setVolume(v: number) { this.volume = Math.max(0, Math.min(1, v)); this.setMuted(this.muted); }
   /** UI feedback: soft tick (hover/select), confirm, back */
   ui(kind: 'tick' | 'confirm' | 'back') {
     if (!this.ctx || this.muted) return;
-    const t = this.ctx.currentTime;
-    if (kind === 'tick') this.tone(t, 1650, 0.035, 0.035, 'sine');
-    else if (kind === 'confirm') { this.tone(t, 740, 0.12, 0.06, 'triangle'); this.tone(t + 0.07, 1110, 0.16, 0.05, 'triangle'); }
-    else this.tone(t, 520, 0.09, 0.04, 'triangle');
+    const t = this.ctx.currentTime, k = 1 / Math.max(0.2, this.duck); // UI clicks keep their level while the scene is ducked
+    if (kind === 'tick') this.tone(t, 1650, 0.035, 0.035 * k, 'sine');
+    else if (kind === 'confirm') { this.tone(t, 740, 0.12, 0.06 * k, 'triangle'); this.tone(t + 0.07, 1110, 0.16, 0.05 * k, 'triangle'); }
+    else this.tone(t, 520, 0.09, 0.04 * k, 'triangle');
   }
 
   private noiseBurst(t: number, dur: number, f: number, q: number, gain: number, type: BiquadFilterType = 'bandpass', pan = 0) {

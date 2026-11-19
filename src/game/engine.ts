@@ -69,7 +69,15 @@ export class GameEngine {
   newStamps: string[] = [];
   private errStreak = 0;
   /** phone haptics (no-op where unsupported) */
-  private buzz(p: number | number[]) { try { if (this.coarse && 'vibrate' in navigator) navigator.vibrate(p); } catch { /* */ } }
+  /** Android haptics (iOS Safari has no vibration API — sound carries the feedback there). Rate-limited so
+   *  scraping along a wall is one buzz, not a rattle; muted together with the sound. */
+  private buzzAt = 0;
+  buzz(p: number | number[], minGapMs = 120) {
+    if (!this.coarse || this.audio.muted || typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
+    if ((navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive === false) return; // blocked (and logged) before the first tap
+    const now = performance.now(); if (now - this.buzzAt < minGapMs) return; this.buzzAt = now;
+    try { navigator.vibrate(p); } catch { /* */ }
+  }
   private coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   finishT: number | null = null;
   /** Часови: a safety-critical mistake stopped the exercise — offer to repeat it */
@@ -345,7 +353,8 @@ export class GameEngine {
       const ip = v.playerPose(sim);
       v.updateCamera(dt, this.finishT !== null ? 'finish' : v.camMode, ip, p.vx, p.steer, this.finishT !== null ? null : glance);
       v.render('world', this.finishT === null, ip);
-      this.audio.update(dt, { revs: p.rpm / p.def.engine.redline, throttle: p.throttle, speed: Math.abs(p.vx), horn: !!p.horn, cafeProximity: 0, cafePan: 0, running: p.engine === 'running' && !this.paused, siren: sim.extraState.siren === 1, diesel: !!p.def.engine.diesel, load: p.engineLoad, slip: !p.locked && p.clutchEff > 0.05 && p.clutchEff < 0.95 && p.gear !== 'N' ? 1 : 0, rpm: p.rpm, tyre: this.paused ? 0 : Math.max(Math.min(1, Math.max(0, Math.abs(p.vy) - 0.8) * 0.6), p.wheelspinning ? 0.8 : 0, p.brake > 0.85 && Math.abs(p.vx) > 9 && sim.world.gripAt(p.x, p.y) < 0.9 ? 0.6 : 0) });
+      this.audio.setDuck(this.paused ? 0.35 : 1); // paused: the street goes quiet, the menu stays clear
+      this.audio.update(dt, { revs: p.rpm / p.def.engine.redline, throttle: p.throttle, speed: this.paused ? 0 : Math.abs(p.vx), horn: !!p.horn && !this.paused, cafeProximity: 0, cafePan: 0, running: p.engine === 'running' && !this.paused, siren: sim.extraState.siren === 1, diesel: !!p.def.engine.diesel, load: p.engineLoad, slip: !p.locked && p.clutchEff > 0.05 && p.clutchEff < 0.95 && p.gear !== 'N' ? 1 : 0, rpm: p.rpm, tyre: this.paused ? 0 : Math.max(Math.min(1, Math.max(0, Math.abs(p.vy) - 0.8) * 0.6), p.wheelspinning ? 0.8 : 0, p.brake > 0.85 && Math.abs(p.vx) > 9 && sim.world.gripAt(p.x, p.y) < 0.9 ? 0.6 : 0) });
       // finish beat: a slow orbit and a title card before the results screen
       if (sim.finished && !this.result) {
         if (this.finishT === null) { this.finishT = 2.2; this.audio.chime(); this.input.clear(); this.view.resetShot(); this.emitHud(); }
@@ -355,6 +364,7 @@ export class GameEngine {
     } else if (this.phase === 'result') {
       v.updateCamera(dt, 'chase', { ...sim.player.pose, z: sim.player.z }, 0, 0, null);
       v.render('world', false);
+      this.audio.setDuck(0.6);
       this.audio.update(dt, { revs: 0.1, throttle: 0, speed: 0, horn: false, cafeProximity: 0, cafePan: 0, running: false });
     } else if (this.phase === 'replay' && this.replay) {
       const r = this.replay;
