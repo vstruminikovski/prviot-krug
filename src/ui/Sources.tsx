@@ -1,15 +1,15 @@
 import { RULES, RULES_VERSION, DATE_CHECKED, SRC, type RuleCategory } from '../game/rules/registry';
 import { SCENARIOS, SPEC_NOTES } from '../game/content/scenarios';
+import { Modal } from './kit';
 
 const CAT: Record<RuleCategory, string> = { trafficLaw: 'Закон (ЗБСП)', officialExam: 'Официјални оценувачки листови', instructorTechnique: 'Техника (совет, не прекршок)', gameBalance: 'Игра' };
 const ST: Record<string, string> = { verified: 'проверено', needsInstructorReview: 'за проверка од инструктор', unverified: 'не е проверено' };
 
 export function Sources({ onClose }: { onClose: () => void }) {
   return (
-    <div className="modal-back" onClick={onClose}>
-      <div className="card sources-panel" onClick={(e) => e.stopPropagation()}>
-        <h2>Извори и правила</h2>
-        <p className="meta">Регистар {RULES_VERSION}, проверено на {DATE_CHECKED}. Каде меѓународен пример се разликува, важи македонскиот закон. Игровните поени не се официјални казнени поени.</p>
+    <Modal title="Извори и правила" kicker="Македонски закон · оценувачки листови" onClose={onClose} wide>
+      <div className="sources-panel">
+        <p className="hint">Регистар {RULES_VERSION}, проверено на {DATE_CHECKED}. Каде меѓународен пример се разликува, важи македонскиот закон. Игровните поени не се официјални казнени поени.</p>
         <ul className="sources">{Object.values(SRC).map((s) => <li key={s.url}><a href={s.url} target="_blank" rel="noreferrer">{s.title}</a></li>)}</ul>
         {(Object.keys(CAT) as RuleCategory[]).map((c) => (
           <details key={c} open={c === 'trafficLaw'}>
@@ -29,8 +29,8 @@ export function Sources({ onClose }: { onClose: () => void }) {
           <summary>Спецификации со статус</summary>
           <ul className="sources">{SPEC_NOTES.map((n) => <li key={n.topic}><b>{n.topic}</b> ({n.status}): {n.text}</li>)}</ul>
         </details>
-        <button className="btn primary" onClick={onClose}>Затвори</button>
+        <button className="btn primary block" onClick={onClose}>Затвори</button>
       </div>
-    </div>
+    </Modal>
   );
 }

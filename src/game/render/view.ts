@@ -58,6 +58,7 @@ export class View {
   private overlayCam = new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1);
   private mirrorPanels: THREE.Mesh[] = [];
   private mirrorFrame = 0; private mirrorFocus = -1;
+  private coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
   mirrorsOn = true;
   mirrorQuality: 'high' | 'low' = 'high';
   private noRearPanel: THREE.Mesh;
@@ -71,7 +72,21 @@ export class View {
   private speedFov = 0;
   private shake = 0;
   /** camera impulse on impacts (presentation only) */
-  kick(strength: number) { this.shake = Math.min(1, this.shake + strength); }
+  kick(strength: number) { if (this.motion) this.shake = Math.min(1, this.shake + strength); }
+  /** reduced-motion option: no shake, no speed FOV, no tilt-shift */
+  motion = true;
+  quality: 'low' | 'medium' | 'high' = 'high';
+  /** Graphics quality: pixel ratio, post chain, ambient occlusion, shadow resolution. */
+  setQuality(q: 'low' | 'medium' | 'high') {
+    this.quality = q;
+    const dpr = window.devicePixelRatio || 1;
+    this.renderer.setPixelRatio(Math.min(dpr, q === 'low' ? 1 : q === 'medium' ? 1.5 : 2));
+    this.atmo.enabled = q !== 'low';
+    if (this.atmo.ao) this.atmo.ao.enabled = q === 'high';
+    const ms = q === 'high' ? 2048 : q === 'medium' ? 1536 : 1024;
+    if (this.sun.shadow.mapSize.x !== ms) { this.sun.shadow.mapSize.set(ms, ms); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
+    this.setSize(this.width, this.height);
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -95,7 +110,6 @@ export class View {
     this.sun.shadow.bias = -0.0004; this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun, this.sun.target);
     this.atmo = new Atmosphere(this.renderer, this.scene, this.camera, this.sun, this.hemi);
-    if (matchMedia('(pointer: coarse)').matches) this.atmo.enabled = false; // phones: plain render for frame rate
     // replay cue marker
     this.highlight = new THREE.Group();
     const ring = new THREE.Mesh(new THREE.RingGeometry(2.4, 3.0, 48), new THREE.MeshBasicMaterial({ color: '#ffb020', transparent: true, opacity: 0.85, side: THREE.DoubleSide, toneMapped: false, depthTest: false }));
@@ -152,13 +166,15 @@ export class View {
 
   private layoutMirrors(glance: Glance) {
     const w = this.width, h = this.height;
-    const small = Math.min(1, w / 1100);
-    const sw = 150 * small + 36, sh = sw * 0.58;
-    const cw = 250 * small + 40, ch = cw * 0.28;
+    const touch = this.coarse;
+    const small = Math.min(1, w / 1100, h / 720) * (touch ? 0.8 : 1);
+    const sw = 150 * small + 30, sh = sw * 0.58;
+    const cw = 250 * small + 34, ch = cw * 0.28;
+    const sideY = touch ? h * 0.7 : h * 0.5; // phones: above the thumb controls
     const base: [number, number, number, number][] = [
-      [sw / 2 + 18, h * 0.5, sw, sh], // left
-      [w - sw / 2 - 18, h * 0.5, sw, sh], // right
-      [w / 2, h - 78 - ch / 2, cw, ch], // interior
+      [sw / 2 + 16, sideY, sw, sh], // left
+      [w - sw / 2 - 16, sideY, sw, sh], // right
+      [w / 2, h - (touch ? 62 : 78) - ch / 2, cw, ch], // interior
     ];
     const big = glance === 'mirrorL' ? 0 : glance === 'mirrorR' ? 1 : glance === 'mirrorC' ? 2 : -1;
     this.mirrorFocus = big;
@@ -429,8 +445,13 @@ export class View {
       this.camPos.lerp(pos, 1 - Math.exp(-dt * 2.5)); this.camLook.lerp(look, 1 - Math.exp(-dt * 3));
       cam.position.copy(this.camPos); cam.lookAt(this.camLook);
     } else if (shot === 'title') {
+      // menu: a slow crane drifting along the neighbourhood (tilt-shift makes it a diorama)
       const t = performance.now() / 1000;
-      cam.position.set(22 + Math.sin(t / 9) * 5, 4.2, -0.8); cam.lookAt(86, 2.2, 7.5);
+      const u = 0.5 - 0.5 * Math.cos((t / 70) * Math.PI * 2);
+      const A = [120, 60, 55, 260, 0, -110], B = [330, 55, 65, 440, 0, -90];
+      const m = (i: number) => A[i] + (B[i] - A[i]) * u;
+      cam.position.set(m(0), m(1) + Math.sin(t / 11) * 3, m(2)); cam.lookAt(m(3), m(4), m(5));
+      fov = 50;
     } else {
       // chase / high: rigidly follow the car's position (no rubber-band lag at speed);
       // only the heading is smoothed, plus springs for anticipation and acceleration feel.
@@ -457,7 +478,7 @@ export class View {
         const dist = L * 1.2 + 2.3 + sp * 0.045 + this.pull;
         cam.position.copy(base).addScaledVector(cf, -dist).addScaledVector(side, this.lookSide * 0.35).setY(z + H + 0.95 + sp * 0.012);
         cam.lookAt(base.clone().addScaledVector(cf, 4 + sp * 0.18).addScaledVector(side, -this.lookSide * 1.1).setY(z + H * 0.62));
-        this.speedFov += (clamp(sp - 8, 0, 22) * 0.42 - this.speedFov) * Math.min(1, dt * 2);
+        this.speedFov += ((this.motion ? clamp(sp - 8, 0, 22) * 0.42 : 0) - this.speedFov) * Math.min(1, dt * 2);
         fov = 60 + this.speedFov;
       }
       this.camInit = true;
@@ -483,7 +504,7 @@ export class View {
     this.sun.target.position.set(p.x, z, -p.y);
     this.sun.position.set(p.x - 85, z + 52, -p.y + 48);
     this.layoutMirrors(glance);
-    this.atmo.setTilt(shot === 'high' ? 1 : shot === 'chase' ? 0.35 : shot === 'replay' ? 0.8 : 0);
+    this.atmo.setTilt(!this.motion ? 0 : shot === 'high' ? 1 : shot === 'chase' ? 0.35 : shot === 'replay' ? 0.8 : shot === 'title' ? 0.7 : 0);
     // keep the car visible through tree crowns / eaves in the outside cameras
     if (++this.xrFrame % 90 === 0 && this.envGroups[this.env]) patchXray(this.envGroups[this.env]!);
     const buf = this.renderer.getDrawingBufferSize(this.tmpV2);
@@ -550,7 +571,12 @@ export class View {
   // ------------------------------------------------------------ garage
   private gCam = new THREE.PerspectiveCamera(48, 1, 0.05, 80);
   private garageCam() {
-    const cam = this.gCam; cam.aspect = this.width / this.height; cam.updateProjectionMatrix();
+    const cam = this.gCam; cam.aspect = this.width / this.height;
+    // frame the car in the space the garage panel leaves free (left panel on wide screens, bottom sheet on narrow)
+    const w = this.width, h = this.height;
+    if (h > w && w <= 760) cam.setViewOffset(w, h, 0, h * 0.28, w, h);
+    else { const px = (h < 560 ? Math.min(w * 0.54, 400) : Math.min(w * 0.46, 440)) + 16; cam.setViewOffset(w, h, -px / 2, 0, w, h); }
+    cam.updateProjectionMatrix();
     const def = this.playerDef;
     if (this.orbit.cockpit && def) {
       const e = def.eye; cam.fov = 70; cam.updateProjectionMatrix();

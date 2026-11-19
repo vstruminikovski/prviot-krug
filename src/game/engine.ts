@@ -66,9 +66,8 @@ export class GameEngine {
   constructor(canvas: HTMLCanvasElement) {
     this.view = new View(canvas);
     this.config = { v: CONTENT_VERSION, env: 'polygon', mission: 'polygon', mode: 'lesson', seed: randomSeed(), vehicle: this.store.garage.vehicle, assist: this.store.settings.assist, load: this.store.garage.load };
-    this.audio.setMuted(this.store.settings.muted);
     this.view.camMode = this.store.settings.camera;
-    this.view.mirrorQuality = this.store.settings.mirrors;
+    this.applySettings();
     this.input.attach();
     this.input.onCommand = (c) => this.command(c);
     this.view.setEnvironment('city', { vehicleLength: 3.5 });
@@ -79,6 +78,17 @@ export class GameEngine {
   subscribe(fn: (h: HudState) => void) { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; }
   persist() { save(this.store); }
 
+  /** Push persisted settings into renderer, audio and input. */
+  applySettings() {
+    const s = this.store.settings;
+    this.audio.volume = s.volume; this.audio.setMuted(s.muted);
+    this.view.mirrorQuality = s.mirrors;
+    this.view.motion = s.motion;
+    if (this.view.quality !== s.quality || !this.qualityApplied) { this.view.setQuality(s.quality); this.qualityApplied = true; }
+    this.input.steerSens = s.steerSens;
+  }
+  private qualityApplied = false;
+  updateSettings(p: Partial<Save['settings']>) { this.store.settings = { ...this.store.settings, ...p }; this.persist(); this.applySettings(); this.emitHud(); }
   get custom(): Custom { const g = this.store.garage; return { paint: g.paint, finish: g.finish, plate: g.plate, layout: g.layout, trims: g.trims, interior: g.interior, mirrorAdj: g.mirrorAdj }; }
   get def(): VehicleDef { return vehicleById(this.store.garage.vehicle); }
 

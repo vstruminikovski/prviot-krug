@@ -8,13 +8,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode; onReset?: ()
   render() {
     if (!this.state.err) return this.props.children;
     return (
-      <div className="modal-back fixed">
-        <div className="card">
-          <h2>Нешто запна</h2>
-          <p className="note">Овој дел од екранот не успеа да се прикаже. Играта продолжува.</p>
-          <p className="note small"><code>{this.state.err}</code></p>
-          <button className="btn primary" onClick={() => { this.setState({ err: null }); this.props.onReset?.(); }}>Назад во менито</button>
-        </div>
+      <div className="scrim">
+        <div className="sheet narrow"><header className="sheet-h"><div><div className="kicker">Грешка</div><h2>Нешто запна</h2></div></header><div className="sheet-b">
+          <p className="hint">Овој дел од екранот не успеа да се прикаже. Играта продолжува.</p>
+          <p className="fine"><code>{this.state.err}</code></p>
+          <button className="btn primary block" onClick={() => { this.setState({ err: null }); this.props.onReset?.(); }}>Назад во менито</button>
+        </div></div>
       </div>
     );
   }

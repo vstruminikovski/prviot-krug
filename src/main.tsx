@@ -1,6 +1,8 @@
 import { createRoot } from 'react-dom/client';
 import App from './ui/App';
 import { setHostOptions, type HostOptions } from './game/host';
+import '@fontsource-variable/unbounded/wght.css';
+import '@fontsource-variable/manrope/wght.css';
 import './ui/styles.css';
 
 /**

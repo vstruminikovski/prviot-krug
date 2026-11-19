@@ -20,7 +20,7 @@ export class GameAudio {
     if (!AC) return;
     const ctx = new AC();
     this.ctx = ctx;
-    this.master = ctx.createGain(); this.master.gain.value = this.muted ? 0 : 0.8; this.master.connect(ctx.destination);
+    this.master = ctx.createGain(); this.master.gain.value = this.muted ? 0 : this.volume; this.master.connect(ctx.destination);
     // noise
     const len = ctx.sampleRate * 2;
     this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -83,9 +83,19 @@ export class GameAudio {
     hf.connect(this.hornGain).connect(this.master);
   }
 
+  volume = 0.8;
   setMuted(m: boolean) {
     this.muted = m;
-    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.8, this.ctx.currentTime, 0.05);
+    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : this.volume, this.ctx.currentTime, 0.05);
+  }
+  setVolume(v: number) { this.volume = Math.max(0, Math.min(1, v)); this.setMuted(this.muted); }
+  /** UI feedback: soft tick (hover/select), confirm, back */
+  ui(kind: 'tick' | 'confirm' | 'back') {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    if (kind === 'tick') this.tone(t, 1650, 0.035, 0.035, 'sine');
+    else if (kind === 'confirm') { this.tone(t, 740, 0.12, 0.06, 'triangle'); this.tone(t + 0.07, 1110, 0.16, 0.05, 'triangle'); }
+    else this.tone(t, 520, 0.09, 0.04, 'triangle');
   }
 
   private noiseBurst(t: number, dur: number, f: number, q: number, gain: number, type: BiquadFilterType = 'bandpass', pan = 0) {

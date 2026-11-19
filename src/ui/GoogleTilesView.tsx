@@ -16,7 +16,7 @@ export function GoogleTilesView({ onClose }: { onClose: () => void }) {
       <div ref={ref} className="gtiles-canvas" />
       <div className="gtiles-bar">
         <span>Google 3D приказ на Дебар Маало — само за ориентација. Возењето се одвива во измисленото маало.</span>
-        <button className="btn small" onClick={onClose}>Затвори</button>
+        <button className="btn glass sm" onClick={onClose}>Затвори</button>
       </div>
       {err && <div className="gtiles-err">{err}</div>}
       <div className="gtiles-attr"><span className="gtiles-logo" aria-label="Google Maps">Google Maps</span>{attr && <span className="gtiles-data">{attr}</span>}</div>

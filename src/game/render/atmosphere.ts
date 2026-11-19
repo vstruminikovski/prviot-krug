@@ -96,7 +96,7 @@ export class Atmosphere {
     this.renderPass = new RenderPass(scene, camera);
     this.composer.addPass(this.renderPass);
     // ambient occlusion: grounds every object (desktop only, half resolution)
-    if (!matchMedia('(pointer: coarse)').matches) {
+    {
       const ao = new GTAOPass(scene, camera, size.x / 2, size.y / 2);
       ao.output = GTAOPass.OUTPUT.Default;
       ao.blendIntensity = 0.85;

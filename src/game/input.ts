@@ -35,6 +35,8 @@ export class Input {
   private clutchLatched = false;
   parkingBrake = true;
   bite = { low: 0.34, high: 0.66 };
+  steerSens = 1;
+  private touchLatch = false;
 
   private down = (e: KeyboardEvent) => {
     if (!this.enabled) return;
@@ -90,7 +92,7 @@ export class Input {
     // steering: eases in and returns to centre like a light hand on the wheel
     const left = k.has('KeyA') || k.has('ArrowLeft'), right = k.has('KeyD') || k.has('ArrowRight');
     const target = (left ? 1 : 0) - (right ? 1 : 0);
-    const rate = target === 0 ? 4.5 : 2.4;
+    const rate = target === 0 ? 4.5 : 2.4 * this.steerSens;
     this.steerKb += Math.max(-rate * dt, Math.min(rate * dt, target - this.steerKb));
     // pedals: ramps so a tap gives a partial pedal
     const wantT = k.has('KeyW') || k.has('ArrowUp') ? 1 : 0;
@@ -102,7 +104,8 @@ export class Input {
     if (held) { this.clutch = Math.min(1, this.clutch + dt * 7); this.clutchLatched = false; }
     else if (k.has('KeyZ')) { this.clutch = Math.min(1, this.clutch + dt * 0.7); this.clutchLatched = true; }
     else if (k.has('KeyX')) { this.clutch = Math.max(0, this.clutch - dt * 0.6); this.clutchLatched = true; }
-    else if (this.touch.clutchLatch !== null) { this.clutch = this.touch.clutchLatch; this.clutchLatched = true; }
+    else if (this.touch.clutchLatch !== null) { this.clutch = this.touch.clutchLatch; this.clutchLatched = true; this.touchLatch = true; }
+    else if (this.touchLatch) { this.touchLatch = false; this.clutchLatched = false; } // finger lifted: ease out through the bite
     else if (!this.clutchLatched && this.clutch > 0) {
       // automatic easing through the biting region (slower in the learner profile)
       const inBite = this.clutch <= this.bite.high + 0.02 && this.clutch >= this.bite.low - 0.02;

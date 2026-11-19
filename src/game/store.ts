@@ -7,12 +7,23 @@ import type { Mode } from './missions/types';
 const KEY = 'krug-niz-maaloto';
 export const SCHEMA = 3;
 
+export type Quality = 'low' | 'medium' | 'high';
+export interface Settings {
+  assist: Assist; camera: 'chase' | 'high' | 'driver'; muted: boolean; mirrors: 'high' | 'low'; legend: boolean;
+  /** camera shake, speed FOV, tilt-shift */
+  motion: boolean;
+  quality: Quality; volume: number; hud: 'S' | 'M' | 'L'; steerSens: number;
+}
+export const coarse = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+export function defaultSettings(): Settings {
+  return { assist: 'learn', camera: 'chase', muted: false, mirrors: coarse() ? 'low' : 'high', legend: true, motion: true, quality: coarse() ? 'low' : 'high', volume: 0.8, hud: 'M', steerSens: 1 };
+}
 export interface GarageChoice { vehicle: string; paint: string; finish: 'solid' | 'metallic'; trims: string[]; plate: string; layout: PlateLayout; interior: string; mirrorAdj: number; load: number }
 export interface AttemptRecord { at: string; env: EnvId; mode: Mode; seed: number; vehicle: string; assist: Assist; score: number; passed: boolean | null; failed: string | null; skills: Record<string, number>; mission?: number; time?: string; weather?: string }
 
 export interface Save {
   schema: number;
-  settings: { assist: Assist; camera: 'chase' | 'high' | 'driver'; muted: boolean; mirrors: 'high' | 'low'; legend: boolean; motion: boolean };
+  settings: Settings;
   garage: GarageChoice;
   favorites: GarageChoice[];
   history: AttemptRecord[];
@@ -25,7 +36,7 @@ export const DEFAULT_GARAGE: GarageChoice = { vehicle: 'vardarka', paint: '#efe3
 export function defaultSave(): Save {
   return {
     schema: SCHEMA,
-    settings: { assist: 'learn', camera: 'chase', muted: false, mirrors: 'high', legend: true, motion: true },
+    settings: defaultSettings(),
     garage: { ...DEFAULT_GARAGE }, favorites: [], history: [], skills: {}, seenIntro: false,
   };
 }
