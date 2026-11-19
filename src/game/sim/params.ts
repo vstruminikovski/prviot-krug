@@ -11,9 +11,8 @@ export const PHYSICS = {
   airDensityKgM3: 1.2,
   /** below this |v| rolling resistance ramps in linearly (avoids a sign flip at standstill) */
   rollingRampSpeedMps: 0.1,
-  /** steering lock is reduced with speed: lock × (1 − reduction × min(1, v / reductionFullSpeed)) */
-  steerLockReductionAtSpeed: 0.62,
-  steerLockReductionFullSpeedMps: 24,
+  /** steering lock at speed = min(lock, margin × (L·μg/v² + K·μg)) — steady-state angle at the grip limit */
+  steerGripLockMargin: 1,
   /** kinematic (walking pace) ↔ dynamic bicycle model blend */
   kinematicBlendFromMps: 3,
   kinematicBlendToMps: 8,
@@ -56,8 +55,7 @@ export const PARAM_INFO: Record<keyof typeof PHYSICS | keyof typeof DETECT, Para
   gravityMps2: { unit: 'm/s²', status: 'verified', basis: 'стандардна гравитација' },
   airDensityKgM3: { unit: 'kg/m³', status: 'provisional', basis: 'приближно на ниво на море, 15 °C (1,225)' },
   rollingRampSpeedMps: { unit: 'm/s', status: 'provisional', basis: 'нумеричка стабилност' },
-  steerLockReductionAtSpeed: { unit: '—', status: 'provisional', basis: 'тастатура: помал волан при брзина (игра)' },
-  steerLockReductionFullSpeedMps: { unit: 'm/s', status: 'provisional', basis: 'игра' },
+  steerGripLockMargin: { unit: '—', status: 'provisional', basis: 'помош за тастатура: волан ограничен на прилепувањето (1 = точно на границата)' },
   kinematicBlendFromMps: { unit: 'm/s', status: 'provisional', basis: 'модел: без ротирање во место' },
   kinematicBlendToMps: { unit: 'm/s', status: 'provisional', basis: 'модел' },
   lateralRelaxationPerS: { unit: '1/s', status: 'provisional', basis: 'замена за релаксација на гумите' },

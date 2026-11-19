@@ -331,7 +331,9 @@ export class Vehicle {
     this.engineLoad = clamp(Te / Math.max(tq, 1), 0, 1);
     let nvx = vx + aVeh * dt;
     // longitudinal tyre utilisation this step (drive + brake), shared with cornering below
-    this.longUse = gripN > 1 ? clamp(Math.abs(m * aVeh - (Fgrav + Froll + Faero)) / gripN, 0, 1) : 0;
+    const Ftyre = m * aVeh - (Fgrav + Froll + Faero);
+    this.longUse = gripN > 1 ? clamp(Math.abs(Ftyre) / gripN, 0, 1) : 0;
+    this.longDrive = Ftyre * Math.sign(vx || 1) > 0; // driving (only the driven axle is loaded) vs braking (all wheels)
     if (!coupled && Math.abs(vx) < 1e-4 && Math.abs(nvx) < 1e-4) nvx = 0;
 
     // stall
@@ -371,14 +373,20 @@ export class Vehicle {
 
     // ---- steering and lateral dynamics
     const sp = Math.abs(nvx);
-    const lockAtSpeed = d.steer.lock * (1 - PHYSICS.steerLockReductionAtSpeed * clamp(sp / PHYSICS.steerLockReductionFullSpeedMps, 0, 1));
+    // grip-limited lock (keyboard / touch steering is binary): the steady-state bicycle-model angle at
+    // the grip limit, δ = L·a_y/v² + K·a_y with a_y = μ·g and the understeer gradient
+    // K = m·(f/C_f − (1−f)/C_r) — all from this vehicle's data and the local grip
+    const ayMax = mu * G * Math.cos(this.grade);
+    const K = Math.max(0, m * (d.frontWeight / d.tyre.cornerF - (1 - d.frontWeight) / d.tyre.cornerR));
+    const gripLock = sp > 0.5 ? (d.dims.wheelbase * ayMax) / (sp * sp) + K * ayMax : d.steer.lock;
+    const lockAtSpeed = Math.min(d.steer.lock, gripLock * PHYSICS.steerGripLockMargin);
     const target = this.steerInput * lockAtSpeed;
     const rate = d.steer.rate * dt;
     this.steer += clamp(target - this.steer, -rate, rate);
     const a = d.dims.wheelbase * (1 - d.frontWeight), b = d.dims.wheelbase * d.frontWeight;
     const Iz = m * (d.dims.L * d.dims.L + d.dims.W * d.dims.W) / 12 * 1.1;
     const steps = 2;
-    let vy = this.vy, r = this.r, latSum = 0;
+    let vy = this.vy, r = this.r, latSum = 0, dvx = 0;
     for (let i = 0; i < steps; i++) {
       const h2 = dt / steps;
       if (sp > 0.5) {
@@ -386,18 +394,23 @@ export class Vehicle {
         const af = Math.atan2(vy + a * r, sp) - this.steer * sgn;
         const ar = Math.atan2(vy - b * r, sp);
         const FzF = N * d.frontWeight, FzR = N * (1 - d.frontWeight);
-        const latFactor = Math.sqrt(Math.max(0.05, 1 - this.longUse * this.longUse)); // friction circle
-        const sat = (C: number, al: number, Fz: number) => { const lim = mu * Fz * latFactor; return -lim * Math.tanh((C * al) / lim); };
-        const Fyf = sat(d.tyre.cornerF, af, FzF), Fyr = sat(d.tyre.cornerR, ar, FzR);
+        // friction circle per axle: braking loads all wheels; drive loads only the driven axle
+        const busy = Math.sqrt(Math.max(0.05, 1 - this.longUse * this.longUse));
+        const fF = !this.longDrive || d.drive !== 'RWD' ? busy : 1, fR = !this.longDrive || d.drive !== 'FWD' ? busy : 1;
+        const sat = (C: number, al: number, Fz: number, f: number) => { const lim = mu * Fz * f; return -lim * Math.tanh((C * al) / lim); };
+        const Fyf = sat(d.tyre.cornerF, af, FzF, fF), Fyr = sat(d.tyre.cornerR, ar, FzR, fR);
         vy += ((Fyf * Math.cos(this.steer) + Fyr) / m - nvx * r) * h2;
         latSum = Math.abs(Fyf * Math.cos(this.steer) + Fyr);
         r += ((a * Fyf * Math.cos(this.steer) - b * Fyr) / Iz) * sgn * h2;
+        // body-frame longitudinal coupling: a sliding car scrubs speed (front force drag + vy·r)
+        if (sgn > 0) dvx += (vy * r - (Fyf * Math.sin(this.steer)) / m) * h2;
       }
     }
     // kinematic model at low speed (no rotating on the spot; exact low-speed turning circle)
     const rKin = (nvx / d.dims.wheelbase) * Math.tan(this.steer);
     const vyKin = rKin * b * 0; // reference at the rear axle: lateral slip vanishes at walking pace
     const kBlend = clamp((sp - PHYSICS.kinematicBlendFromMps) / (PHYSICS.kinematicBlendToMps - PHYSICS.kinematicBlendFromMps), 0, 1);
+    if (nvx > 0) nvx = Math.max(0, nvx + dvx * kBlend);
     this.r = rKin * (1 - kBlend) + r * kBlend;
     this.vy = vyKin * (1 - kBlend) + vy * kBlend;
     // relaxation only where the kinematic model rules: in the dynamic regime the tyre forces already
@@ -483,7 +496,7 @@ export class Vehicle {
   }
   wheelspinning = false;
   /** tyre utilisation 0..1 (friction circle): longitudinal and lateral share one grip budget */
-  longUse = 0; latUse = 0;
+  longUse = 0; latUse = 0; longDrive = false;
   private rollbackReported = false;
   private overRevCool = 0;
 

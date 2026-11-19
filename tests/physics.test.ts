@@ -3,7 +3,7 @@
 // low-speed turning circle, and contact classification for lessons vs exams.
 import { describe, it, expect } from 'vitest';
 import { Vehicle, type VehicleWorld, type Controls, type DynamicBody } from '../src/game/vehicles/vehicle';
-import { vehicleById, type VehicleDef } from '../src/game/vehicles/defs';
+import { vehicleById, VEHICLES, type VehicleDef } from '../src/game/vehicles/defs';
 import { PHYSICS, DETECT } from '../src/game/sim/params';
 import { createSim } from '../src/game/attempt';
 import { CONTENT_VERSION, type Sim } from '../src/game/sim/sim';
@@ -140,5 +140,23 @@ describe('contacts: closing speed and classification', () => {
     sim.incident('neutral-descent', { layer: 'technique', severity: 'note', ruleIds: ['tech.neutral.descent'], text: 'x' }); // not in matrix → no exam
     expect(sim.ledger.examTotal('Образец бр. 4')).toBe(50);
     expect(sim.result().exam?.passed).toBe(true); // 50 is not "more than 50"
+  });
+});
+
+describe('keyboard steering stability (binary full-lock input)', () => {
+  it('every vehicle, dry and wet, 50 and 80 km/h: no spin, yaw within grip, straightens after release', () => {
+    for (const d of VEHICLES) for (const grip of [1, 0.72]) for (const v0 of [14, 22]) {
+      const v = new Vehicle(d, { x: 0, y: 0, h: 0 }, 'auto', { parkingBrake: false });
+      v.place({ x: 0, y: 0, h: 0 }, v0, 3); v.parkingBrake = 0;
+      let maxBeta = 0, maxR = 0;
+      for (let i = 0; i < 240; i++) {
+        v.step(DT, ctl({ throttle: 0.3, steer: i < 90 ? 1 : 0 }), world({ grip }), [], i * DT, () => {});
+        maxBeta = Math.max(maxBeta, Math.abs(Math.atan2(v.vy, Math.max(0.1, v.vx)))); maxR = Math.max(maxR, Math.abs(v.r));
+      }
+      const tag = `${d.id} grip ${grip} ${v0} m/s`;
+      expect(maxBeta, tag).toBeLessThan((15 * Math.PI) / 180);
+      expect(maxR, tag).toBeLessThan(((d.tyre.mu * grip * G) / (v0 * 0.85)) * 1.25);
+      expect(Math.abs(v.r), tag).toBeLessThan(0.02);
+    }
   });
 });
