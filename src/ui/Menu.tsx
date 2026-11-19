@@ -24,11 +24,14 @@ const TIME_ICON: Record<TimeOfDay, IconName> = { golden: 'sun', noon: 'sun', dus
 const WEATHER_ICON: Record<Weather, IconName> = { clear: 'sun', rain: 'rain', fog: 'fog' };
 
 export function Menu({ engine }: { engine: GameEngine }) {
-  const [env, setEnv] = useState<EnvId>(engine.config.env);
-  const [mode, setMode] = useState<Mode>(engine.config.mode === 'exam' ? 'exam' : 'lesson'); // Часови | Полагање
+  const saved = engine.store.menu;
+  const [env, setEnv] = useState<EnvId>(saved?.env ?? engine.config.env);
+  const [mode, setMode] = useState<Mode>((saved?.mode ?? engine.config.mode) === 'exam' ? 'exam' : 'lesson'); // Часови | Полагање
   const [assist, setAssist] = useState<Assist>(engine.store.settings.assist === 'exam' ? 'manual' : engine.store.settings.assist);
-  const [time, setTime] = useState<TimeOfDay>(engine.config.time ?? 'golden');
-  const [weather, setWeather] = useState<Weather>(engine.config.weather ?? 'clear');
+  const [time, setTime] = useState<TimeOfDay>(saved?.time ?? engine.config.time ?? 'golden');
+  const [weather, setWeather] = useState<Weather>(saved?.weather ?? engine.config.weather ?? 'clear');
+  // remember every choice immediately (garage visits and reloads keep it)
+  useEffect(() => { engine.store.menu = { env, mode, time, weather }; engine.persist(); }, [engine, env, mode, time, weather]);
   const [sheet, setSheet] = useState<null | 'sources' | 'book' | 'settings' | 'help'>(engine.store.history.length === 0 ? 'help' : null);
   const code = incomingChallenge();
   const ch = decodeChallenge(code);

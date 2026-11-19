@@ -135,7 +135,8 @@ export class Sim {
     if (c) {
       const items = examItemsFor(c, o.exam);
       const action = actionFor(c, items);
-      o = { ...o, exam: items, severity: severityFor(c, items), cls: { mistake: c.m.id, action, exam: c.exam, source: sourceLine(c.m, { action, exam: items.length ? items : c.cell.exam }), status: c.m.status, why: c.m.why } };
+      const ref = c.exam ? sourceLine(c.m, { action, exam: items.length ? items : c.cell.exam }) : (c.m.exam[c.place].exam?.length ? `На испит: ${sourceLine(c.m, c.m.exam[c.place])}` : sourceLine(c.m, { action: 'none' }));
+      o = { ...o, exam: items, severity: severityFor(c, items), cls: { mistake: c.m.id, action, exam: c.exam, source: ref, status: c.m.status, why: c.m.why } };
     } else if (this.config.mode !== 'exam') o = { ...o, exam: [] }; // a lesson is never an official exam
     const inc = this.ledger.add(this.t, key, { ...o, pos: o.pos ?? { x: this.player.x, y: this.player.y } }, debounce);
     if (inc) {

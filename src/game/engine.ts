@@ -123,8 +123,8 @@ export class GameEngine {
     if ((cand?.id ?? null) !== (this.coachCand?.id ?? null)) { this.coachCand = cand; this.coachT = 0; }
     this.coachT += dt;
     if ((cand?.id ?? null) !== (this.coachShown?.id ?? null)) {
-      if (cand && this.coachT > 0.35) this.coachShown = cand;
-      else if (!cand && this.coachT > 0.5) this.coachShown = null;
+      if (this.coachShown) this.coachShown = null; // the player acted: drop the old hint at once
+      else if (cand && this.coachT > 0.35) this.coachShown = cand; // a new hint must hold briefly (no flicker)
     }
   }
   onFatal: ((msg: string) => void) | null = null;

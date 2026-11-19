@@ -22,7 +22,7 @@ export function Garage({ engine }: { engine: GameEngine }) {
   const plateOk = validPlate(plateText);
   const cmp = (id: string) => vehicleById(id);
   const peak = (d: typeof def) => Math.max(...d.engine.curve.map((c) => c[1]));
-  const blocked = compatibility(def.id, engine.config.env);
+  const blocked = compatibility(def.id, engine.store.menu?.env ?? engine.config.env);
   return (
     <div className="garage">
       <aside className="garage-panel panel">
@@ -89,7 +89,7 @@ export function Garage({ engine }: { engine: GameEngine }) {
           <button className="btn ghost sm" onClick={() => { set({ ...DEFAULT_GARAGE, vehicle: g.vehicle, paint: def.paint }); setPlateText(DEFAULT_GARAGE.plate); }}><Icon name="retry" size={16} />Ресетирај</button>
         </div>
         <footer className="garage-foot">
-          <button className="btn primary go" disabled={!!blocked} title={blocked ?? ''} onClick={() => engine.start({})}><Icon name="play" size={18} />Возиме</button>
+          <button className="btn primary go" disabled={!!blocked} title={blocked ?? ''} onClick={() => engine.start({ ...engine.store.menu, assist: engine.store.settings.assist })}><Icon name="play" size={18} />Возиме</button>
         </footer>
       </aside>
       <div className="garage-hint"><Icon name="eye" size={15} />Влечи за вртење · тркалце или два прста за зум</div>

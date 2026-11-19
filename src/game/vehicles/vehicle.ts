@@ -217,6 +217,8 @@ export class Vehicle {
       pedal = Math.max(pedal, d.clutch.biteLow + (d.clutch.biteHigh - d.clutch.biteLow) * (0.25 + 0.6 * k));
       throttleEff = Math.max(throttleEff, 0.12 * k);
     }
+    // learner aid: braking towards a stop, the clutch opens by itself before the engine dies
+    if (this.assist === 'learn' && running && typeof this.gear === 'number' && this.brake > 0.1 && rpm < d.engine.idle * 1.3) pedal = Math.max(pedal, 1);
     // idle governor
     if (running) {
       const idleCmd = clamp((d.engine.idle - rpm) / 220, 0, d.engine.diesel ? 0.7 : 0.55);
@@ -297,7 +299,7 @@ export class Vehicle {
       if (canLock) {
         this.locked = true;
         aVeh = aLock;
-        Fdrive = FengLocked;
+        Fdrive = (Treq * G_ratio * eff) / rW; // what reaches the tyres: engine torque minus what spins the engine up
         newOmega = (vx + aVeh * dt) / rW * G_ratio;
       } else {
         this.locked = false;
@@ -320,11 +322,11 @@ export class Vehicle {
     const driveShare = d.drive === 'AWD' ? 1 : d.drive === 'FWD' ? d.frontWeight - (aVeh * d.comHeight) / (G * d.dims.wheelbase) : 1 - d.frontWeight + (aVeh * d.comHeight) / (G * d.dims.wheelbase);
     const Fmax = longBudget * clamp(driveShare, 0.2, 1);
     if (Math.abs(Fdrive) > Fmax * PHYSICS.tractionSlack) {
-      if (!this.wheelspinning && Math.abs(vx) < 12) this.emit('wheelspin');
-      this.wheelspinning = true;
+      this.spinT += dt;
+      if (!this.wheelspinning && this.spinT > DETECT.wheelspinMinSeconds && Math.abs(vx) < 12) { this.emit('wheelspin'); this.wheelspinning = true; }
       const excess = (Math.abs(Fdrive) - Fmax) * Math.sign(Fdrive);
       aVeh -= excess / m;
-    } else this.wheelspinning = false;
+    } else { this.wheelspinning = false; this.spinT = 0; }
 
     newOmega = Math.max(0, newOmega);
     this.omegaE = newOmega;
@@ -380,6 +382,7 @@ export class Vehicle {
     const K = Math.max(0, m * (d.frontWeight / d.tyre.cornerF - (1 - d.frontWeight) / d.tyre.cornerR));
     const gripLock = sp > 0.5 ? (d.dims.wheelbase * ayMax) / (sp * sp) + K * ayMax : d.steer.lock;
     const lockAtSpeed = Math.min(d.steer.lock, gripLock * PHYSICS.steerGripLockMargin);
+    this.lockNow = lockAtSpeed;
     const target = this.steerInput * lockAtSpeed;
     const rate = d.steer.rate * dt;
     this.steer += clamp(target - this.steer, -rate, rate);
@@ -496,7 +499,9 @@ export class Vehicle {
   }
   wheelspinning = false;
   /** tyre utilisation 0..1 (friction circle): longitudinal and lateral share one grip budget */
-  longUse = 0; latUse = 0; longDrive = false;
+  longUse = 0; latUse = 0; longDrive = false; private spinT = 0;
+  /** road-wheel angle a full steering input asks for right now (rad) — grip-limited at speed */
+  lockNow = 0;
   private rollbackReported = false;
   private overRevCool = 0;
 

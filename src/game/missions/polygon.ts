@@ -80,8 +80,8 @@ export class PolygonMission implements Mission {
 
   private width(e: Ex) { return e.id === 'lane' || e.id === 'reverse' ? (this.truck ? 3.5 : EX_LANE.width) : 0; }
 
-  private examInc(sim: Sim, e: Ex, ruleId: string, text: string, layer: 'safety' | 'technique' = 'technique', once = true) {
-    const key = `${e.id}-${ruleId}-${e.attempts}`;
+  private examInc(sim: Sim, e: Ex, ruleId: string, text: string, layer: 'safety' | 'technique' = 'technique', once = true, tag = '') {
+    const key = `${e.id}-${ruleId}-${tag ? tag + '-' : ''}${e.attempts}`;
     if (once && e.flags.has(key)) return;
     e.flags.add(key);
     const official = e.official;
@@ -147,7 +147,7 @@ export class PolygonMission implements Mission {
     const front = back ? p.rear().x : p.front().x;
     const line = back ? lane.x0 : lane.x1;
     const beyond = back ? front < line - 0.05 : front > line + 0.05;
-    if (beyond) this.examInc(sim, e, back ? 'exam1.2B' : 'exam1.1E', 'Возилото ја премина СТОП линијата.', 'safety');
+    if (beyond) this.examInc(sim, e, back ? 'exam1.2B' : 'exam1.1E', 'Возилото ја премина СТОП линијата.', 'safety', true, 'stopover');
     const dist = back ? front - line : line - front;
     // unnecessary stop in the middle of the lane
     if (e.stopT > 1.5 && dist > 4 && ((back && front < lane.x1 - 3) || (!back && front > lane.x0 + 3))) this.examInc(sim, e, back ? 'exam1.2A' : 'exam1.1Z', 'Непотребно запирање во лентата.');

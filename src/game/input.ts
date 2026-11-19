@@ -111,7 +111,7 @@ export class Input {
     else if (!this.clutchLatched && this.clutch > 0) {
       // automatic easing through the biting region (slower in the learner profile)
       const inBite = this.clutch <= this.bite.high + 0.02 && this.clutch >= this.bite.low - 0.02;
-      const slow = this.assist === 'learn' ? 0.42 : 0.75;
+      const slow = this.assist === 'learn' ? 0.3 : 0.35; // faster than ~0.4/s stalls the low-torque cars on a keyboard launch (tests/playtest)
       this.clutch = Math.max(0, this.clutch - dt * (inBite ? slow : 3.2));
     }
     const steer = Math.abs(this.touch.steer) > 0.02 ? this.touch.steer : this.steerKb;

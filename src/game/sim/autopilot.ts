@@ -6,6 +6,7 @@ import type { Controls } from '../vehicles/vehicle';
 import type { CityMission } from '../missions/city';
 import type { Sim } from './sim';
 import type { S1, S2, S3 } from './scenarios';
+import { SIGNAL_STOP_E } from '../traffic/cityTraffic';
 
 export interface AutoOptions { mode: 'lawful' | 'reckless'; signal?: boolean; wrongWay?: boolean; cruise?: number; lateSignal?: boolean }
 
@@ -33,7 +34,7 @@ export class Autopilot {
     const PL = sim.player.def.dims;
     if (sim.player.gear === 'N') sim.player.requestGear(1);
     const delta = Math.atan((2 * PL.wheelbase * Math.sin(alpha)) / Ld);
-    const maxSteer = sim.player.def.steer.lock * (1 - 0.62 * clamp(Math.abs(v) / 24, 0, 1));
+    const maxSteer = Math.max(0.05, sim.player.lockNow || sim.player.def.steer.lock); // same lock the car applies
     const steer = clamp(delta / maxSteer, -1, 1);
 
     // Desired speed: cruise, slower into corners, stop at the end.
@@ -52,6 +53,12 @@ export class Autopilot {
         const np = s2.npc.pose;
         const onTiha = Math.abs(np.x - 478.6) < 1.5 && np.y < 259;
         if ((onTiha && np.y + s2.npc.L / 2 > 86) || (!onTiha && np.x > 430 && np.y > 250)) stopDist = Math.min(stopDist, 79 - front.y);
+      }
+      // traffic signal on Бакалска: stop for red, and for yellow when a normal stop is still possible
+      const sig = (sim.mission as unknown as { traffic?: { signal?: { lamp: string } } }).traffic?.signal;
+      if (sig && Math.abs(p.y) < 3.6 && Math.cos(p.h) > 0.7 && front.x < SIGNAL_STOP_E && SIGNAL_STOP_E - front.x < 45) {
+        const d = SIGNAL_STOP_E - front.x - 0.6;
+        if (sig.lamp === 'red' || sig.lamp === 'redYellow' || (sig.lamp === 'yellow' && d > (v * v) / (2 * 3.5))) stopDist = Math.min(stopDist, d);
       }
       const s3 = (sim.mission as CityMission).scenarios.find((s) => s.id === 's3') as S3 | undefined;
       if (s3?.ped && front.x > 332 && front.x < 380 && Math.abs(p.y - 260) < 4) {

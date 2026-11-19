@@ -31,6 +31,8 @@ export interface Save {
   history: AttemptRecord[];
   skills: Record<string, { attempts: number; good: number }>;
   seenIntro: boolean;
+  /** last menu choice — survives the garage, results and reloads */
+  menu?: { env: EnvId; mode: Mode; time: 'golden' | 'noon' | 'dusk' | 'night'; weather: 'clear' | 'rain' | 'fog' };
 }
 
 export const DEFAULT_GARAGE: GarageChoice = { vehicle: 'vardarka', paint: '#efe3c8', finish: 'solid', trims: [], plate: 'SK 1984-DM', layout: 'long', interior: 'petrol', mirrorAdj: 0, load: 0 };
