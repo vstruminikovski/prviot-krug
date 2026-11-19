@@ -188,3 +188,12 @@ The running page exposes `window.__krug` (the game engine):
 - `__krug.qaInstantRun({ mode: 'lawful' | 'reckless', signal: true })` simulates a whole run instantly and opens the review.
 - `__krug.setAutopilot({ mode: 'lawful', signal: true })` with `__krug.timeScale = 6` lets the scripted driver drive the real page.
 - `__krug.startRetry('s1' | 's2' | 's3' | 's4')` jumps straight to a situation.
+
+## Third-party resources (expansion)
+
+| Resource | Licence | Use | Notes |
+|---|---|---|---|
+| Spectral GT-RS car (github.com/JaronKBragg7337/spectral-gt-rs) | CC0 1.0 | Guest vehicle `spectral` (garage) | Optimised by `tools/blender/import_spectral.py`: removed hidden engine/suspension, text badges and plate text; selective decimation + planar dissolve; 152k → 31.5k tris, 4.7 → 1.7 MB; mapped to game conventions (Wheel_FL…, Paint, Glass, IndL/IndR, PlateMount_F/R). Physics uses its own `VehicleDef` (estimated, labelled). |
+| 3d-tiles-renderer 0.4.10 (NASA-AMMOS) | Apache-2.0 | Optional Google 3D view, lazy-loaded | Not in the main bundle path until opened. |
+| Google Photorealistic 3D Tiles | Google Maps Platform terms | Optional live **display only** („Google 3D поглед“ in the menu) | Never stored, converted, or used for collisions/scenario geometry. Shows "Google Maps" label + aggregated tile copyrights. Requires `VITE_GOOGLE_MAPS_API_KEY` in `.env.local` (see `.env.example`) with the Map Tiles API enabled; without it the button is disabled. Not verified with a live key. |
+| Kenney City Kit Suburban / Roads | CC0 | Not integrated yet | kenney.nl blocks scripted download. Next step: download the zip manually into `tools/assets/kenney/` and run a small import script. |

@@ -242,3 +242,11 @@ kbd { background: var(--paper-2); border: 1px solid #b9a77f; border-bottom-width
   .layers { grid-template-columns: 1fr; }
   .env-cards { grid-template-columns: 1fr; }
 }
+
+/* optional Google 3D Tiles view */
+.gtiles { position: fixed; inset: 0; z-index: 60; background: #c9d6dc; }
+.gtiles-canvas { position: absolute; inset: 0; }
+.gtiles-bar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; gap: 10px; align-items: center; justify-content: space-between; background: rgba(243,234,214,.94); border: 2px solid var(--petrol); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.gtiles-err { position: absolute; top: 60px; left: 10px; background: #fbe9e4; color: var(--bad); padding: 6px 10px; border-radius: 6px; }
+.gtiles-attr { position: absolute; left: 10px; bottom: 8px; right: 10px; display: flex; gap: 12px; align-items: center; color: #fff; font-size: 11px; text-shadow: 0 1px 2px #000; pointer-events: none; }
+.gtiles-logo { font: 700 16px Arial, sans-serif; color: #fff; padding: 2px 0 2px 2px; }

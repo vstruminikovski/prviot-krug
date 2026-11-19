@@ -24,7 +24,7 @@ const PROFILES: Record<CarType, Profile> = {
 };
 
 /** Which mesh profile a vehicle definition uses (procedural fallback for the Blender assets). */
-export const MESH_FOR: Record<string, CarType> = { vardarka: 'yugo', pelister: 'sedan', shar: 'estate', ohrid: 'coupe', korab: 'suv', bistra: 'van', jakupica: 'truck' };
+export const MESH_FOR: Record<string, CarType> = { vardarka: 'yugo', pelister: 'sedan', shar: 'estate', ohrid: 'coupe', korab: 'suv', bistra: 'van', jakupica: 'truck', spectral: 'coupe' };
 
 export type CarMat = 'body' | 'glass' | 'black' | 'tire' | 'hub' | 'chrome' | 'head' | 'tail' | 'indL' | 'indR' | 'plate' | 'rust' | 'interior';
 export interface CarPart { geom: THREE.BufferGeometry; mat: CarMat }

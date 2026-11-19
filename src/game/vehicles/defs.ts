@@ -173,6 +173,24 @@ export const VEHICLES: VehicleDef[] = [
     rearWindow: false, plates: ['long', 'twoRow'], trims: ['Цирада', 'Сандак', 'Ладилник'],
     simplifications: 'Пневматските сопирачки се приближени со доцнење од 0,3 с; без моторна сопирачка и без мерење на оска по оска.',
   },
+  {
+    id: 'spectral', name: 'Spectral GT-RS (гостин)', family: 'coupe', familyLabel: 'Гостин: модерно спортско купе', era: '2020-ти', paint: '#22304f',
+    blurb: 'Модел CC0 од трета страна — широк, низок и силен. Тешко се гледа наоколу; во маалото е тесно.',
+    scope: { category: 'B', label: 'Категорија Б (гостин-возило, само за вежба)', verified: false },
+    dims: { L: 5.19, W: 2.0, H: 1.68, wheelbase: 3.05, track: 1.72, wheelR: 0.36, frontOverhang: 1.05, groundClearance: 0.11 },
+    mass: 1520, comHeight: 0.45, frontWeight: 0.44, drive: 'RWD',
+    steer: { lock: 0.55, rate: 2.6 },
+    engine: { idle: 900, redline: 7600, stall: 480, inertia: 0.16, friction0: 10, friction1: 0.005, offDrag: 30, curve: [[0, 0], [900, 160], [2000, 320], [3500, 420], [5000, 460], [6500, 440], [7600, 380], [8000, 300]] },
+    gears: [3.3, 2.1, 1.5, 1.15, 0.92], reverse: 3.2, finalDrive: 3.6, driveEfficiency: 0.9,
+    clutch: { maxTorque: 600, biteHigh: 0.64, biteLow: 0.4 },
+    brakes: { decel: 9.5, parkDecel: 3.0, lag: 0.05 },
+    tyre: { mu: 1.05, cornerF: 80000, cornerR: 90000 },
+    aero: { cdA: 0.62, rolling: 0.011 },
+    eye: { x: -0.35, y: 1.08, z: -0.4 },
+    mirrors: { left: { x: 0.55, y: 1.0, z: -1.15 }, right: { x: 0.55, y: 1.0, z: 1.15 }, interior: { x: 0.1, y: 1.25, z: 0 } },
+    rearWindow: true, plates: ['long'], trims: [],
+    simplifications: 'Гостин-модел: физиката е проценета за модерно купе, не е мерена.',
+  } as VehicleDef,
 ];
 
 export const vehicleById = (id: string) => VEHICLES.find((v) => v.id === id) ?? VEHICLES[0];

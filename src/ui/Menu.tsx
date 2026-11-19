@@ -8,6 +8,8 @@ import { incomingChallenge } from '../game/host';
 import type { EnvId } from '../game/env/types';
 import type { Assist } from '../game/vehicles/vehicle';
 import { Sources } from './Sources';
+import { GoogleTilesView } from './GoogleTilesView';
+import { googleTilesEnabled } from '../game/render/googleTiles';
 
 const ASSISTS: { id: Assist; label: string; note: string }[] = [
   { id: 'learn', label: 'Помош при учење', note: 'Помош против гаснење, означена точка на зафаќање, предлог за брзина.' },
@@ -28,6 +30,7 @@ export function Menu({ engine }: { engine: GameEngine }) {
   const [mode, setMode] = useState<Mode>(engine.config.mode);
   const [assist, setAssist] = useState<Assist>(engine.store.settings.assist);
   const [sources, setSources] = useState(false);
+  const [gmap, setGmap] = useState(false);
   const code = incomingChallenge();
   const ch = decodeChallenge(code);
   const def = vehicleById(engine.store.garage.vehicle);
@@ -69,6 +72,7 @@ export function Menu({ engine }: { engine: GameEngine }) {
         <div className="row">
           <button className="btn primary big" disabled={!!block} onClick={go}>Возиме</button>
           <button className="btn ghost small" onClick={() => setSources(true)}>Извори и правила</button>
+          <button className="btn ghost small" disabled={!googleTilesEnabled()} title={googleTilesEnabled() ? '' : 'Потребен е VITE_GOOGLE_MAPS_API_KEY (види README)'} onClick={() => setGmap(true)}>Google 3D поглед</button>
         </div>
         {last.length > 0 && (
           <div className="history">
@@ -78,6 +82,7 @@ export function Menu({ engine }: { engine: GameEngine }) {
       </div>
       <ControlCard />
       {sources && <Sources onClose={() => setSources(false)} />}
+      {gmap && <GoogleTilesView onClose={() => setGmap(false)} />}
       <span className="sr">{VEHICLES.length}</span>
     </div>
   );
