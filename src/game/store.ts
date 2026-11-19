@@ -12,7 +12,7 @@ export interface AttemptRecord { at: string; env: EnvId; mode: Mode; seed: numbe
 
 export interface Save {
   schema: number;
-  settings: { assist: Assist; camera: 'chase' | 'driver'; muted: boolean; mirrors: 'high' | 'low'; legend: boolean; motion: boolean };
+  settings: { assist: Assist; camera: 'chase' | 'high' | 'driver'; muted: boolean; mirrors: 'high' | 'low'; legend: boolean; motion: boolean };
   garage: GarageChoice;
   favorites: GarageChoice[];
   history: AttemptRecord[];

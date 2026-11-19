@@ -7,7 +7,9 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export type TimeOfDay = 'golden' | 'noon' | 'dusk' | 'night';
 export type Weather = 'clear' | 'rain' | 'fog';
@@ -24,29 +26,53 @@ const PRESETS: Record<TimeOfDay, Preset> = {
 
 const GradeShader = {
   uniforms: {
-    tDiffuse: { value: null }, uTime: { value: 0 }, uWarm: { value: 1 }, uVignette: { value: 0.32 }, uGrain: { value: 0.035 },
-    uSat: { value: 1.08 }, uContrast: { value: 1.05 }, uWet: { value: 0 },
+    tDiffuse: { value: null }, uTime: { value: 0 }, uWarm: { value: 1 }, uVignette: { value: 0.3 }, uGrain: { value: 0.03 },
+    uSat: { value: 1.12 }, uContrast: { value: 1.06 }, uWet: { value: 0 }, uTilt: { value: 0 }, uFringe: { value: 0.0012 },
+    uRes: { value: new THREE.Vector2(1, 1) }, uFlash: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime, uWarm, uVignette, uGrain, uSat, uContrast, uWet; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime, uWarm, uVignette, uGrain, uSat, uContrast, uWet, uTilt, uFringe, uFlash; uniform vec2 uRes; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+    vec3 tap(vec2 uv){
+      // lens fringing grows towards the frame edge
+      vec2 d = uv - 0.5; float e = dot(d, d);
+      return vec3(texture2D(tDiffuse, uv - d * uFringe * e * 8.0).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv + d * uFringe * e * 8.0).b);
+    }
     void main(){
-      vec3 c = texture2D(tDiffuse, vUv).rgb;
-      float l = dot(c, vec3(0.299,0.587,0.114));
-      // split toning: dusky teal shadows, warm peach highlights
-      vec3 shadowT = vec3(0.86, 1.0, 1.04), highT = vec3(1.07, 1.0, 0.9);
-      c *= mix(vec3(1.0), mix(shadowT, highT, smoothstep(0.15, 0.75, l)), uWarm);
-      c = mix(vec3(l), c, uSat - uWet * 0.25);
-      c = (c - 0.5) * uContrast + 0.5;
-      vec2 d = vUv - 0.5; c *= 1.0 - uVignette * dot(d, d) * 2.2;
-      c += (hash(vUv * 900.0 + uTime) - 0.5) * uGrain;
+      vec3 c = tap(vUv);
+      // tilt-shift: a sharp horizontal band, soft top and bottom (miniature look in the outside cameras)
+      if (uTilt > 0.0) {
+        float b = smoothstep(0.18, 0.5, abs(vUv.y - 0.46)) * uTilt;
+        if (b > 0.01) {
+          vec3 acc = c; float w = 1.0;
+          for (int i = 0; i < 8; i++) {
+            float a = float(i) * 2.39996 + hash(vUv) * 0.5; float r = (float(i) + 1.0) / 8.0;
+            vec2 o = vec2(cos(a), sin(a)) * r * b * 7.0 / uRes;
+            acc += texture2D(tDiffuse, vUv + o).rgb; w += 1.0;
+          }
+          c = mix(c, acc / w, b);
+        }
+      }
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      // split toning: cool teal shadows, warm peach highlights
+      vec3 shadowT = vec3(0.9, 1.0, 1.06), highT = vec3(1.06, 1.0, 0.92);
+      c *= mix(vec3(1.0), mix(shadowT, highT, smoothstep(0.1, 0.8, l)), uWarm);
+      c = mix(vec3(l), c, uSat - uWet * 0.22);
+      // gentle filmic S-curve around mid grey, lifted blacks (print-film feel)
+      c = clamp(c, 0.0, 1.0);
+      c = mix(c, c * c * (3.0 - 2.0 * c), clamp((uContrast - 1.0) * 3.0, 0.0, 0.5));
+      c = c * 0.97 + vec3(0.012, 0.014, 0.022);
+      vec2 d = vUv - 0.5; c *= 1.0 - uVignette * dot(d, d) * 2.0;
+      c += (hash(vUv * uRes + fract(uTime) * 91.0) - 0.5) * uGrain;
+      c = mix(c, vec3(1.0), uFlash);
       gl_FragColor = vec4(c, 1.0);
     }`,
 };
 
 export class Atmosphere {
   composer: EffectComposer;
+  ao: GTAOPass | null = null;
   private bloom: UnrealBloomPass;
   private grade: ShaderPass;
   private renderPass: RenderPass;
@@ -63,14 +89,35 @@ export class Atmosphere {
   private lastSkid = new Map<number, THREE.Vector3>();
 
   constructor(private renderer: THREE.WebGLRenderer, private scene: THREE.Scene, private camera: THREE.PerspectiveCamera, private sun: THREE.DirectionalLight, private hemi: THREE.HemisphereLight) {
-    this.composer = new EffectComposer(renderer);
+    // multisampled HDR target: the composer otherwise renders without anti-aliasing
+    const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
+    this.composer = new EffectComposer(renderer, rt);
     this.renderPass = new RenderPass(scene, camera);
     this.composer.addPass(this.renderPass);
+    // ambient occlusion: grounds every object (desktop only, half resolution)
+    if (!matchMedia('(pointer: coarse)').matches) {
+      const ao = new GTAOPass(scene, camera, size.x / 2, size.y / 2);
+      ao.output = GTAOPass.OUTPUT.Default;
+      ao.blendIntensity = 0.85;
+      ao.updateGtaoMaterial({ radius: 1.6, distanceExponent: 1.4, thickness: 2.5, scale: 1.2, samples: 10, distanceFallOff: 1, screenSpaceRadius: false });
+      ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 12 });
+      const setSize = ao.setSize.bind(ao);
+      ao.setSize = (w: number, h: number) => setSize(Math.max(1, w / 2), Math.max(1, h / 2));
+      this.ao = ao;
+      this.composer.addPass(ao);
+    }
+    // soft studio reflections for glossy paint and chrome (lit materials only)
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.55;
+    pm.dispose();
     this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.3, 0.55, 0.86);
     this.composer.addPass(this.bloom);
+    // tone mapping + sRGB first, then grade in display space (vignette, grain, split tone)
+    this.composer.addPass(new OutputPass());
     this.grade = new ShaderPass(GradeShader);
     this.composer.addPass(this.grade);
-    this.composer.addPass(new OutputPass());
 
     this.sky = new Sky();
     this.sky.scale.setScalar(4000);
@@ -88,7 +135,7 @@ export class Atmosphere {
 
     // headlights (follow the player pose)
     for (let i = 0; i < 2; i++) {
-      const s = new THREE.SpotLight('#fff1d0', 0, 60, 0.42, 0.55, 1.4);
+      const s = new THREE.SpotLight('#fff1d0', 0, 55, 0.36, 0.6, 1.5);
       const t = new THREE.Object3D(); s.target = t;
       scene.add(s, t); this.heads.push(s); this.headTargets.push(t);
     }
@@ -105,7 +152,15 @@ export class Atmosphere {
     this.setTime('golden');
   }
 
-  setSize(w: number, h: number) { this.composer.setSize(w, h); this.bloom.resolution.set(w / 2, h / 2); }
+  setSize(w: number, h: number) {
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer.setSize(w, h); this.bloom.resolution.set(w / 2, h / 2);
+    (this.grade.uniforms.uRes as { value: THREE.Vector2 }).value.set(w * this.renderer.getPixelRatio(), h * this.renderer.getPixelRatio());
+  }
+  /** tilt-shift amount (0 = off): used by the outside cameras */
+  setTilt(k: number) { const u = this.grade.uniforms.uTilt as { value: number }; u.value += (k - u.value) * 0.08; }
+  /** brief white flash (impacts / photo moment) */
+  flash(k: number) { (this.grade.uniforms.uFlash as { value: number }).value = Math.max((this.grade.uniforms.uFlash as { value: number }).value, k); }
 
   setTime(t: TimeOfDay) {
     this.time = t;
@@ -121,7 +176,9 @@ export class Atmosphere {
     this.applyFog();
     this.renderer.toneMappingExposure = 1.0;
     (this.grade.uniforms.uWarm as { value: number }).value = p.warm;
-    this.bloom.strength = p.bloom;
+    this.bloom.strength = p.bloom * 0.8;
+    this.scene.environmentIntensity = ({ golden: 0.5, noon: 0.6, dusk: 0.22, night: 0.05 } as const)[t];
+    this.bloom.threshold = t === 'night' || t === 'dusk' ? 0.72 : 1.25;
     this.lampLevel = p.lamps;
     this.updateLamps();
   }
@@ -164,16 +221,17 @@ export class Atmosphere {
   /** Per frame: headlights, rain, skid marks, smoke. */
   update(dt: number, player: { x: number; y: number; z: number; h: number; vx: number; vy: number; brake: number; spin: boolean; track: number; wheelbase: number; L: number } | null) {
     (this.grade.uniforms.uTime as { value: number }).value += dt;
+    const fl = this.grade.uniforms.uFlash as { value: number }; fl.value *= Math.exp(-dt * 9);
     // headlights
     const on = this.lightsNeeded && !!player;
     for (let i = 0; i < 2; i++) {
       const s = this.heads[i];
-      s.intensity = on ? (this.time === 'night' ? 320 : 160) : 0;
+      s.intensity = on ? (this.time === 'night' ? 240 : 120) : 0;
       if (!player) continue;
       const c = Math.cos(player.h), sn = Math.sin(player.h), side = i ? 0.55 : -0.55;
       const fx = player.x + c * (player.L / 2) + sn * side, fy = player.y + sn * (player.L / 2) - c * side;
       s.position.set(fx, player.z + 0.7, -fy);
-      this.headTargets[i].position.set(fx + c * 18, player.z, -(fy + sn * 18));
+      this.headTargets[i].position.set(fx + c * 14, player.z - 0.4, -(fy + sn * 14));
     }
     // rain falls and recycles around the camera
     if (this.rain.visible) {

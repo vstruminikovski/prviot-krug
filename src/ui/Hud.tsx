@@ -2,10 +2,35 @@ import { useEffect, useRef, useState } from 'react';
 import type { GameEngine, HudState } from '../game/engine';
 import { BINDINGS } from '../game/input';
 import { MODE_LABEL } from '../game/missions/types';
+import { ENV_INFO } from '../game/attempt';
+import { TIME_LABEL, WEATHER_LABEL } from '../game/render/atmosphere';
+import { kmh } from '../game/math';
 
 const ASSIST_LABEL: Record<string, string> = { learn: 'Помош при учење', manual: 'Мануелно', exam: 'Испит', auto: 'Автоматски (пристапност)' };
 
-function Gauge({ value, max, ticks, label, red, unit, size = 150 }: { value: number; max: number; ticks: number; label: string; red?: number; unit: string; size?: number }) {
+/** 60 fps needle with a little spring overshoot, read straight from the simulation (HUD state is 15 Hz). */
+function useNeedle(read: () => number, max: number, sweep: number, digits?: React.RefObject<SVGTextElement>) {
+  const ref = useRef<SVGGElement>(null);
+  const r = useRef(read); r.current = read;
+  useEffect(() => {
+    let raf = 0, v = r.current(), vel = 0, last = performance.now(), shown = -1;
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      const target = Math.max(0, Math.min(max * 1.02, r.current()));
+      vel += ((target - v) * 260 - vel * 22) * dt; v += vel * dt;
+      ref.current?.setAttribute('transform', `rotate(${(sweep * Math.max(0, v)) / max} 80 80)`);
+      if (digits?.current) { const n = Math.round(target); if (n !== shown) { shown = n; digits.current.textContent = String(n).padStart(3, ' '); } }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [max, sweep, digits]);
+  return ref;
+}
+
+function Gauge({ value, max, ticks, label, red, unit, size = 150, read, lcd }: { value: number; max: number; ticks: number; label: string; red?: number; unit: string; size?: number; read?: () => number; lcd?: boolean }) {
+  const lcdRef = useRef<SVGTextElement>(null);
+  const needle = useNeedle(read ?? (() => value), max, 270, lcd ? lcdRef : undefined);
   const a0 = -225, a1 = 45;
   const ang = (v: number) => ((a0 + ((a1 - a0) * Math.min(v, max)) / max) * Math.PI) / 180;
   const pt = (v: number, r: number) => [80 + Math.cos(ang(v)) * r, 80 + Math.sin(ang(v)) * r];
@@ -17,15 +42,19 @@ function Gauge({ value, max, ticks, label, red, unit, size = 150 }: { value: num
     if (major) { const [tx, ty] = pt(v, 41); els.push(<text key={'t' + v} x={tx} y={ty + 3.5} textAnchor="middle" fontSize="10" fill="#1f3b3a" fontWeight={700}>{unit === 'rpm' ? Math.round(v / 1000) : Math.round(v)}</text>); }
   }
   if (red !== undefined) { const [ax, ay] = pt(red, 66), [bx, by] = pt(max, 66); els.push(<path key="red" d={`M ${ax} ${ay} A 66 66 0 0 1 ${bx} ${by}`} stroke="#b3342b" strokeWidth="5" fill="none" />); }
-  const [nx, ny] = pt(value, 57);
+  const [nx, ny] = pt(0, 57);
   return (
     <svg className="gauge" viewBox="0 0 160 160" width={size} height={size} aria-label={`${label} ${Math.round(value)}`}>
       <circle cx="80" cy="80" r="77" fill="#1f3b3a" />
       <circle cx="80" cy="80" r="71" fill="#efe3c8" stroke="#c9b48a" strokeWidth="2" />
       {els}
       <text x="80" y="60" textAnchor="middle" fontSize="7.5" fill="#6b5a3a" letterSpacing="1">{label}</text>
-      <line x1="80" y1="80" x2={nx} y2={ny} stroke="#b3342b" strokeWidth="3" strokeLinecap="round" />
-      <circle cx="80" cy="80" r="6" fill="#1f3b3a" />
+      {lcd && <><rect x="58" y="96" width="44" height="17" rx="3" fill="#1b2422" /><text ref={lcdRef} x="80" y="109" textAnchor="middle" fontSize="13" fill="#9fe0a8" fontFamily="ui-monospace, Menlo, monospace" fontWeight={700}>0</text></>}
+      <g ref={needle}>
+        <line x1="80" y1="80" x2={nx} y2={ny} stroke="#b3342b" strokeWidth="3" strokeLinecap="round" />
+        <line x1="80" y1="80" x2={80 - (nx - 80) * 0.22} y2={80 - (ny - 80) * 0.22} stroke="#b3342b" strokeWidth="4" strokeLinecap="round" />
+      </g>
+      <circle cx="80" cy="80" r="6" fill="#1f3b3a" /><circle cx="78.5" cy="78.5" r="1.8" fill="#4a6a68" />
     </svg>
   );
 }
@@ -76,7 +105,9 @@ function Gate({ gear, suggest }: { gear: string; suggest: number | null }) {
 }
 
 export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
-  const [legend, setLegend] = useState(engine.store.settings.legend);
+  const [legend, setLegend] = useState(engine.store.settings.legend && engine.store.history.length < 3);
+  const sp = () => (engine.sim ? kmh(Math.abs(engine.sim.player.vx)) : 0);
+  const rp = () => (engine.sim ? engine.sim.player.rpm : 0);
   const driving = hud.phase === 'drive';
   if (!driving) return null;
   const arrow = hud.task?.nav?.arrow;
@@ -84,14 +115,14 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
   return (
     <>
       <div className="instruments">
-        <Gauge value={hud.speed} max={hud.env === 'openRoad' ? 140 : 120} ticks={hud.env === 'openRoad' ? 14 : 12} label="км/ч" unit="kmh" />
+        <Gauge value={hud.speed} read={sp} lcd max={hud.env === 'openRoad' ? 140 : 120} ticks={hud.env === 'openRoad' ? 14 : 12} label="км/ч" unit="kmh" />
         <div className="gearbox">
-          <div className={`gear-big ${hud.gear === 'R' ? 'r' : ''}`}>{hud.gear === 'N' ? 'N' : hud.gear}</div>
+          <div key={hud.gear} className={`gear-big ${hud.gear === 'R' ? 'r' : ''}`}>{hud.gear === 'N' ? 'N' : hud.gear}</div>
           {hud.suggestGear && <div className="gear-sug">→ {hud.suggestGear}</div>}
           <Gate gear={hud.gear} suggest={hud.suggestGear} />
           <div className="limit" title="Важечко ограничување">{hud.limit}</div>
         </div>
-        <Gauge value={hud.rpm} max={Math.ceil(hud.redline / 1000 + 1) * 1000} ticks={Math.ceil(hud.redline / 1000 + 1) * 2} label="×1000 вртежи" unit="rpm" red={hud.redline} />
+        <Gauge value={hud.rpm} max={Math.ceil(hud.redline / 1000 + 1) * 1000} ticks={Math.ceil(hud.redline / 1000 + 1) * 2} label="×1000 вртежи" unit="rpm" red={hud.redline} read={rp} />
         <Lamps h={hud} />
         <Pedals h={hud} />
       </div>
@@ -105,18 +136,18 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
           {hud.task.progress && <span className="task-p">{hud.task.progress}</span>}
         </div>
       )}
-      {hud.say && <div className="say"><b>{hud.say.who}:</b> {hud.say.text}</div>}
-      {hud.prompt && <div className="prompt">{hud.prompt}</div>}
-      {hud.toast && <div className={`toast ${hud.toast.tone}`}>{hud.toast.text}</div>}
-      {hud.countdown !== null && <div className="countdown">{hud.countdown}</div>}
+      {hud.say && <div key={hud.say.text} className="say"><b>{hud.say.who}:</b> {hud.say.text}</div>}
+      {hud.prompt && hud.countdown === null && <div className="prompt">{hud.prompt}</div>}
+      {hud.toast && <div key={hud.toast.text} className={`toast ${hud.toast.tone}`}>{hud.toast.text}</div>}
+      {hud.countdown !== null && <Intro engine={engine} hud={hud} />}
       <div className="mode-tag">{MODE_LABEL[hud.mode]} · {ASSIST_LABEL[hud.assist]}</div>
       <div className="topbar">
-        <button className="icon-btn" onClick={() => engine.toggleCamera()} title="Камера (V)">{hud.camMode === 'chase' ? '🚗 Од возачот' : '🎥 Зад колата'}</button>
+        <button className="icon-btn" onClick={() => engine.toggleCamera()} title="Камера (V)">{hud.camMode === 'chase' ? '🎥 Зад колата' : hud.camMode === 'high' ? '🛰 Од високо' : '🚗 Од возачот'}</button>
         <button className="icon-btn" onClick={() => engine.toggleMute()} title="Звук (0)">{hud.muted ? '🔇' : '🔊'}</button>
         <button className="icon-btn" onClick={() => { setLegend(!legend); engine.store.settings.legend = !legend; engine.persist(); }} title="Контроли">⌨</button>
         <button className="icon-btn" onClick={() => engine.command({ type: 'pause' })} title="Пауза (Esc)">❚❚</button>
       </div>
-      {legend && (
+      {legend && hud.countdown === null && (
         <div className="legend">
           {BINDINGS.slice(0, 15).map((b) => <div key={b.keys}><kbd>{b.keys}</kbd> {b.action}</div>)}
           <div className="legend-more">J/K/M огледала · U/I рамо · V камера · T почеток · Esc</div>
@@ -129,6 +160,21 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       {hud.env === 'osm' && <div className="osm-attr">Податоци за улици и згради © OpenStreetMap contributors (ODbL)</div>}
       <TouchControls engine={engine} hud={hud} />
     </>
+  );
+}
+
+/** Cinematic opening: letterbox, place and conditions, while the camera sweeps in behind the car. */
+function Intro({ engine, hud }: { engine: GameEngine; hud: HudState }) {
+  const c = engine.config;
+  return (
+    <div className="intro">
+      <div className="lb top" /><div className="lb bot" />
+      <div className="intro-card">
+        <div className="intro-k">{MODE_LABEL[hud.mode]} · {TIME_LABEL[c.time ?? 'golden']} · {WEATHER_LABEL[c.weather ?? 'clear']}</div>
+        <div className="intro-t">{ENV_INFO[hud.env].title}</div>
+        <div className="intro-s">{hud.task?.text ?? ''}</div>
+      </div>
+    </div>
   );
 }
 

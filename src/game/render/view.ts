@@ -16,10 +16,11 @@ import { buildCityExtras, buildOpenRoadScene, buildPolygonScene, buildOsmScene, 
 import { buildGarage, type GarageScene } from './garage';
 import { decorateOpenRoad } from './kenneyProps';
 import { Atmosphere } from './atmosphere';
+import { patchXray, aimXray, xrayUniforms } from './xray';
 import type { EnvId } from '../env/types';
 import type { Glance } from '../input';
 
-export type CamMode = 'chase' | 'driver';
+export type CamMode = 'chase' | 'high' | 'driver';
 export type ShotMode = CamMode | 'replay' | 'title';
 
 export interface Custom { paint: string; finish: 'solid' | 'metallic'; plate: string; layout: PlateLayout; trims: string[]; interior: string; mirrorAdj: number }
@@ -39,7 +40,10 @@ export class View {
   private strollers = new Map<string, PersonRig>();
   private highlight: THREE.Group;
   private camPos = new THREE.Vector3(); private camLook = new THREE.Vector3(); private camInit = false; private camYaw = 0;
-  private glanceYaw = 0;
+  private glanceYaw = 0; private camLastH = 0; private lookSide = 0; private pull = 0;
+  /** last sim-step longitudinal acceleration (for camera pull) */
+  get lastAx() { return this.stepAx; }
+  private glassShot = ''; private xrFrame = 0; private tmpV2 = new THREE.Vector2(); private tmpV3 = new THREE.Vector3();
   camMode: CamMode = 'chase';
   private envGroups: Partial<Record<EnvId, THREE.Group>> = {};
   private envKey: Partial<Record<EnvId, string>> = {};
@@ -53,7 +57,7 @@ export class View {
   private overlay = new THREE.Scene();
   private overlayCam = new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1);
   private mirrorPanels: THREE.Mesh[] = [];
-  private mirrorFrame = 0;
+  private mirrorFrame = 0; private mirrorFocus = -1;
   mirrorsOn = true;
   mirrorQuality: 'high' | 'low' = 'high';
   private noRearPanel: THREE.Mesh;
@@ -102,19 +106,13 @@ export class View {
     this.scene.add(this.highlight);
     // mirrors: three cameras into small render targets, shown as flipped panels in an overlay
     for (let i = 0; i < 3; i++) {
-      const cam = new THREE.PerspectiveCamera(i === 2 ? 34 : 30, 2, 0.15, 900);
+      const cam = new THREE.PerspectiveCamera(i === 2 ? 34 : 30, 2, 0.15, 260);
       this.mirrorCams.push(cam);
       const rt = new THREE.WebGLRenderTarget(i === 2 ? 512 : 360, i === 2 ? 160 : 220);
       rt.texture.colorSpace = THREE.SRGBColorSpace;
       this.mirrorRTs.push(rt);
       const tex = rt.texture.clone(); void tex;
-      const mat = new THREE.MeshBasicMaterial({ map: rt.texture, toneMapped: false });
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
-      // flip horizontally: a mirror shows the reversed scene
-      const uv = panel.geometry.attributes.uv as THREE.BufferAttribute;
-      for (let k = 0; k < uv.count; k++) uv.setX(k, 1 - uv.getX(k));
-      const frame = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: '#1b1d1c', toneMapped: false }));
-      frame.position.z = -0.1; frame.scale.set(1.06, 1.1, 1); panel.add(frame);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mirrorMaterial(rt.texture, i === 2));
       this.overlay.add(panel);
       this.mirrorPanels.push(panel);
     }
@@ -155,20 +153,22 @@ export class View {
   private layoutMirrors(glance: Glance) {
     const w = this.width, h = this.height;
     const small = Math.min(1, w / 1100);
-    const sw = 190 * small + 40, sh = sw * 0.6;
-    const cw = 300 * small + 40, ch = cw * 0.3;
+    const sw = 150 * small + 36, sh = sw * 0.58;
+    const cw = 250 * small + 40, ch = cw * 0.28;
     const base: [number, number, number, number][] = [
-      [sw / 2 + 14, h * 0.56, sw, sh], // left
-      [w - sw / 2 - 14, h * 0.56, sw, sh], // right
-      [w / 2, h - 70 - ch / 2, cw, ch], // interior
+      [sw / 2 + 18, h * 0.5, sw, sh], // left
+      [w - sw / 2 - 18, h * 0.5, sw, sh], // right
+      [w / 2, h - 78 - ch / 2, cw, ch], // interior
     ];
     const big = glance === 'mirrorL' ? 0 : glance === 'mirrorR' ? 1 : glance === 'mirrorC' ? 2 : -1;
+    this.mirrorFocus = big;
     base.forEach(([x, y, pw, ph], i) => {
       const k = i === big ? 2.1 : 1;
       const p = this.mirrorPanels[i];
       const px = i === big ? (i === 0 ? Math.max(x, (pw * k) / 2 + 14) : i === 1 ? Math.min(x, w - (pw * k) / 2 - 14) : x) : x;
       const py = i === big ? Math.min(y, h - (ph * k) / 2 - 60) : y;
       p.position.set(px, py, 0); p.scale.set(pw * k, ph * k, 1);
+      ((p.material as THREE.ShaderMaterial).uniforms.uSize.value as THREE.Vector2).set(pw * k, ph * k);
       if (i === 2) { this.noRearPanel.position.set(px, py, 0.01); this.noRearPanel.scale.set(pw * k, ph * k, 1); }
     });
   }
@@ -190,6 +190,7 @@ export class View {
       this.scene.add(g);
     }
     for (const [k, g] of Object.entries(this.envGroups)) g!.visible = k === env;
+    patchXray(this.envGroups[env]!);
     for (const r of this.cars.values()) r.group.visible = false;
     for (const r of this.peds.values()) r.group.visible = false;
     for (const r of this.strollers.values()) r.group.visible = env === 'city';
@@ -247,29 +248,72 @@ export class View {
     const rig = this.player; if (!rig) return;
     rig.group.position.set(p.x, (p.z ?? 0) + 0.01, -p.y);
     rig.group.rotation.set(0, p.h, 0);
-    rig.body.rotation.z = pitch; rig.body.rotation.x = roll;
+    rig.body.rotation.z = pitch; rig.body.rotation.x = roll; rig.body.position.y = this.susp.h;
     rig.setIndicators(l, r); rig.setBrake(brake);
     const spin = (this.spin += (v / (this.playerDef?.dims.wheelR ?? 0.3)) * dt);
     rig.setSteer(steer, spin); rig.setSteeringWheel(-steer * 14); rig.setGear(gear);
     void dt;
   }
-  private spin = 0; private pitchS = 0; private lastV = 0;
+  private spin = 0;
+
+  // ---- render interpolation: the sim runs at a fixed 60 Hz, the display at 60–144 Hz.
+  // Before every sim step the previous state is captured; frames blend prev→current by `alpha`,
+  // so motion is smooth on any refresh rate (no judder on 120 Hz screens).
+  alpha = 1;
+  private prevP = { x: 0, y: 0, h: 0, z: 0, vx: 0, ok: false };
+  private prevA = new Map<string, { x: number; y: number; h: number }>();
+  private stepAx = 0;
+  capture(sim: Sim) {
+    const p = sim.player;
+    this.stepAx = this.prevP.ok ? (p.vx - this.prevP.vx) * 60 : 0;
+    Object.assign(this.prevP, { x: p.x, y: p.y, h: p.h, z: p.z, vx: p.vx, ok: true });
+    for (const c of sim.cars) { if (c.done) continue; const q = c.pose; const o = this.prevA.get(c.id); if (o) { o.x = q.x; o.y = q.y; o.h = q.h; } else this.prevA.set(c.id, { x: q.x, y: q.y, h: q.h }); }
+    for (const d of sim.peds) { if (d.done) continue; const o = this.prevA.get(d.id); if (o) { o.x = d.pos.x; o.y = d.pos.y; o.h = d.h; } else this.prevA.set(d.id, { x: d.pos.x, y: d.pos.y, h: d.h }); }
+  }
+  resetInterp() { this.prevP.ok = false; this.prevA.clear(); this.alpha = 1; this.susp = { p: 0, pv: 0, r: 0, rv: 0, h: 0, hv: 0 }; }
+  private lerpPose(id: string, x: number, y: number, h: number) {
+    const o = this.prevA.get(id), a = this.alpha;
+    if (!o || Math.hypot(x - o.x, y - o.y) > 4) return { x, y, h };
+    return { x: o.x + (x - o.x) * a, y: o.y + (y - o.y) * a, h: o.h + wrapAngle(h - o.h) * a };
+  }
+  /** Interpolated player pose for this frame. */
+  playerPose(sim: Sim): Pose & { z: number } {
+    const p = sim.player, o = this.prevP, a = this.alpha;
+    if (!o.ok || Math.hypot(p.x - o.x, p.y - o.y) > 4) return { x: p.x, y: p.y, h: p.h, z: p.z };
+    return { x: o.x + (p.x - o.x) * a, y: o.y + (p.y - o.y) * a, h: o.h + wrapAngle(p.h - o.h) * a, z: o.z + (p.z - o.z) * a };
+  }
+
+  // ---- visual suspension: a damped spring that leans the body with real accelerations
+  private susp = { p: 0, pv: 0, r: 0, rv: 0, h: 0, hv: 0 };
+  private stepSuspension(dt: number, ax: number, ay: number) {
+    const s = this.susp;
+    const tp = clamp(ax * 0.0062, -0.045, 0.045), tr = clamp(ay * 0.0085, -0.06, 0.06), th = -Math.abs(tr) * 0.25 - Math.max(0, -tp) * 0.6;
+    const k = 70, c = 2 * Math.sqrt(k) * 0.42;
+    for (let t = dt; t > 0; t -= 1 / 120) {
+      const h = Math.min(t, 1 / 120);
+      s.pv += (k * (tp - s.p) - c * s.pv) * h; s.p += s.pv * h;
+      s.rv += (k * (tr - s.r) - c * s.rv) * h; s.r += s.rv * h;
+      s.hv += (k * 1.4 * (th - s.h) - c * 1.2 * s.hv) * h; s.h += s.hv * h;
+    }
+  }
+  /** a jolt into the springs (impacts, kerbs) */
+  jolt(v: number) { this.susp.hv -= v * 0.6; this.susp.pv -= v * 0.5; }
 
   /** Live: mirror the simulation state. */
   syncLive(sim: Sim, dt: number, blink: boolean) {
     const p = sim.player;
-    const acc = dt > 0 ? (p.vx - this.lastV) / dt : 0; this.lastV = p.vx;
-    this.pitchS += (clamp(-acc * 0.006, -0.035, 0.035) + p.grade * 0 - this.pitchS) * Math.min(1, dt * 6);
+    const ip = this.playerPose(sim);
+    this.stepSuspension(dt, this.stepAx, p.vx * p.r);
     const haz = p.hazards && blink;
-    this.placePlayer({ ...p.pose, z: p.z }, p.vx, p.steer, dt, (p.indicator === 'left' && blink) || haz, (p.indicator === 'right' && blink) || haz, p.brake > 0.1, String(p.gear), this.pitchS - p.grade, p.roll * 0.5 + clamp(p.vx * p.steer * 0.008, -0.03, 0.03));
-    this.atmo.update(dt, { x: p.x, y: p.y, z: p.z, h: p.h, vx: p.vx, vy: p.vy, brake: p.brake, spin: (p as unknown as { wheelspinning: boolean }).wheelspinning, track: p.def.dims.track, wheelbase: p.def.dims.wheelbase, L: p.L });
+    this.placePlayer(ip, p.vx, p.steer, dt, (p.indicator === 'left' && blink) || haz, (p.indicator === 'right' && blink) || haz, p.brake > 0.1, String(p.gear), this.susp.p + p.grade, p.roll * 0.5 + this.susp.r);
+    this.atmo.update(dt, { x: ip.x, y: ip.y, z: ip.z, h: ip.h, vx: p.vx, vy: p.vy, brake: p.brake, spin: p.wheelspinning, track: p.def.dims.track, wheelbase: p.def.dims.wheelbase, L: p.L });
     const seen = new Set<string>();
     for (const c of sim.cars) {
       if (c.done) continue;
       const rig = this.npcRig(c.id, sim.actorMeta.get(c.id));
       if (!rig) continue;
       seen.add(c.id); rig.group.visible = true;
-      const q = c.pose;
+      const c0 = c.pose, q = this.lerpPose(c.id, c0.x, c0.y, c0.h);
       rig.group.position.set(q.x, sim.world.heightAt(q.x, q.y) + 0.01, -q.y); rig.group.rotation.y = q.h;
       const hz = c.id === 'van-dbl' && blink;
       rig.setIndicators((c.indicator === 'left' && blink) || hz, (c.indicator === 'right' && blink) || hz);
@@ -283,8 +327,9 @@ export class View {
       const rig = this.pedRig(d.id, sim.actorMeta.get(d.id));
       if (!rig) continue;
       seenP.add(d.id); rig.group.visible = true;
-      rig.group.position.set(d.pos.x, (d.onRoad ? 0.01 : 0.16) + sim.world.heightAt(d.pos.x, d.pos.y), -d.pos.y);
-      rig.group.rotation.y = d.h;
+      const q = this.lerpPose(d.id, d.pos.x, d.pos.y, d.h);
+      rig.group.position.set(q.x, (d.onRoad ? 0.01 : 0.16) + sim.world.heightAt(q.x, q.y), -q.y);
+      rig.group.rotation.y = q.h;
       rig.animate(d.phase, d.state === 'walk' || d.state === 'cross' || d.state === 'after');
     }
     for (const [id, rig] of this.peds) if (!seenP.has(id)) rig.group.visible = false;
@@ -345,6 +390,9 @@ export class View {
   }
 
   resetShot() { this.camInit = false; }
+  private introT = 0; private introLen = 1;
+  /** opening camera sweep: from a low front three-quarter view round to the driving camera */
+  startIntro(secs: number) { this.introT = secs; this.introLen = secs; }
   setCamMode(m: CamMode) { this.camMode = m; this.camInit = false; }
 
   /** Camera for the given shot. `p` is the player pose (with z). */
@@ -366,6 +414,7 @@ export class View {
       const yaw = p.h + steer * 0.18 + this.glanceYaw;
       const look = pos.clone().add(new THREE.Vector3(Math.cos(yaw), -0.06, -Math.sin(yaw)).multiplyScalar(10));
       cam.position.copy(pos); cam.lookAt(look);
+      cam.rotateZ(-this.susp.r * 0.35); cam.rotateX(-this.susp.p * 0.5);
       fov = 70; this.camInit = false;
       for (const o of glbInterior) o.visible = true;
     } else if (shot === 'replay') {
@@ -383,20 +432,47 @@ export class View {
       const t = performance.now() / 1000;
       cam.position.set(22 + Math.sin(t / 9) * 5, 4.2, -0.8); cam.lookAt(86, 2.2, 7.5);
     } else {
-      if (!this.camInit) this.camYaw = p.h;
-      this.camYaw += wrapAngle(p.h - this.camYaw) * (1 - Math.exp(-dt * 3.2));
+      // chase / high: rigidly follow the car's position (no rubber-band lag at speed);
+      // only the heading is smoothed, plus springs for anticipation and acceleration feel.
+      const high = shot === 'high';
+      if (!this.camInit) { this.camYaw = p.h; this.camLastH = p.h; this.lookSide = 0; this.pull = 0; }
+      const yawRate = dt > 0 ? wrapAngle(p.h - this.camLastH) / dt : 0; this.camLastH = p.h;
+      const rev = v < -0.3;
+      const follow = high ? 1.4 : 2.2 + Math.min(2.2, Math.abs(v) * 0.11);
+      const goal = p.h; void rev;
+      this.camYaw += wrapAngle(goal - this.camYaw) * (1 - Math.exp(-dt * follow));
+      this.lookSide += (clamp(yawRate * (high ? 2 : 1.4), -2.2, 2.2) - this.lookSide) * (1 - Math.exp(-dt * 2.5));
+      this.pull += (clamp(this.lastAx * 0.05, -0.8, 0.8) - this.pull) * (1 - Math.exp(-dt * 3));
       const yaw = this.camYaw + this.glanceYaw;
       const cf = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+      const side = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)); // +right
       const L = def?.dims.L ?? 3.5, H = def?.dims.H ?? 1.4;
-      const dist = L * 1.35 + 1.8 + clamp(Math.abs(v) * 0.08, 0, 1.2);
-      const pos = base.clone().addScaledVector(cf, -dist).setY(z + H + 1.2);
-      const look = base.clone().addScaledVector(cf, 3.5).setY(z + H * 0.7);
-      if (!this.camInit) { this.camPos.copy(pos); this.camLook.copy(look); this.camInit = true; }
-      this.speedFov += (clamp(Math.abs(v) - 8, 0, 20) * 0.45 - this.speedFov) * Math.min(1, dt * 2);
-      fov = 62 + this.speedFov;
-      const k = 1 - Math.exp(-dt * 4.5);
-      this.camPos.lerp(pos, k); this.camLook.lerp(look, Math.min(1, k * 1.6));
-      cam.position.copy(this.camPos); cam.lookAt(this.camLook);
+      const sp = clamp(Math.abs(v), 0, 30);
+      if (high) {
+        const dist = 10.5 + L * 0.7 + sp * 0.06;
+        cam.position.copy(base).addScaledVector(cf, -dist).setY(z + 6.6 + L * 0.35 + sp * 0.04);
+        cam.lookAt(base.clone().addScaledVector(cf, 2.5 + sp * 0.12).addScaledVector(side, -this.lookSide * 1.2).setY(z + 0.6));
+        fov = 50;
+      } else {
+        const dist = L * 1.2 + 2.3 + sp * 0.045 + this.pull;
+        cam.position.copy(base).addScaledVector(cf, -dist).addScaledVector(side, this.lookSide * 0.35).setY(z + H + 0.95 + sp * 0.012);
+        cam.lookAt(base.clone().addScaledVector(cf, 4 + sp * 0.18).addScaledVector(side, -this.lookSide * 1.1).setY(z + H * 0.62));
+        this.speedFov += (clamp(sp - 8, 0, 22) * 0.42 - this.speedFov) * Math.min(1, dt * 2);
+        fov = 60 + this.speedFov;
+      }
+      this.camInit = true;
+      if (this.introT > 0) {
+        this.introT = Math.max(0, this.introT - dt);
+        const u = 1 - this.introT / this.introLen, e = u * u * (3 - 2 * u);
+        const ang = p.h + Math.PI * 0.8 * (1 - e) + 0.35 * (1 - e);
+        const r = (L: number) => L * 1.6 + 3.2;
+        const from = base.clone().add(new THREE.Vector3(Math.cos(ang) * r(def?.dims.L ?? 3.5), 1.1 + 0.6 * e, -Math.sin(ang) * r(def?.dims.L ?? 3.5)));
+        const to = cam.position.clone();
+        const lookTo = base.clone().addScaledVector(cf, 4).setY(z + 0.8);
+        cam.position.copy(from.lerp(to, e * e));
+        cam.lookAt(base.clone().setY(z + 0.7).lerp(lookTo, e));
+        fov = THREE.MathUtils.lerp(42, fov, e);
+      }
     }
     if (this.shake > 0.001) {
       const k = this.shake * this.shake * 0.12;
@@ -407,9 +483,18 @@ export class View {
     this.sun.target.position.set(p.x, z, -p.y);
     this.sun.position.set(p.x - 85, z + 52, -p.y + 48);
     this.layoutMirrors(glance);
+    this.atmo.setTilt(shot === 'high' ? 1 : shot === 'chase' ? 0.35 : shot === 'replay' ? 0.8 : 0);
+    // keep the car visible through tree crowns / eaves in the outside cameras
+    if (++this.xrFrame % 90 === 0 && this.envGroups[this.env]) patchXray(this.envGroups[this.env]!);
+    const buf = this.renderer.getDrawingBufferSize(this.tmpV2);
+    aimXray(cam, this.tmpV3.set(p.x, z + (def?.dims.H ?? 1.4) * 0.6, -p.y), z + (def?.dims.H ?? 1.4) + 0.35, buf.x, buf.y, shot === 'chase' || shot === 'high' || shot === 'replay');
     if (this.player) {
-      // see through the windscreen from the driver's seat
-      this.player.group.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m && m.name === 'Glass') m.opacity = shot === 'driver' ? 0.12 : 0.62; });
+      // see through the windscreen from the driver's seat (only re-applied when the shot or rig changes)
+      const key = `${shot === 'driver'}:${this.player.group.uuid}`;
+      if (key !== this.glassShot) {
+        this.glassShot = key;
+        this.player.group.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m && m.name === 'Glass') m.opacity = shot === 'driver' ? 0.12 : 0.62; });
+      }
     }
   }
 
@@ -438,18 +523,24 @@ export class View {
     this.atmo.render();
     if (mirrors && this.mirrorsOn && pose) {
       this.mirrorFrame++;
-      if (this.mirrorQuality === 'high' || this.mirrorFrame % 2 === 0) {
+      {
         this.updateMirrors(pose);
         const prevFog = this.scene.fog; const shadow = r.shadowMap.autoUpdate;
+        const xrOn = xrayUniforms.uXr.value.w; xrayUniforms.uXr.value.w = 0;
         r.shadowMap.autoUpdate = false;
+        // round-robin: one mirror per frame (each ≥ 20 Hz); the mirror being looked at renders every frame
+        const focus = this.mirrorFocus;
         for (let i = 0; i < 3; i++) {
           if (i === 2 && !this.playerDef?.rearWindow) continue;
+          const due = this.mirrorFrame % (this.mirrorQuality === 'high' ? 3 : 6) === i;
+          if (!due && i !== focus) continue;
           // the interior mirror looks through the cabin: hide the car shell for it
           if (i === 2 && this.player) this.player.group.visible = false;
           r.setRenderTarget(this.mirrorRTs[i]); r.render(this.scene, this.mirrorCams[i]);
           if (this.player) this.player.group.visible = true;
         }
         r.setRenderTarget(null); r.shadowMap.autoUpdate = shadow; this.scene.fog = prevFog;
+        xrayUniforms.uXr.value.w = xrOn;
       }
       this.mirrorPanels[2].visible = true;
       r.autoClear = false; r.clearDepth(); r.render(this.overlay, this.overlayCam); r.autoClear = true;
@@ -519,4 +610,33 @@ function buildAmbulance(atlas: PlateAtlas): CarRig {
   const lampMat = new THREE.MeshBasicMaterial({ color: '#2244ff', toneMapped: false });
   const bar = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 1.2), lampMat); bar.position.set(0.9, 1.93, 0); base.body.add(bar);
   return { ...base, setHazardsLamp(on: boolean) { lampMat.color.set(on ? '#3a5bff' : '#0a1050'); } };
+}
+
+// ------------------------------------------------------------ mirror glass
+/** Rounded mirror glass with a dark bezel, soft inner shadow and a diagonal sheen. The scene
+ *  texture is flipped horizontally because a mirror shows the reversed view. */
+function mirrorMaterial(map: THREE.Texture, interior: boolean) {
+  return new THREE.ShaderMaterial({
+    transparent: true, depthTest: false, toneMapped: false,
+    uniforms: { map: { value: map }, uSize: { value: new THREE.Vector2(200, 100) }, uR: { value: interior ? 0.5 : 0.36 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `
+      uniform sampler2D map; uniform vec2 uSize; uniform float uR; varying vec2 vUv;
+      float sdRound(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
+      void main(){
+        vec2 p = (vUv - 0.5) * uSize;
+        float r = min(uSize.x, uSize.y) * uR;
+        float d = sdRound(p, uSize * 0.5, r);
+        float bez = 5.0;
+        float outer = 1.0 - smoothstep(-1.0, 0.5, d);
+        float glass = 1.0 - smoothstep(-bez - 1.0, -bez, d);
+        vec3 col = texture2D(map, vec2(1.0 - vUv.x, vUv.y)).rgb;
+        // inner shadow + sheen
+        col *= 0.7 + 0.3 * smoothstep(0.0, 12.0, -d - bez);
+        float sheen = smoothstep(0.0, 0.5, 1.0 - abs((vUv.x + vUv.y) - 0.75) * 3.0) * 0.08;
+        col += sheen;
+        vec3 bezel = mix(vec3(0.06, 0.065, 0.07), vec3(0.32, 0.33, 0.34), smoothstep(-bez, 0.0, d) * (0.4 + 0.6 * vUv.y));
+        gl_FragColor = vec4(mix(bezel, col, glass), outer * 0.97);
+      }`,
+  });
 }

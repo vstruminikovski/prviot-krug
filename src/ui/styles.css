@@ -273,3 +273,60 @@ kbd { background: var(--paper-2); border: 1px solid #b9a77f; border-bottom-width
 .lic-cat { font-size: 40px; font-weight: 900; color: #1f45a8; border: 3px solid #1f45a8; border-radius: 8px; width: 60px; text-align: center; }
 .new-stamp { background: #fbe9e4; border: 2px solid #b3342b; color: #b3342b; font-weight: 800; padding: 8px 12px; border-radius: 8px; margin: 10px 0; animation: stampIn .5s ease-out; }
 .modal-back.fixed { position: fixed; z-index: 60; }
+
+/* ---- 2026 polish: motion & glass ---- */
+@keyframes popIn { 0% { transform: scale(1.5); opacity: 0; } 60% { transform: scale(0.94); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes slideDown { 0% { transform: translate(-50%, -14px); opacity: 0; } 100% { transform: translate(-50%, 0); opacity: 1; } }
+@keyframes riseIn { 0% { transform: translate(-50%, 12px); opacity: 0; } 100% { transform: translate(-50%, 0); opacity: 1; } }
+.gear-big { animation: popIn 0.28s cubic-bezier(.2,.9,.3,1.3); }
+.toast { animation: slideDown 0.25s ease-out; box-shadow: 0 6px 20px rgba(0,0,0,.3); backdrop-filter: blur(6px); }
+.say { animation: riseIn 0.3s ease-out; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.08); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.task { backdrop-filter: blur(8px); box-shadow: 0 8px 26px rgba(0,0,0,.3); transition: all .3s; }
+.legend { background: rgba(20, 26, 25, 0.62); color: #efe3c8; border: 1px solid rgba(239,227,200,.18); backdrop-filter: blur(8px); border-radius: 10px; }
+.legend kbd { background: rgba(239,227,200,.12); color: #fff4dc; border-color: rgba(239,227,200,.3); }
+.legend-more { color: #c9bfa6; }
+.mode-tag, .icon-btn { backdrop-filter: blur(6px); }
+.intro { position: absolute; inset: 0; pointer-events: none; animation: introFade 2.8s ease forwards; }
+.intro .lb { position: absolute; left: 0; right: 0; height: 11vh; background: #0b0d0c; }
+.intro .lb.top { top: 0; animation: lbTop 2.8s ease forwards; } .intro .lb.bot { bottom: 0; animation: lbBot 2.8s ease forwards; }
+.intro-card { position: absolute; left: 6vw; bottom: 16vh; color: #fff4dc; text-shadow: 0 3px 18px rgba(0,0,0,.55); animation: cardIn 2.8s ease forwards; }
+.intro-k { text-transform: uppercase; letter-spacing: 4px; font-size: 12px; font-weight: 800; color: var(--amber); }
+.intro-t { font-size: clamp(34px, 6vw, 72px); font-weight: 900; letter-spacing: -1px; line-height: 1; margin: 4px 0; }
+.intro-s { font-size: 16px; max-width: 520px; opacity: .9; }
+@keyframes lbTop { 0%, 70% { transform: none; } 100% { transform: translateY(-100%); } }
+@keyframes lbBot { 0%, 70% { transform: none; } 100% { transform: translateY(100%); } }
+@keyframes cardIn { 0% { opacity: 0; transform: translateX(-30px); } 15%, 72% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(20px); } }
+@keyframes introFade { 0% { background: rgba(0,0,0,.85); } 25% { background: rgba(0,0,0,0); } 100% { background: rgba(0,0,0,0); } }
+.phase-drive .instruments, .phase-drive .topbar, .phase-drive .task { animation: hudIn .6s ease 2.2s both; }
+@keyframes hudIn { from { opacity: 0; } to { opacity: 1; } }
+.phase-drive .task { animation-name: hudInTask; }
+@keyframes hudInTask { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ---- menu: game front-end ---- */
+.menu { background: linear-gradient(90deg, rgba(14, 24, 23, 0.72), rgba(14, 24, 23, 0.15) 55%, transparent 80%); padding: 2.5vh 3vw; }
+.glass { background: rgba(246, 239, 222, 0.86) !important; backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); border: 1px solid rgba(255,255,255,.55) !important; box-shadow: 0 20px 60px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.6) !important; }
+.menu-card.glass { max-width: 600px; max-height: 95vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 18px; animation: menuIn .5s cubic-bezier(.2,.8,.2,1); background-image: none; }
+@keyframes menuIn { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+.menu-scroll { overflow: auto; padding: 20px 24px 8px; }
+.menu-foot { padding: 10px 24px 16px; border-top: 1px solid rgba(31,59,58,.15); background: linear-gradient(rgba(246,239,222,.4), rgba(246,239,222,.95)); }
+.menu-foot .vehicle-row { margin-top: 0; }
+.menu-card h1 { background: linear-gradient(180deg, #1f3b3a, #2f5a57); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.btn.go { position: relative; overflow: hidden; display: inline-flex; align-items: baseline; gap: 10px; transition: transform .15s, box-shadow .15s; }
+.btn.go small { font-size: 11px; opacity: .7; font-weight: 700; letter-spacing: 1px; }
+.btn.go:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(31,59,58,.35); }
+.btn.go::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.25) 50%, transparent 60%); transform: translateX(-100%); animation: shine 3.2s ease-in-out infinite; }
+@keyframes shine { 0%, 60% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.env-card { position: relative; transition: transform .18s, box-shadow .18s, background .18s; border-radius: 12px; }
+.env-card:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0,0,0,.18); }
+.env-card.sel { box-shadow: 0 10px 24px rgba(31,59,58,.35); transform: translateY(-2px); }
+.env-ico { font-style: normal; font-size: 22px; line-height: 1; color: var(--enamel); }
+.env-card.sel .env-ico { color: var(--amber); }
+.chips.seg { gap: 0; background: rgba(31,59,58,.08); padding: 3px; border-radius: 10px; display: inline-flex; }
+.chips.seg .chip { border: none; background: transparent; border-radius: 8px; transition: background .15s, color .15s; }
+.chips.seg .chip.sel { background: var(--petrol); color: var(--cream); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.chips.seg .chip.sel::before { display: none; }
+.chips.seg .chip-sep { width: 1px; background: rgba(31,59,58,.25); margin: 4px 6px; }
+.control-card.glass { position: relative; border-radius: 16px; animation: menuIn .6s .1s cubic-bezier(.2,.8,.2,1) both; }
+.control-card .x { position: absolute; right: 10px; top: 6px; border: none; background: none; font-size: 22px; cursor: pointer; color: var(--petrol); }
+.help-fab { position: absolute; right: 3vw; bottom: 3vh; border-radius: 999px; padding: 10px 16px; font-weight: 800; color: var(--petrol); cursor: pointer; animation: menuIn .6s .2s both; }
+@media (max-width: 760px) { .env-cards { grid-template-columns: repeat(2, 1fr); } .menu { padding: 8px; } .menu-card.glass { max-height: none; } .help-fab { display: none; } }

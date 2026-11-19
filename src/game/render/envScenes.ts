@@ -140,7 +140,7 @@ export function buildPolygonScene(vehicleLength: number): THREE.Group {
     uv.setXY(i, x / 7, y / 7);
   }
   pad.computeVertexNormals();
-  b.add(pad, 'pad', () => lam({ map: T.asphalt(), color: '#d8d2c6' }), undefined, false);
+  b.add(pad, 'pad', () => lam({ map: T.asphalt(), color: '#e2e2e0' }), undefined, false);
   const h = polygonHeight;
   const w = 0.12;
   // 1. forward lane 2.5 × 36 m with start and STOP lines
@@ -200,16 +200,27 @@ export function buildOpenRoadScene(debrisS: number): OpenRoadScene {
   terr.rotateX(-Math.PI / 2);
   const pos = terr.attributes.position as THREE.BufferAttribute;
   const cols = new Float32Array(pos.count * 3);
-  const cA = new THREE.Color('#a9b06f'), cB = new THREE.Color('#c6b07a'), cC = new THREE.Color('#8b8f62');
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i) + (x0 + x1) / 2, y = -pos.getZ(i) + (y0 + y1) / 2;
-    const hgt = terrainHeight(x, y) - 0.35;
-    pos.setXYZ(i, x, hgt, -y);
-    const c = cA.clone().lerp(cB, Math.max(0, Math.min(1, (hgt - 10) / 30))).lerp(cC, (Math.sin(x / 37) * Math.cos(y / 29) + 1) * 0.15);
-    cols.set([c.r, c.g, c.b], i * 3);
+    pos.setXYZ(i, x, terrainHeight(x, y) - 0.35, -y);
+  }
+  terr.computeVertexNormals();
+  // stylised low-poly palette: lush valley floor, dry golden grass higher up, ochre rock on steep
+  // faces, and a per-vertex jitter so every facet catches the light a little differently
+  const nrm = terr.attributes.normal as THREE.BufferAttribute;
+  const lush = new THREE.Color('#8fae5a'), dry = new THREE.Color('#d6bd72'), rock = new THREE.Color('#b98a5a'), deep = new THREE.Color('#6f9450');
+  const tmp = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), hgt = pos.getY(i), y = -pos.getZ(i);
+    const steep = 1 - nrm.getY(i);
+    tmp.copy(lush).lerp(deep, (Math.sin(x / 23) * Math.cos(y / 31) + 1) * 0.35)
+      .lerp(dry, THREE.MathUtils.smoothstep(hgt, 6, 34))
+      .lerp(rock, THREE.MathUtils.smoothstep(steep, 0.18, 0.42));
+    const j = Math.abs(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1;
+    tmp.offsetHSL(0, 0, (j - 0.5) * 0.06);
+    cols.set([tmp.r, tmp.g, tmp.b], i * 3);
   }
   terr.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-  terr.computeVertexNormals();
   const tm = new THREE.Mesh(terr, lam({ vertexColors: true, flatShading: true }));
   tm.receiveShadow = true; group.add(tm);
   // road ribbon
@@ -319,16 +330,23 @@ import { OSM } from '../env/osm';
 export function buildOsmScene(): THREE.Group {
   const group = new THREE.Group();
   const b = new Batcher();
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), lam({ color: '#b9b08a' }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), lam({ map: (() => { const t = T.paving('sidewalk').clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1040, 1040); t.needsUpdate = true; return t; })(), color: '#d9d4c6' }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; ground.receiveShadow = true; group.add(ground);
+  // stylised Skopje palette: pastel render, windows in world-scale UVs (≈4 m bays, 3.2 m floors),
+  // terracotta or concrete roof caps
   const pal = ['#e9c9ae', '#cfe0c8', '#efdcc0', '#e6c2a8', '#d9e4d6', '#e3cfa6', '#ecd9c6'];
+  const fac = (style: number) => { const t = T.facade(style, '#6b4a2e', false).clone(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 4, 1 / 3.2); t.needsUpdate = true; return t; };
+  const roofCols = ['#b5583b', '#9a9488', '#a8492f', '#8d877c'];
   OSM.buildings.forEach((bd, i) => {
     if (bd.p.length < 4) return;
     const shape = new THREE.Shape(bd.p.map(([x, y]) => new THREE.Vector2(x, y)));
     const g = new THREE.ExtrudeGeometry(shape, { depth: bd.h, bevelEnabled: false });
     g.rotateX(-Math.PI / 2); // shape (x, y) → world (x, -z); extrude up along +y
-    const col = pal[i % pal.length];
-    b.add(g, 'osm-' + col, () => lam({ color: col }));
+    const col = pal[i % pal.length], st = i % 3;
+    b.add(g, `osm-${col}-${st}`, () => lam({ color: col, map: fac(st) }));
+    const roof = new THREE.ShapeGeometry(shape); roof.rotateX(-Math.PI / 2); roof.translate(0, bd.h + 0.03, 0);
+    const rc = roofCols[(i * 7) % roofCols.length];
+    b.add(roof, 'osm-roof-' + rc, () => lam({ color: rc }), undefined, false);
   });
   for (const r of OSM.roads) {
     const pts = r.p.map(([x, y]) => ({ x, y }));

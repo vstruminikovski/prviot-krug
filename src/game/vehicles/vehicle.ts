@@ -324,8 +324,13 @@ export class Vehicle {
 
     // stall
     if (running && radToRpm(this.omegaE) < d.engine.stall) {
-      this.engine = 'stalled';
-      this.emit('stall', { speed: Math.round(nvx * 36) / 10 });
+      if (this.assist === 'auto') {
+        // an automatic's torque converter never lets the engine die: decouple and hold idle
+        this.omegaE = rpmToRad(d.engine.idle); this.locked = false;
+      } else {
+        this.engine = 'stalled';
+        this.emit('stall', { speed: Math.round(nvx * 36) / 10 });
+      }
     }
     if (!running && this.engine !== 'starting' && !coupled) this.omegaE = Math.max(0, this.omegaE - dt * rpmToRad(1500));
 
@@ -402,7 +407,26 @@ export class Vehicle {
       world.knock?.(hit.id);
       hit = this.collide({ x: nx, y: ny, h: nh }, world, bodies);
     }
-    if (!hit) {
+    // glancing hits on kerbs and walls: slide along them instead of sticking (contact is still reported)
+    let slid = false;
+    if (hit && hit.kind !== 'vehicle' && hit.kind !== 'pedestrian') {
+      const full = Math.hypot(wx, wy) * dt;
+      const cands: Pose[] = [{ x: nx, y: this.y, h: nh }, { x: this.x, y: ny, h: nh }, { x: nx, y: this.y, h: this.h }, { x: this.x, y: ny, h: this.h }];
+      let best: Pose | null = null, bestD = 0;
+      for (const c of cands) { const dd = Math.hypot(c.x - this.x, c.y - this.y); if (dd > bestD && !this.collide(c, world, bodies)) { best = c; bestD = dd; } }
+      if (best && full > 1e-4 && bestD / full > 0.4) {
+        const keep = bestD / full;
+        const impact = Math.hypot(nvx, this.vy) * Math.sqrt(Math.max(0, 1 - keep * keep));
+        const last = this.lastContact.get(hit.id) ?? -99;
+        if (t - last > 1.5 && impact > 0.3) onContact({ t, kind: hit.kind as Contact['kind'], id: hit.id, speed: impact });
+        this.lastContact.set(hit.id, t);
+        this.x = best.x; this.y = best.y; this.h = best.h;
+        this.vx = nvx * (0.55 + 0.4 * keep); this.vy *= 0.3; this.r *= 0.4;
+        this.odometer += bestD;
+        slid = true;
+      }
+    }
+    if (slid) { /* handled above */ } else if (!hit) {
       this.x = nx; this.y = ny; this.h = nh; this.vx = nvx;
       this.odometer += Math.hypot(wx, wy) * dt;
     } else {
@@ -452,6 +476,10 @@ export class Vehicle {
   }
   private autoGearbox(dt: number) {
     this.autoShiftCooldown -= dt;
+    // an automatic engages drive when the driver asks for throttle from neutral at a standstill
+    if (this.gear === 'N' && this.engine === 'running' && this.throttle > 0.08 && this.brake < 0.05 && Math.abs(this.vx) < 0.5) {
+      this.gear = 1; this.locked = false; this.autoShiftCooldown = 0.6; this.emit('gearChange', { from: 'N', to: '1' }); return;
+    }
     if (this.gear === 'N' || this.gear === 'R' || this.autoShiftCooldown > 0) return;
     const rpm = this.rpm, d = this.def;
     const up = d.engine.diesel ? d.engine.redline * 0.62 : d.engine.redline * 0.5;

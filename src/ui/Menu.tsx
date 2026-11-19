@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { GameEngine } from '../game/engine';
 import { ENV_INFO, compatibility, decodeChallenge } from '../game/attempt';
 import { MODE_LABEL, type Mode } from '../game/missions/types';
@@ -42,10 +42,18 @@ export function Menu({ engine }: { engine: GameEngine }) {
   const def = vehicleById(engine.store.garage.vehicle);
   const block = compatibility(def.id, env);
   const last = engine.store.history.slice(-3).reverse();
-  const go = () => { engine.store.settings.assist = assist; engine.persist(); engine.start({ env, mode, assist, time, weather }); };
+  const go = () => { if (block) return; engine.store.settings.assist = assist; engine.persist(); engine.start({ env, mode, assist, time, weather }); };
+  const [help, setHelp] = useState(engine.store.history.length === 0);
+  // Enter starts the drive (keyboard players never need the mouse)
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === '?') { setHelp((h) => !h); return; } if (e.code === 'Enter' && !sources && !gmap && !book && !(e.target as HTMLElement)?.closest?.('input,select,textarea')) { e.preventDefault(); go(); } };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  });
+  const ICON: Record<EnvId, string> = { polygon: '◎', city: '⌂', osm: '⌖', openRoad: '⟿' };
   return (
     <div className="menu">
-      <div className="menu-card">
+      <div className="menu-card glass">
+        <div className="menu-scroll">
         <div className="kicker">Возачка школа · Дебар Маало · 1999</div>
         <h1>Круг низ маалото</h1>
         <p className="lead">Секој круг е различен. Управувај со автомобилот, читај го сообраќајот, слушај го инструкторот и донесувај одлуки — истовремено.</p>
@@ -60,41 +68,44 @@ export function Menu({ engine }: { engine: GameEngine }) {
         <div className="env-cards">
           {(Object.keys(ENV_INFO) as EnvId[]).map((e) => (
             <button key={e} className={`env-card ${env === e ? 'sel' : ''} env-${e}`} onClick={() => setEnv(e)}>
-              <b>{ENV_INFO[e].title}</b><span>{ENV_INFO[e].blurb}</span>
+              <i className="env-ico" aria-hidden>{ICON[e]}</i><b>{ENV_INFO[e].title}</b><span>{ENV_INFO[e].blurb}</span>
             </button>
           ))}
         </div>
         <h3>Како?</h3>
-        <div className="chips">{MODES.map((m) => <button key={m.id} className={`chip ${mode === m.id ? 'sel' : ''}`} onClick={() => setMode(m.id)} title={m.note}>{MODE_LABEL[m.id]}</button>)}</div>
+        <div className="chips seg">{MODES.map((m) => <button key={m.id} className={`chip ${mode === m.id ? 'sel' : ''}`} onClick={() => setMode(m.id)} title={m.note}>{MODE_LABEL[m.id]}</button>)}</div>
         <p className="note">{MODES.find((m) => m.id === mode)?.note}</p>
-        <div className="chips">{ASSISTS.map((a) => <button key={a.id} className={`chip ${assist === a.id ? 'sel' : ''}`} onClick={() => setAssist(a.id)} title={a.note}>{a.label}</button>)}</div>
+        <div className="chips seg">{ASSISTS.map((a) => <button key={a.id} className={`chip ${assist === a.id ? 'sel' : ''}`} onClick={() => setAssist(a.id)} title={a.note}>{a.label}</button>)}</div>
         <p className="note">{ASSISTS.find((a) => a.id === assist)?.note}</p>
         <h3>Кога?</h3>
-        <div className="chips">
+        <div className="chips seg">
           {(Object.keys(TIME_LABEL) as TimeOfDay[]).map((t) => <button key={t} className={`chip ${time === t ? 'sel' : ''}`} onClick={() => setTime(t)}>{TIME_LABEL[t]}</button>)}
           <span className="chip-sep" />
           {(Object.keys(WEATHER_LABEL) as Weather[]).map((w) => <button key={w} className={`chip ${weather === w ? 'sel' : ''}`} onClick={() => setWeather(w)}>{WEATHER_LABEL[w]}</button>)}
         </div>
         {weather === 'rain' && <p className="note">Дожд: помало прилепување (≈72 %), подолг пат на сопирање.</p>}
-        <div className="vehicle-row">
-          <span className="swatch" style={{ background: engine.store.garage.paint }} />
-          <div><b>{def.name}</b> · {def.familyLabel}<br /><small>{def.scope.label}</small></div>
-          <button className="btn small" onClick={() => engine.openGarage()}>Гаража</button>
-        </div>
-        {block && <p className="warn">{block}</p>}
-        <div className="row">
-          <button className="btn primary big" disabled={!!block} onClick={go}>Возиме</button>
-          <button className="btn small" onClick={() => setBook(true)}>📕 Возачка книшка {earnedStamps(engine.store.history).length}/{STAMPS.length}</button>
-          <button className="btn ghost small" onClick={() => setSources(true)}>Извори и правила</button>
-          <button className="btn ghost small" disabled={!googleTilesEnabled()} title={googleTilesEnabled() ? '' : 'Потребен е VITE_GOOGLE_MAPS_API_KEY (види README)'} onClick={() => setGmap(true)}>Google 3D поглед</button>
-        </div>
         {last.length > 0 && (
           <div className="history">
             {last.map((h, i) => <div key={i}>{ENV_INFO[h.env].title} · {MODE_LABEL[h.mode]} · {vehicleById(h.vehicle).name} — <b>{h.score}</b>{h.passed === true ? ' · положено' : h.passed === false ? ' · не положено' : ''}{h.failed ? ` · ${h.failed}` : ''}</div>)}
           </div>
         )}
+        </div>
+        <div className="menu-foot">
+          <div className="vehicle-row">
+            <span className="swatch" style={{ background: engine.store.garage.paint }} />
+            <div><b>{def.name}</b> · {def.familyLabel}<br /><small>{def.scope.label}</small></div>
+            <button className="btn small" onClick={() => engine.openGarage()}>Гаража</button>
+          </div>
+          {block && <p className="warn">{block}</p>}
+          <div className="row">
+            <button className="btn primary big go" disabled={!!block} onClick={go}>Возиме <small>Enter ↵</small></button>
+            <button className="btn small" onClick={() => setBook(true)}>📕 {earnedStamps(engine.store.history).length}/{STAMPS.length}</button>
+            <button className="btn ghost small" onClick={() => setSources(true)}>Извори</button>
+            <button className="btn ghost small" disabled={!googleTilesEnabled()} title={googleTilesEnabled() ? '' : 'Потребен е VITE_GOOGLE_MAPS_API_KEY (види README)'} onClick={() => setGmap(true)}>Google 3D</button>
+          </div>
+        </div>
       </div>
-      <ControlCard />
+      {help ? <ControlCard onClose={() => setHelp(false)} /> : <button className="help-fab glass" onClick={() => setHelp(true)}>Како се вози? <kbd>?</kbd></button>}
       {sources && <Sources onClose={() => setSources(false)} />}
       {gmap && <GoogleTilesView onClose={() => setGmap(false)} />}
       {book && <Booklet history={engine.store.history} plate={engine.store.garage.plate} onClose={() => setBook(false)} />}
@@ -103,9 +114,10 @@ export function Menu({ engine }: { engine: GameEngine }) {
   );
 }
 
-function ControlCard() {
+function ControlCard({ onClose }: { onClose: () => void }) {
   return (
-    <div className="control-card">
+    <div className="control-card glass">
+      <button className="x" onClick={onClose} aria-label="Затвори">×</button>
       <h3>Тргнување (рачен менувач)</h3>
       <div className="anim-pedals" aria-hidden>
         <div className="ap ap-c"><span>К</span></div>

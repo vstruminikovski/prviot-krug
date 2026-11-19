@@ -60,6 +60,8 @@ export class GameEngine {
   private auto: Autopilot | null = null;
   timeScale = 1;
   newStamps: string[] = [];
+  private errStreak = 0;
+  onFatal: ((msg: string) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.view = new View(canvas);
@@ -113,13 +115,16 @@ export class GameEngine {
     this.view.atmo.updateLamps();
     this.view.setPlayer(def, this.custom);
     this.view.resetShot();
+    this.view.resetInterp();
+    this.acc = 0;
     this.input.clear();
     this.input.assist = this.config.assist;
     this.input.parkingBrake = sim.player.parkingBrake > 0.5;
     this.input.clutch = 0;
     this.input.bite = { low: def.clutch.biteLow, high: def.clutch.biteHigh };
     this.sayQueue = []; this.current = null; this.bubbles = [];
-    this.countdown = 1.2;
+    this.countdown = 2.8;
+    this.view.startIntro(2.8);
     this.phase = 'drive';
     this.audio.crank();
     (document.activeElement as HTMLElement | null)?.blur?.();
@@ -156,7 +161,7 @@ export class GameEngine {
     if (msg) this.flash(msg, 'warn');
     this.emitHud();
   }
-  toggleCamera() { this.view.setCamMode(this.view.camMode === 'chase' ? 'driver' : 'chase'); this.store.settings.camera = this.view.camMode; this.persist(); this.emitHud(); }
+  toggleCamera() { const order: CamMode[] = ['chase', 'high', 'driver']; this.view.setCamMode(order[(order.indexOf(this.view.camMode) + 1) % order.length]); this.store.settings.camera = this.view.camMode; this.persist(); this.emitHud(); }
   toggleMute() { this.audio.setMuted(!this.audio.muted); this.store.settings.muted = this.audio.muted; this.persist(); this.emitHud(); }
   flash(text: string, tone: NonNullable<HudState['toast']>['tone'] = 'info', secs = 2.4) { this.toast = { text, tone }; this.toastUntil = performance.now() / 1000 + secs; }
 
@@ -186,7 +191,16 @@ export class GameEngine {
     this.raf = requestAnimationFrame(this.frame);
     const dt = Math.min(0.1, this.last ? (now - this.last) / 1000 : 0.016);
     this.last = now;
-    try { this.update(dt); } catch (e) { console.error(e); }
+    try { this.update(dt); this.errStreak = 0; } catch (e) {
+      // one bad frame is logged and skipped; a persistent failure goes back to the menu instead of freezing
+      this.errStreak++;
+      if (this.errStreak <= 3) console.error(e);
+      if (this.errStreak === 30) {
+        console.error('[engine] repeated frame errors — returning to menu');
+        try { this.backToMenu(); } catch { this.onFatal?.(String((e as Error)?.message ?? e)); }
+        this.flash('Настана грешка — вратени сте во менито.', 'warn', 4);
+      }
+    }
   };
 
   private update(dt: number) {
@@ -217,16 +231,19 @@ export class GameEngine {
           const ctl = this.input.read(1 / 60);
           const inp = this.auto ? { ...this.auto.input(sim), parkingBrake: false } : ctl;
           if (this.auto) this.input.parkingBrake = false;
+          v.capture(sim);
           sim.step(1 / 60, inp);
           this.acc -= 1 / 60; n++;
         }
         if (n === maxSteps) this.acc = 0;
+        v.alpha = Math.min(1, this.acc * 60);
         this.handleEvents(sim);
-      }
+      } else v.alpha = 1;
       v.syncLive(sim, dt, blink);
-      v.updateCamera(dt, v.camMode, { ...p.pose, z: p.z }, p.vx, p.steer, glance);
-      v.render('world', true, { ...p.pose, z: p.z });
-      this.audio.update(dt, { revs: p.rpm / p.def.engine.redline, throttle: p.throttle, speed: Math.abs(p.vx), horn: !!p.horn, cafeProximity: 0, cafePan: 0, running: p.engine === 'running' && !this.paused, siren: sim.extraState.siren === 1, diesel: !!p.def.engine.diesel, load: p.engineLoad, slip: !p.locked && p.clutchEff > 0.05 && p.clutchEff < 0.95 && p.gear !== 'N' ? 1 : 0 });
+      const ip = v.playerPose(sim);
+      v.updateCamera(dt, v.camMode, ip, p.vx, p.steer, glance);
+      v.render('world', true, ip);
+      this.audio.update(dt, { revs: p.rpm / p.def.engine.redline, throttle: p.throttle, speed: Math.abs(p.vx), horn: !!p.horn, cafeProximity: 0, cafePan: 0, running: p.engine === 'running' && !this.paused, siren: sim.extraState.siren === 1, diesel: !!p.def.engine.diesel, load: p.engineLoad, slip: !p.locked && p.clutchEff > 0.05 && p.clutchEff < 0.95 && p.gear !== 'N' ? 1 : 0, rpm: p.rpm, tyre: this.paused ? 0 : Math.max(Math.min(1, Math.max(0, Math.abs(p.vy) - 0.8) * 0.6), p.wheelspinning ? 0.8 : 0, p.brake > 0.85 && Math.abs(p.vx) > 9 && sim.world.gripAt(p.x, p.y) < 0.9 ? 0.6 : 0) });
       if (sim.finished && !this.result) this.onFinished(sim);
     } else if (this.phase === 'result') {
       v.updateCamera(dt, 'chase', { ...sim.player.pose, z: sim.player.z }, 0, 0, null);
@@ -255,7 +272,7 @@ export class GameEngine {
     this.bubbles = this.bubbles.filter((b) => b.until > nowS);
     // instructor queue: higher priority interrupts, otherwise each line stays readable
     if (this.current && nowS > this.current.until) this.current = null;
-    if (this.sayQueue.length) {
+    if (this.sayQueue.length && this.countdown === null) {
       this.sayQueue.sort((a, b) => b.priority - a.priority);
       const nx = this.sayQueue[0];
       if (!this.current || nx.priority > this.current.priority) { this.current = { ...nx, until: nowS + Math.max(3.2, nx.text.length / 14) }; this.sayQueue.shift(); }
@@ -274,7 +291,7 @@ export class GameEngine {
   private handleEvents(sim: Sim) {
     for (const e of sim.drainEvents()) {
       if (e.type === 'say') this.sayQueue.push({ text: e.text, who: e.who ?? 'Инструктор', priority: e.priority, until: 0 });
-      else if (e.type === 'contact') { this.audio.thud(e.contact.speed); this.view.kick(Math.min(1, e.contact.speed / 6)); }
+      else if (e.type === 'contact') { this.audio.thud(e.contact.speed); this.view.kick(Math.min(1, e.contact.speed / 6)); this.view.jolt(Math.min(1.5, e.contact.speed / 4)); }
       else if (e.type === 'incident') {
         const i = e.incident;
         if (i.severity !== 'note' || i.layer === 'mission') this.flash(`${i.text}${i.points ? ` −${i.points}` : ''}`, i.severity === 'note' ? 'ok' : i.severity === 'minor' ? 'warn' : 'bad', 2.8);
@@ -284,6 +301,7 @@ export class GameEngine {
         if (e.e.type === 'stall') this.audio.stall();
         if (e.e.type === 'engineStart') this.audio.started();
         if (e.e.type === 'crank') this.audio.crank();
+        if (e.e.type === 'gearChange') this.audio.clunk();
       } else if (e.type === 'fail') this.sayQueue.push({ text: `Обидот заврши: ${e.incident.text}`, who: 'Инструктор', priority: 3, until: 0 });
     }
   }

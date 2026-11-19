@@ -27,15 +27,43 @@ export class GameAudio {
     const d = this.noiseBuf.getChannelData(0);
     let b0 = 0, b1 = 0, b2 = 0;
     for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; b0 = 0.99765 * b0 + w * 0.099; b1 = 0.963 * b1 + w * 0.2965; b2 = 0.57 * b2 + w * 1.0526; d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.18; }
-    // engine
-    this.engFilter = ctx.createBiquadFilter(); this.engFilter.type = 'lowpass'; this.engFilter.frequency.value = 420; this.engFilter.Q.value = 2;
+    // engine: 4-cylinder synthesis — firing-order harmonics + half-order rumble, a load-driven
+    // soft clipper (the "bark" under throttle), intake roar from band-passed noise, exhaust low-pass.
+    this.engFilter = ctx.createBiquadFilter(); this.engFilter.type = 'lowpass'; this.engFilter.frequency.value = 420; this.engFilter.Q.value = 1.2;
     this.engGain = ctx.createGain(); this.engGain.gain.value = 0;
-    this.engOsc1 = ctx.createOscillator(); this.engOsc1.type = 'sawtooth'; this.engOsc1.frequency.value = 38;
-    this.engOsc2 = ctx.createOscillator(); this.engOsc2.type = 'square'; this.engOsc2.frequency.value = 19;
-    const o2g = ctx.createGain(); o2g.gain.value = 0.5;
-    this.engOsc1.connect(this.engFilter); this.engOsc2.connect(o2g).connect(this.engFilter);
+    const harm = [0, 1, 0.62, 0.3, 0.42, 0.16, 0.2, 0.08, 0.1, 0.05];
+    const wave = ctx.createPeriodicWave(new Float32Array(harm.length), new Float32Array(harm));
+    this.engOsc1 = ctx.createOscillator(); this.engOsc1.setPeriodicWave(wave); this.engOsc1.frequency.value = 27;
+    this.engOsc2 = ctx.createOscillator(); this.engOsc2.type = 'triangle'; this.engOsc2.frequency.value = 13.5;
+    const o2g = ctx.createGain(); o2g.gain.value = 0.42;
+    this.drive = ctx.createWaveShaper(); this.drive.oversample = '2x'; this.setDrive(0.2);
+    // combustion irregularity: slow random-ish amplitude wobble, strongest at idle
+    this.wobble = ctx.createGain(); this.wobble.gain.value = 1;
+    const wob = ctx.createOscillator(); wob.frequency.value = 6.3; this.wobbleDepth = ctx.createGain(); this.wobbleDepth.gain.value = 0.12;
+    wob.connect(this.wobbleDepth).connect(this.wobble.gain); wob.start();
+    this.engOsc1.connect(this.drive); this.engOsc2.connect(o2g).connect(this.drive);
+    this.drive.connect(this.wobble).connect(this.engFilter);
     this.engFilter.connect(this.engGain).connect(this.master);
     this.engOsc1.start(); this.engOsc2.start();
+    // intake / induction roar
+    const intake = ctx.createBufferSource(); intake.buffer = this.noiseBuf; intake.loop = true;
+    this.intakeF = ctx.createBiquadFilter(); this.intakeF.type = 'bandpass'; this.intakeF.Q.value = 3; this.intakeF.frequency.value = 300;
+    this.intakeG = ctx.createGain(); this.intakeG.gain.value = 0;
+    intake.connect(this.intakeF).connect(this.intakeG).connect(this.master); intake.start();
+    // tyres: squeal (narrow band noise + wavering tone) and road rumble; wind by speed
+    const sq = ctx.createBufferSource(); sq.buffer = this.noiseBuf; sq.loop = true;
+    this.squealF = ctx.createBiquadFilter(); this.squealF.type = 'bandpass'; this.squealF.Q.value = 14; this.squealF.frequency.value = 1150;
+    this.squealG = ctx.createGain(); this.squealG.gain.value = 0;
+    sq.connect(this.squealF).connect(this.squealG).connect(this.master); sq.start(0, 0.7);
+    this.squealOsc = ctx.createOscillator(); this.squealOsc.type = 'sine'; this.squealOsc.frequency.value = 1050;
+    const vib = ctx.createOscillator(); vib.frequency.value = 7; const vibG = ctx.createGain(); vibG.gain.value = 40; vib.connect(vibG).connect(this.squealOsc.frequency); vib.start();
+    this.squealToneG = ctx.createGain(); this.squealToneG.gain.value = 0; this.squealOsc.connect(this.squealToneG).connect(this.master); this.squealOsc.start();
+    const rum = ctx.createBufferSource(); rum.buffer = this.noiseBuf; rum.loop = true; rum.playbackRate.value = 0.5;
+    const rf = ctx.createBiquadFilter(); rf.type = 'lowpass'; rf.frequency.value = 140;
+    this.rumbleG = ctx.createGain(); this.rumbleG.gain.value = 0; rum.connect(rf).connect(this.rumbleG).connect(this.master); rum.start(0, 0.3);
+    const wind = ctx.createBufferSource(); wind.buffer = this.noiseBuf; wind.loop = true;
+    this.windF = ctx.createBiquadFilter(); this.windF.type = 'bandpass'; this.windF.Q.value = 0.6; this.windF.frequency.value = 600;
+    this.windG = ctx.createGain(); this.windG.gain.value = 0; wind.connect(this.windF).connect(this.windG).connect(this.master); wind.start(0, 1.1);
     // city bed
     const bed = ctx.createBufferSource(); bed.buffer = this.noiseBuf; bed.loop = true;
     const bf = ctx.createBiquadFilter(); bf.type = 'lowpass'; bf.frequency.value = 500;
@@ -136,10 +164,22 @@ export class GameAudio {
   ratchet() { if (!this.ctx) return; const t = this.ctx.currentTime; for (let i = 0; i < 5; i++) this.noiseBurst(t + i * 0.035, 0.02, 2600, 8, 0.35, 'bandpass', -0.2); }
   stall() { if (!this.ctx) return; const t = this.ctx.currentTime; const o = this.tone(t, 70, 0.5, 0.25, 'sawtooth'); o.frequency.exponentialRampToValueAtTime(25, t + 0.45); this.noiseBurst(t, 0.3, 300, 2, 0.4, 'lowpass'); this.engineOn = false; }
   started() { this.engineOn = true; }
+  private drive!: WaveShaperNode; private driveK = -1; private wobble!: GainNode; private wobbleDepth!: GainNode;
+  private intakeF!: BiquadFilterNode; private intakeG!: GainNode;
+  private squealF!: BiquadFilterNode; private squealG!: GainNode; private squealOsc!: OscillatorNode; private squealToneG!: GainNode;
+  private rumbleG!: GainNode; private windF!: BiquadFilterNode; private windG!: GainNode;
+  private setDrive(k: number) {
+    const q = Math.round(k * 20) / 20; if (q === this.driveK) return; this.driveK = q;
+    const n = 1024, c = new Float32Array(n), a = 1 + q * 6;
+    for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(a * x) / Math.tanh(a); }
+    this.drive.curve = c;
+  }
+  /** gear change: a short mechanical clunk */
+  clunk() { if (!this.ctx) return; const t = this.ctx.currentTime; this.noiseBurst(t, 0.07, 700, 4, 0.35, 'bandpass', 0.1); this.tone(t, 120, 0.08, 0.1, 'triangle'); }
   private sirenOsc: OscillatorNode | null = null; private sirenGain: GainNode | null = null;
 
   /** Called every frame. */
-  update(dt: number, s: { revs: number; throttle: number; speed: number; horn: boolean; cafeProximity: number; cafePan: number; running: boolean; siren?: boolean; diesel?: boolean; load?: number; slip?: number }) {
+  update(dt: number, s: { revs: number; throttle: number; speed: number; horn: boolean; cafeProximity: number; cafePan: number; running: boolean; siren?: boolean; diesel?: boolean; load?: number; slip?: number; rpm?: number; tyre?: number }) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const run = s.running;
@@ -153,11 +193,26 @@ export class GameAudio {
       if (!s.siren) { this.sirenGain!.gain.setTargetAtTime(0, t, 0.2); this.sirenOsc.stop(t + 0.6); this.sirenOsc = null; }
       else this.sirenOsc.frequency.setTargetAtTime((t % 1.4) < 0.7 ? 760 : 980, t, 0.05);
     }
-    const base = (s.diesel ? 26 : 34) + s.revs * (s.diesel ? 70 : 95);
-    this.engOsc1.frequency.setTargetAtTime(base, t, 0.08);
-    this.engOsc2.frequency.setTargetAtTime(base / 2, t, 0.08);
-    this.engFilter.frequency.setTargetAtTime(300 + s.throttle * 900 + s.revs * 400 + (s.load ?? 0) * 300 + (s.slip ?? 0) * 500, t, 0.1);
-    this.engGain.gain.setTargetAtTime(run ? 0.07 + s.throttle * 0.08 + Math.min(s.speed, 15) * 0.002 : 0, t, run ? 0.12 : 0.6);
+    // firing frequency of a four-stroke four: rpm / 30
+    const rpm = s.rpm ?? (800 + s.revs * 5200);
+    const f = Math.max(8, rpm / 30) * (s.diesel ? 0.92 : 1);
+    this.engOsc1.frequency.setTargetAtTime(f, t, 0.03);
+    this.engOsc2.frequency.setTargetAtTime(f / 2, t, 0.03);
+    const load = s.load ?? 0;
+    this.setDrive(clamp(0.15 + s.throttle * 0.5 + load * 0.35, 0, 1));
+    this.wobbleDepth.gain.setTargetAtTime(clamp(0.16 - s.revs * 0.16, 0.02, 0.16), t, 0.2);
+    this.engFilter.frequency.setTargetAtTime((s.diesel ? 220 : 280) + f * 3.2 + s.throttle * 700 + load * 400 + (s.slip ?? 0) * 400, t, 0.06);
+    this.engGain.gain.setTargetAtTime(run ? 0.06 + s.throttle * 0.06 + load * 0.03 + s.revs * 0.03 : 0, t, run ? 0.08 : 0.5);
+    this.intakeF.frequency.setTargetAtTime(f * 2.4 + 120, t, 0.05);
+    this.intakeG.gain.setTargetAtTime(run ? (s.throttle * 0.05 + s.revs * 0.03) * (s.diesel ? 0.6 : 1) : 0, t, 0.08);
+    const tyre = clamp(s.tyre ?? 0, 0, 1);
+    this.squealG.gain.setTargetAtTime(tyre * 0.22, t, 0.04);
+    this.squealToneG.gain.setTargetAtTime(tyre * 0.025, t, 0.04);
+    this.squealF.frequency.setTargetAtTime(1000 + tyre * 400, t, 0.1);
+    const v = Math.min(s.speed, 40);
+    this.rumbleG.gain.setTargetAtTime(v * 0.012, t, 0.2);
+    this.windG.gain.setTargetAtTime(v * v * 0.00009, t, 0.3);
+    this.windF.frequency.setTargetAtTime(400 + v * 25, t, 0.3);
     this.hornGain.gain.setTargetAtTime(s.horn ? 0.09 : 0, t, 0.015);
     this.murmurGain.gain.setTargetAtTime(s.cafeProximity * 0.5, t, 0.3);
     this.nextBird -= dt;

@@ -44,13 +44,13 @@ export class Recorder {
     const ip = (pa: { x: number; y: number; h: number }, pb: { x: number; y: number; h: number }) => ({
       x: lerp(pa.x, pb.x, u), y: lerp(pa.y, pb.y, u), h: pa.h + wrapAngle(pb.h - pa.h) * u,
     });
-    const p = { ...a.p, ...ip(a.p, b.p), v: lerp(a.p.v, b.p.v, u) };
+    const p = { ...a.p, ...ip(a.p, b.p), v: lerp(a.p.v, b.p.v, u), steer: lerp(a.p.steer, b.p.steer, u), z: a.p.z !== undefined && b.p.z !== undefined ? lerp(a.p.z, b.p.z, u) : a.p.z };
     const byId = new Map(b.a.map((x) => [x.id, x]));
     const acts = a.a.map((x) => {
       const y = byId.get(x.id);
       return y ? { ...x, ...ip(x, y), ph: x.ph !== undefined && y.ph !== undefined ? lerp(x.ph, y.ph, u) : x.ph } : x;
     });
-    return { t, p, a: acts };
+    return { t, p, a: acts, x: a.x };
   }
 
   /** First time in [t0, t1] where the predicate holds on a recorded frame. */

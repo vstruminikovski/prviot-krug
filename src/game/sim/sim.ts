@@ -142,7 +142,13 @@ export class Sim {
     if (this.finished) return;
     this.t += dt;
     const bodies: DynamicBody[] = [...this.cars.filter((c) => !c.done), ...this.peds.filter((p) => !p.done), ...this.extraBodies()];
-    this.player.step(dt, controls, this.world, bodies, this.t, (c) => this.onContact(c));
+    const pl = this.player, keep = { x: pl.x, y: pl.y, h: pl.h, omegaE: pl.omegaE, steer: pl.steer };
+    pl.step(dt, controls, this.world, bodies, this.t, (c) => this.onContact(c));
+    // numerical safety net: a non-finite state is never allowed to reach the renderer or the score
+    if (![pl.x, pl.y, pl.h, pl.vx, pl.vy, pl.r, pl.omegaE, pl.z].every(Number.isFinite)) {
+      Object.assign(pl, keep, { vx: 0, vy: 0, r: 0, z: Number.isFinite(pl.z) ? pl.z : 0 });
+      if (!Number.isFinite(pl.omegaE)) pl.omegaE = 0;
+    }
     for (const e of this.player.drainEvents()) this.onVehicleEvent(e);
     const ctx = { playerQuad: this.player.quad(this.player.pose, 0.3), playerPose: this.player.pose, cars: this.cars, peds: this.peds };
     for (const c of this.cars) c.update(dt, ctx);

@@ -33,7 +33,7 @@ export function asphalt(): THREE.Texture {
   const k = 'asphalt';
   if (cache.has(k)) return cache.get(k)!;
   const { c, g } = canvas(512, 512);
-  g.fillStyle = '#5b5852'; g.fillRect(0, 0, 512, 512);
+  g.fillStyle = '#565a60'; g.fillRect(0, 0, 512, 512);
   noise(g, 512, 512, 0.25, 7, 2);
   noise(g, 512, 512, 0.12, 9, 5);
   // patches and cracks
@@ -43,8 +43,6 @@ export function asphalt(): THREE.Texture {
     for (let j = 0; j < 6; j++) { x += (Math.random() - 0.5) * 60; y += (Math.random() - 0.5) * 60; g.lineTo(x, y); }
     g.stroke();
   }
-  g.fillStyle = 'rgba(70,66,60,0.5)';
-  g.fillRect(80, 300, 120, 70); g.fillRect(350, 60, 90, 140);
   const t = tex(c, { repeat: true, aniso: 8 });
   cache.set(k, t); return t;
 }

@@ -11,11 +11,14 @@ Tests: 26 passing (`npm test`): 14 vehicle-physics, 12 city scenarios with live 
 | Drivetrain: engine curve, clutch bite, 5+R gearbox, stall/restart, parking brake, slope gravity, engine braking, tyre model | Done, tested headless | `src/game/vehicles/vehicle.ts`, `tests/vehicle.test.ts` |
 | Inputs per brief (Space/Z/X clutch curve, 1–5/N/6, P, R, J/K/M, U/I, F/G, V…) + touch | Written, **not yet play-tested by hand** | `src/game/input.ts`, `src/ui/Hud.tsx` |
 | Rule registry (law / official exam sheets Образец 1 & 4 / technique / game) + incident ledger (3 layers) | Done | `src/game/rules/*` |
-| Environments: Полигон (5 official чл. 33 exercises + 2 practice), Градско (Debar Maalo + lane graph traffic, signal crossing, zebra intents, delivery van), Отворен пат (bends, crest, descent, bridge, tractor, rockfall, roadworks, ambulance, viewpoint) | Written; city tested headless; polygon/open road **untested** | `src/game/env/*`, `src/game/missions/*`, `src/game/traffic/*` |
+| Environments: Полигон (5 official чл. 33 exercises + 2 practice), Градско (Debar Maalo + lane graph traffic, signal crossing, zebra intents, delivery van), Отворен пат (bends, crest, descent, bridge, tractor, rockfall, roadworks, ambulance, viewpoint) | City scenarios tested headless; every env fuzz-tested (120 s random driving, finite state, valid result, determinism) | `src/game/env/*`, `src/game/missions/*`, `src/game/traffic/*` |
 | Blender pipeline: generator → 7 GLBs with named parts, loads in game, live paint | Done (proof quality) | `tools/blender/*`, `public/assets/vehicles/*.glb`, `src/game/render/vehicleAssets.ts` |
 | Garage (orbit, paint/finish, trims, plate + layout, load, comparison, favourites) | Works in browser | `src/ui/Garage.tsx`, `src/game/render/garage.ts` |
-| Real-scene mirrors (render targets, flipped) + glance observation proxy | Written, **not visually checked** | `src/game/render/view.ts`, `engine.ts` |
+| Real-scene mirrors (rounded glass panels, round-robin render) + glance observation proxy | Visually checked | `src/game/render/view.ts`, `engine.ts` |
 | Menu / results (layers, exam total, incident timeline, replay, same seed / new variation, share code) | Written; menu & garage seen working | `src/ui/*` |
+
+| Presentation (2026 pass): fixed-step render interpolation, spring suspension, rigid chase / high / driver cameras with anticipation, camera x-ray cut-out, GTAO + MSAA + bloom + display-space grade with tilt-shift, time-of-day env reflections, cinematic intro, 60 fps spring gauges, synthesized 4-cyl engine + tyre/wind/rumble audio | Done; verified by stepped frames (pane was hidden — real-time feel still to be judged by hand) | `src/game/render/{view,atmosphere,xray}.ts`, `src/game/audio/audio.ts`, `src/ui/Hud.tsx` |
+| Robustness: UI error boundary, WebGL context-loss recovery, frame-error streak → menu, NaN guard in sim | Done | `src/ui/ErrorBoundary.tsx`, `src/ui/App.tsx`, `src/game/engine.ts`, `src/game/sim/sim.ts` |
 
 ## Rough map of remaining work
 
