@@ -90,7 +90,7 @@ export class GameEngine {
     const idle = (fn: () => void, ms: number) => setTimeout(() => ((window as unknown as { requestIdleCallback?: (f: () => void) => void }).requestIdleCallback ?? ((f: () => void) => f()))(() => { try { if (this.phase === 'menu' || this.phase === 'garage') fn(); } catch (e) { console.warn('[warmup]', e); } }), ms);
     void loadVehicleGLB(this.store.garage.vehicle);
     idle(() => this.view.prebuild('polygon', { vehicleLength: this.def.dims.L }), 1200);
-    idle(() => this.view.prebuild('osm', { vehicleLength: this.def.dims.L }), 2400);
+    idle(() => this.view.prebuild('city', { vehicleLength: this.def.dims.L }), 2400);
     idle(() => { void decorateOpenRoad(new THREE.Group()); }, 3200);
   }
   dispose() { cancelAnimationFrame(this.raf); this.input.detach(); this.view.renderer.dispose(); }
@@ -130,6 +130,8 @@ export class GameEngine {
     const g = this.store.garage;
     const prev = this.config;
     this.config = { ...prev, ...opts, v: CONTENT_VERSION, vehicle: opts.vehicle ?? g.vehicle, load: opts.load ?? g.load, assist: opts.assist ?? this.store.settings.assist, seed: same ? prev.seed : (opts.seed ?? randomSeed()) };
+    // phones: a clutch and a gear lever on glass are not a good experience — automatic, always
+    if (this.coarse) this.config.assist = 'auto';
     this.config.mission = this.config.env;
     const why = compatibility(this.config.vehicle, this.config.env);
     if (why) { this.flash(why, 'warn'); return false; }

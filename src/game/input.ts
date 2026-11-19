@@ -37,6 +37,8 @@ export class Input {
   bite = { low: 0.34, high: 0.66 };
   steerSens = 1;
   private touchLatch = false;
+  /** phone mode: the handbrake releases itself when the driver asks for throttle */
+  touchMode = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
   private down = (e: KeyboardEvent) => {
     if (!this.enabled) return;
@@ -113,6 +115,7 @@ export class Input {
       this.clutch = Math.max(0, this.clutch - dt * (inBite ? slow : 3.2));
     }
     const steer = Math.abs(this.touch.steer) > 0.02 ? this.touch.steer : this.steerKb;
+    if (this.touchMode && this.parkingBrake && this.touch.throttle > 0.05) this.parkingBrake = false;
     return {
       throttle: Math.max(this.throttle, this.touch.throttle),
       brake: Math.max(this.brake, this.touch.brake),

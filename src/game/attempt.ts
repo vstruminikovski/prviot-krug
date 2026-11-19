@@ -3,8 +3,6 @@ import { Sim, CONTENT_VERSION, type AttemptConfig } from './sim/sim';
 import { cityEnv } from './env/city';
 import { polygonEnv } from './env/polygon';
 import { openRoadEnv } from './env/openRoad';
-import { osmEnv } from './env/osm';
-import { FreeMission } from './missions/free';
 import { CityMission } from './missions/city';
 import { PolygonMission } from './missions/polygon';
 import { OpenRoadMission } from './missions/openRoad';
@@ -17,7 +15,6 @@ import { rng } from './math';
 export const ENV_INFO: Record<EnvId, { title: string; blurb: string }> = {
   polygon: { title: 'Полигон', blurb: 'Петте вежби од чл. 33 за категорија Б: лента, назад, полукружно, паркирање и угорнина. Плус слалом и бокс.' },
   city: { title: 'Градско возење', blurb: 'Маалото: раскрсници, еднонасочни, премини, семафор, доставувач во лента и живи пешаци.' },
-  osm: { title: 'Реално маало (OSM)', blurb: 'Вистинските улици на Дебар Маало од OpenStreetMap. Слободно возење, без бодувани ситуации.' },
   openRoad: { title: 'Отворен пат', blurb: 'Кривини, преслап, долга надолнина, трактор, одрон, работи на патот и видиковец.' },
 };
 
@@ -35,14 +32,13 @@ export function createSim(config: AttemptConfig): Sim {
     const r = rng(config.seed ^ 0x51ed);
     return new Sim(config, openRoadEnv(2060 + r.range(0, 110)), new OpenRoadMission());
   }
-  if (config.env === 'osm') return new Sim(config, osmEnv(), new FreeMission());
   return new Sim(config, cityEnv(), new CityMission());
 }
 
 // ---------------------------------------------------------------- share links
 const MODES: Mode[] = ['lesson', 'practice', 'challenge', 'exam', 'free'];
 const ASSISTS: Assist[] = ['learn', 'manual', 'exam', 'auto'];
-const ENVS: EnvId[] = ['polygon', 'city', 'openRoad', 'osm'];
+const ENVS: EnvId[] = ['polygon', 'city', 'openRoad']; // order is part of the share-code format
 
 export function encodeChallenge(c: AttemptConfig, score?: number): string {
   const parts = [CONTENT_VERSION, ENVS.indexOf(c.env), MODES.indexOf(c.mode), c.seed >>> 0, VEHICLES.findIndex((v) => v.id === c.vehicle), ASSISTS.indexOf(c.assist), Math.round(c.load / 100), score ?? -1];

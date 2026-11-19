@@ -178,7 +178,7 @@ Where an international reference (DVSA, Zutobi) differs from these texts, Macedo
 
 - All geometry, textures (canvas-generated), sign artwork, cars, people and audio (Web Audio synthesis) are original to this project and created at runtime.
 - No photographs, map data or OpenStreetMap geometry are used. All streets, businesses, people and plate numbers are invented.
-- If OSM geometry is used for a future route, add the "© OpenStreetMap contributors" attribution and document the ODbL in this file.
+- (The earlier OSM free-drive and optional Google 3D view were removed to keep the game focused.) If OSM geometry is used for a future route, add the "© OpenStreetMap contributors" attribution and document the ODbL in this file.
 - Dependencies: three.js (MIT), React (MIT), Vite (MIT), Vitest (MIT).
 
 ## QA hooks
@@ -194,8 +194,5 @@ The running page exposes `window.__krug` (the game engine):
 | Resource | Licence | Use | Notes |
 |---|---|---|---|
 | Spectral GT-RS car (github.com/JaronKBragg7337/spectral-gt-rs) | CC0 1.0 | Guest vehicle `spectral` — **currently out of the garage** (`GUEST_VEHICLES` in `defs.ts`): the optimised shell has missing panels, takes no paint and its cabin is too low for first person | Optimised by `tools/blender/import_spectral.py`: removed hidden engine/suspension, text badges and plate text; selective decimation + planar dissolve; 152k → 31.5k tris, 4.7 → 1.7 MB; mapped to game conventions (Wheel_FL…, Paint, Glass, IndL/IndR, PlateMount_F/R). Physics uses its own `VehicleDef` (estimated, labelled). |
-| 3d-tiles-renderer 0.4.10 (NASA-AMMOS) | Apache-2.0 | Optional Google 3D view, lazy-loaded | Not in the main bundle path until opened. |
-| Google Photorealistic 3D Tiles | Google Maps Platform terms | Optional live **display only** („Google 3D поглед“ in the menu) | Never stored, converted, or used for collisions/scenario geometry. Shows "Google Maps" label + aggregated tile copyrights. Requires `VITE_GOOGLE_MAPS_API_KEY` in `.env.local` (see `.env.example`) with the Map Tiles API enabled; without it the button is disabled. Not verified with a live key. |
 | Kenney City Kit Suburban / Roads | CC0 (licence files in `public/assets/kenney/`) | Open-road village houses, fences, trees and roadworks barriers/cones/lights (`src/game/render/kenneyProps.ts`) | Visual only; collisions stay in env data. 26 selected models + 2 colour maps (2 MB). Procedural meshes remain the fallback. Kenney road signs are not used (non-Macedonian designs). Source zips live in git-ignored `tools/assets/kenney/`. |
-| mapforge (MIT) approach | MIT (not a dependency — it is an R3F browser app) | Reimplemented as `tools/osm/fetch-debar-maalo.mjs` → `src/game/content/osm/debar-maalo.json` | New free-drive environment „Реално маало (OSM)“: 1,302 buildings, 245 roads of real Debar Maalo. Data © OpenStreetMap contributors (ODbL 1.0), attribution shown in-game. No scored scenarios there (real signs/priority not modelled). |
 | Needle car-physics | No licence stated | Reference only | Existing drivetrain/tyre model kept; no code copied. |

@@ -12,7 +12,7 @@ import type { CarType } from '../content/generate';
 import { clamp, wrapAngle, type Pose } from '../math';
 import type { VehicleDef, PlateLayout } from '../vehicles/defs';
 import { loadVehicleGLB, vehicleReady, rigFromGLB, proceduralRig, type VehicleRig } from './vehicleAssets';
-import { buildCityExtras, buildOpenRoadScene, buildPolygonScene, buildOsmScene, type CityExtras, type OpenRoadScene } from './envScenes';
+import { buildCityExtras, buildOpenRoadScene, buildPolygonScene, type CityExtras, type OpenRoadScene } from './envScenes';
 import { buildGarage, type GarageScene } from './garage';
 import { decorateOpenRoad } from './kenneyProps';
 import { Atmosphere } from './atmosphere';
@@ -208,7 +208,6 @@ export class View {
         g = buildWorld(this.atlas).group;
         this.cityExtras = buildCityExtras(); g.add(this.cityExtras.group); g.add(this.patrons);
       } else if (env === 'polygon') g = buildPolygonScene(opts.vehicleLength);
-      else if (env === 'osm') g = buildOsmScene();
       else { this.openRoad = buildOpenRoadScene(opts.debrisS ?? 2100); g = this.openRoad.group; void decorateOpenRoad(g).then(() => patchXray(g)); }
       patchXray(g);
       g.visible = env === this.env;
@@ -568,6 +567,8 @@ export class View {
       return;
     }
     this.atmo.render();
+    // phones: mirrors cost frame time and thumb space — only the one being looked at is shown
+    if (this.coarse) mirrors = mirrors && this.mirrorFocus >= 0;
     if (mirrors && this.mirrorsOn && pose) {
       this.mirrorFrame++;
       {
@@ -580,7 +581,7 @@ export class View {
         for (let i = 0; i < 3; i++) {
           if (i === 2 && !this.playerDef?.rearWindow) continue;
           const due = this.mirrorFrame % (this.mirrorQuality === 'high' ? 3 : 6) === i;
-          if (!due && i !== focus) continue;
+          if (this.coarse ? i !== focus : !due && i !== focus) continue;
           // the interior mirror looks through the cabin: hide the car shell for it
           if (i === 2 && this.player) this.player.group.visible = false;
           r.setRenderTarget(this.mirrorRTs[i]); r.render(this.scene, this.mirrorCams[i]);
@@ -589,7 +590,7 @@ export class View {
         r.setRenderTarget(null); r.shadowMap.autoUpdate = shadow; this.scene.fog = prevFog;
         xrayUniforms.uXr.value.w = xrOn;
       }
-      this.mirrorPanels[2].visible = true;
+      for (let i = 0; i < 3; i++) this.mirrorPanels[i].visible = !this.coarse || i === this.mirrorFocus;
       r.autoClear = false; r.clearDepth(); r.render(this.overlay, this.overlayCam); r.autoClear = true;
     }
   }

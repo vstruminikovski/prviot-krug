@@ -16,7 +16,7 @@ export const STAMPS: Stamp[] = [
   { id: 'polygonExam', title: 'Прв практичен дел', how: 'Испитен предизвик на полигон: ≤ 50 негативни поени (Образец бр. 1).', earned: (h) => done(h, (r) => r.env === 'polygon' && r.mode === 'exam' && r.passed === true) },
   { id: 'city', title: 'Градско возење', how: 'Заврши го кругот низ маалото со ≥ 75 % од мисијата.', earned: (h) => done(h, (r) => r.env === 'city' && (r.mission ?? 0) >= 75) },
   { id: 'openRoad', title: 'Отворен пат', how: 'Стигни до видиковецот со ≥ 70 % од мисијата.', earned: (h) => done(h, (r) => r.env === 'openRoad' && (r.mission ?? 0) >= 70) },
-  { id: 'hard', title: 'Тешки услови', how: 'Заврши возење ноќе, во самрак, на дожд или во магла.', earned: (h) => done(h, (r) => (r.time === 'night' || r.time === 'dusk' || (r.weather ?? 'clear') !== 'clear') && r.env !== 'osm') },
+  { id: 'hard', title: 'Тешки услови', how: 'Заврши возење ноќе, во самрак, на дожд или во магла.', earned: (h) => done(h, (r) => (r.time === 'night' || r.time === 'dusk' || (r.weather ?? 'clear') !== 'clear')) },
   { id: 'manual', title: 'Без помош', how: 'Заврши кој било предел во мануелен или испитен профил со ≥ 70 поени.', earned: (h) => done(h, (r) => (r.assist === 'manual' || r.assist === 'exam') && r.score >= 70) },
   { id: 'cityExam', title: 'Втор практичен дел', how: 'Испитен предизвик во градско: ≤ 50 негативни поени (Образец бр. 4).', earned: (h) => done(h, (r) => r.env === 'city' && r.mode === 'exam' && r.passed === true) },
 ];
@@ -33,7 +33,7 @@ export const STAMP_SETUP: Record<string, { env: EnvId; mode: Mode; assist?: Assi
   cityExam: { env: 'city', mode: 'exam', assist: 'exam' },
 };
 /** First stamp still missing, in booklet order. */
-export function nextStamp(h: AttemptRecord[]): Stamp | null { const got = earnedStamps(h); return STAMPS.find((s) => !got.includes(s.id)) ?? null; }
+export function nextStamp(h: AttemptRecord[], touch = false): Stamp | null { const got = earnedStamps(h); return STAMPS.find((s) => !got.includes(s.id) && !(touch && s.id === 'manual')) ?? null; }
 
 export function earnedStamps(h: AttemptRecord[]) { return STAMPS.filter((s) => s.earned(h)).map((s) => s.id); }
 export function licenceEarned(h: AttemptRecord[]) { return earnedStamps(h).length === STAMPS.length; }

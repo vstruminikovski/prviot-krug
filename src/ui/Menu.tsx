@@ -8,12 +8,10 @@ import { incomingChallenge } from '../game/host';
 import type { EnvId } from '../game/env/types';
 import type { Assist } from '../game/vehicles/vehicle';
 import { Sources } from './Sources';
-import { GoogleTilesView } from './GoogleTilesView';
 import { Booklet } from './Booklet';
 import { Settings } from './Settings';
 import { earnedStamps, nextStamp, STAMP_SETUP, STAMPS } from '../game/career';
 import { TIME_LABEL, WEATHER_LABEL, type TimeOfDay, type Weather } from '../game/render/atmosphere';
-import { googleTilesEnabled } from '../game/render/googleTiles';
 import { Icon, Logo, Modal, Seg, type IconName } from './kit';
 
 const ASSISTS: { id: Assist; label: string; note: string }[] = [
@@ -29,7 +27,7 @@ const MODES: { id: Mode; note: string }[] = [
   { id: 'exam', note: 'Официјален оценувачки лист (над 50 нег. поени = не положено). Игра, не сертификат.' },
   { id: 'free', note: 'Слободно возење без крај.' },
 ];
-const ENV_ICON: Record<EnvId, IconName> = { polygon: 'flag', city: 'home', osm: 'map', openRoad: 'wheel' };
+const ENV_ICON: Record<EnvId, IconName> = { polygon: 'flag', city: 'home', openRoad: 'wheel' };
 const TIME_ICON: Record<TimeOfDay, IconName> = { golden: 'sun', noon: 'sun', dusk: 'sun', night: 'moon' };
 const WEATHER_ICON: Record<Weather, IconName> = { clear: 'sun', rain: 'rain', fog: 'fog' };
 
@@ -39,14 +37,15 @@ export function Menu({ engine }: { engine: GameEngine }) {
   const [assist, setAssist] = useState<Assist>(engine.store.settings.assist);
   const [time, setTime] = useState<TimeOfDay>(engine.config.time ?? 'golden');
   const [weather, setWeather] = useState<Weather>(engine.config.weather ?? 'clear');
-  const [sheet, setSheet] = useState<null | 'sources' | 'gmap' | 'book' | 'settings' | 'help'>(engine.store.history.length === 0 ? 'help' : null);
+  const [sheet, setSheet] = useState<null | 'sources' | 'book' | 'settings' | 'help'>(engine.store.history.length === 0 ? 'help' : null);
   const code = incomingChallenge();
   const ch = decodeChallenge(code);
   const def = vehicleById(engine.store.garage.vehicle);
   const block = compatibility(def.id, env);
   const stamps = earnedStamps(engine.store.history).length;
   const last = engine.store.history.slice(-3).reverse();
-  const goal = nextStamp(engine.store.history);
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const goal = nextStamp(engine.store.history, touch);
   const go = () => { if (block) return; engine.store.settings.assist = assist; engine.persist(); engine.start({ env, mode, assist, time, weather }); };
   // keyboard: Enter drives, ? opens help, G garage
   useEffect(() => {
@@ -101,11 +100,13 @@ export function Menu({ engine }: { engine: GameEngine }) {
             <Seg value={mode} onChange={setMode} options={MODES.map((m) => ({ id: m.id, label: MODE_LABEL[m.id], title: m.note }))} />
             <p className="hint">{MODES.find((m) => m.id === mode)?.note}</p>
           </section>
-          <section>
-            <h3 className="sec">Менувач</h3>
-            <Seg value={assist} onChange={setAssist} options={ASSISTS.map((a) => ({ id: a.id, label: a.label, title: a.note }))} />
-            <p className="hint">{ASSISTS.find((a) => a.id === assist)?.note}</p>
-          </section>
+          {touch ? <p className="hint touch-note"><Icon name="info" size={14} />На телефон се вози со автоматски менувач. Рачниот менувач со кумплунг е на компјутер.</p> : (
+            <section>
+              <h3 className="sec">Менувач</h3>
+              <Seg value={assist} onChange={setAssist} options={ASSISTS.map((a) => ({ id: a.id, label: a.label, title: a.note }))} />
+              <p className="hint">{ASSISTS.find((a) => a.id === assist)?.note}</p>
+            </section>
+          )}
           <section>
             <h3 className="sec">Услови</h3>
             <div className="seg-row">
@@ -127,7 +128,6 @@ export function Menu({ engine }: { engine: GameEngine }) {
           )}
           <div className="menu-links">
             <button className="link" onClick={() => setSheet('sources')}><Icon name="info" size={15} />Извори и правила</button>
-            <button className="link" disabled={!googleTilesEnabled()} title={googleTilesEnabled() ? '' : 'Потребен е VITE_GOOGLE_MAPS_API_KEY (види README)'} onClick={() => setSheet('gmap')}><Icon name="map" size={15} />Google 3D поглед</button>
           </div>
         </div>
         <footer className="menu-foot">
@@ -146,7 +146,6 @@ export function Menu({ engine }: { engine: GameEngine }) {
         <div className="hero-s">Дебар Маало · Скопје · 1999</div>
       </div>
       {sheet === 'sources' && <Sources onClose={() => setSheet(null)} />}
-      {sheet === 'gmap' && <GoogleTilesView onClose={() => setSheet(null)} />}
       {sheet === 'book' && <Booklet history={engine.store.history} plate={engine.store.garage.plate} onClose={() => setSheet(null)} />}
       {sheet === 'settings' && <Settings engine={engine} onClose={() => setSheet(null)} />}
       {sheet === 'help' && <HowTo onClose={() => setSheet(null)} />}
@@ -166,10 +165,10 @@ export function HowTo({ onClose }: { onClose: () => void }) {
         </div>
         {touch ? (
           <ol className="steps">
-            <li>Држи го <b>К</b> (кумплунг) долу, допри <b>1</b> на менувачот.</li>
-            <li>Спушти ја рачната — <b>P</b>.</li>
-            <li>Малку <b>Г</b> (гас), а прстот од <b>К</b> лизгај нагоре — колата полека тргнува.</li>
-            <li>Управувај со лизгање по левата подлога. Огледалата се на копчињата горе.</li>
+            <li><b>Лев палец</b> лизга по подлогата — волан.</li>
+            <li><b>Десен палец</b>: ГАС и СОП. Подлабоко притискање = повеќе. Рачната сама се спушта.</li>
+            <li><b>D / R</b> — напред или рикверц (кога стоиш).</li>
+            <li>Горе лево: <b>◀ ▶</b> покажувачи и <b>око</b> — држи за огледало, подолго за поглед преку рамо.</li>
           </ol>
         ) : (
           <ol className="steps">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameEngine } from '../game/engine';
-import { VEHICLES, PAINT_PRESETS, INTERIOR_PALETTES, turningCircle, vehicleById } from '../game/vehicles/defs';
+import { VEHICLES, PAINT_PRESETS, turningCircle, vehicleById } from '../game/vehicles/defs';
 import { validPlate, DEFAULT_GARAGE } from '../game/store';
 import { compatibility } from '../game/attempt';
 import { Icon, Seg } from './kit';
@@ -56,12 +56,6 @@ export function Garage({ engine }: { engine: GameEngine }) {
               <label className="sw custom" title="Своја боја"><input type="color" value={g.paint} onChange={(e) => set({ paint: e.target.value })} />+</label>
             </div>
             <Seg size="sm" value={g.finish} onChange={(f) => set({ finish: f })} options={[{ id: 'solid', label: 'Мат лак' }, { id: 'metallic', label: 'Металик' }]} />
-            <h3 className="sec">Ентериер</h3>
-            <Seg size="sm" value={g.interior} onChange={(i) => set({ interior: i })} options={INTERIOR_PALETTES.map((p) => ({ id: p.id, label: p.name }))} />
-            {def.trims.length > 0 && (<>
-              <h3 className="sec">Фабрички опции</h3>
-              <div className="chips">{def.trims.map((t) => <button key={t} className={`chip ${g.trims.includes(t) ? 'on' : ''}`} aria-pressed={g.trims.includes(t)} onClick={() => set({ trims: g.trims.includes(t) ? g.trims.filter((x) => x !== t) : [...g.trims, t] })}>{g.trims.includes(t) && <Icon name="check" size={14} />}{t}</button>)}</div>
-            </>)}
           </>)}
           {tab === 'plate' && (<>
             <div className="plate-preview" aria-hidden><span className="plate-eu">MK</span><b>{plateOk ? plateText : g.plate}</b></div>
@@ -95,10 +89,8 @@ export function Garage({ engine }: { engine: GameEngine }) {
         </div>
         <div className="garage-tools">
           <button className={`btn glass sm ${cockpit ? 'on' : ''}`} onClick={() => setCockpit(!cockpit)}><Icon name={cockpit ? 'car' : 'eye'} size={16} />{cockpit ? 'Надвор' : 'Седни внатре'}</button>
-          <button className="btn glass sm" onClick={() => { engine.store.favorites = [...engine.store.favorites.filter((f) => f.vehicle !== g.vehicle), { ...g }].slice(-6); engine.persist(); force((x) => x + 1); }}><Icon name="check" size={16} />Зачувај</button>
           <button className="btn ghost sm" onClick={() => { set({ ...DEFAULT_GARAGE, vehicle: g.vehicle, paint: def.paint }); setPlateText(DEFAULT_GARAGE.plate); }}><Icon name="retry" size={16} />Ресетирај</button>
         </div>
-        {engine.store.favorites.length > 0 && <div className="chips favs">{engine.store.favorites.map((f, i) => <button key={i} className="chip" onClick={() => { set(f); setPlateText(f.plate); }}><span className="dot" style={{ background: f.paint }} />{vehicleById(f.vehicle).name}</button>)}</div>}
         <footer className="garage-foot">
           <button className="btn glass" onClick={() => engine.start({ env: 'polygon', mode: 'practice' })}>Проба на полигон</button>
           <button className="btn primary go" disabled={!!blocked} title={blocked ?? ''} onClick={() => engine.start({})}><Icon name="play" size={18} />Возиме</button>

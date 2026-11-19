@@ -163,8 +163,8 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       {hud.bubbles.map((b) => b.y > -900 && <div key={b.id} className="bubble" style={{ left: b.x, top: b.y }}>{b.text}</div>)}
       {hud.paused && !settings && <PauseMenu engine={engine} hud={hud} onSettings={() => setSettings(true)} />}
       {settings && <Settings engine={engine} onClose={() => setSettings(false)} />}
-      {hud.env === 'osm' && <div className="osm-attr">© OpenStreetMap contributors (ODbL)</div>}
       <TouchControls engine={engine} hud={hud} />
+      <div className="tspeed"><b>{Math.round(hud.speed)}</b><small>км/ч</small><span className={`tgear ${hud.gear === 'R' ? 'r' : ''}`}>{hud.gear === 'R' ? 'R' : hud.gear === 'N' ? 'N' : 'D'}</span><span className="tlimit">{hud.limit}</span></div>
     </div>
   );
 }
@@ -233,50 +233,42 @@ function useHold(onChange: (v: boolean) => void) {
   return ref;
 }
 
-/** Landscape touch: left thumb slides on a steering pad (analog), right thumb works three
- *  pressure pedals (finger depth = pedal travel — so the clutch bite can be held), plus a tap gearbox. */
+/** Phone driving (automatic): steering pad on the left, brake + gas on the right, a D/R switch,
+ *  indicators and one "look" button — hold for the mirror on the signalled side, keep holding
+ *  for a shoulder check. Mirrors only appear while looking. Nothing else competes for the thumbs. */
 function TouchControls({ engine, hud }: { engine: GameEngine; hud: HudState }) {
   const t = engine.input.touch;
   const knob = useRef<HTMLSpanElement>(null);
   const steerRef = useDrag((fx) => { const v = (0.5 - fx) * 2.4; t.steer = Math.max(-1, Math.min(1, Math.abs(v) < 0.06 ? 0 : v)); if (knob.current) knob.current.style.transform = `translateX(${(fx - 0.5) * 100}%)`; },
     () => { t.steer = 0; if (knob.current) knob.current.style.transform = ''; });
-  const depth = (fy: number) => Math.max(0.2, Math.min(1, 0.2 + fy * 0.95));
+  const depth = (fy: number) => Math.max(0.25, Math.min(1, 0.25 + fy * 0.9));
   const gRef = useDrag((_, fy, el) => { t.throttle = depth(fy); el.style.setProperty('--d', String(t.throttle)); }, () => { t.throttle = 0; });
   const bRef = useDrag((_, fy, el) => { t.brake = depth(fy); el.style.setProperty('--d', String(t.brake)); }, () => { t.brake = 0; });
-  const cRef = useDrag((_, fy, el) => { const v = Math.max(0, Math.min(1, fy * 1.15)); t.clutchLatch = v; t.clutchHeld = v > 0.97; el.style.setProperty('--d', String(v)); }, () => { t.clutchLatch = null; t.clutchHeld = false; });
-  const mlRef = useHold((v) => { t.glance = v ? 'mirrorL' : null; });
-  const mcRef = useHold((v) => { t.glance = v ? 'mirrorC' : null; });
-  const mrRef = useHold((v) => { t.glance = v ? 'mirrorR' : null; });
-  const slRef = useHold((v) => { t.glance = v ? 'shoulderL' : null; });
-  const srRef = useHold((v) => { t.glance = v ? 'shoulderR' : null; });
-  useEffect(() => () => { t.steer = 0; t.throttle = 0; t.brake = 0; t.clutchHeld = false; t.clutchLatch = null; t.horn = false; t.glance = null; }, [t]);
+  const lookTimer = useRef(0);
+  const lookRef = useHold((v) => {
+    window.clearTimeout(lookTimer.current);
+    if (!v) { t.glance = null; return; }
+    const ind = engine.sim?.player.indicator ?? 'off';
+    t.glance = ind === 'left' ? 'mirrorL' : ind === 'right' ? 'mirrorR' : 'mirrorC';
+    lookTimer.current = window.setTimeout(() => { const i = engine.sim?.player.indicator ?? 'off'; t.glance = i === 'right' ? 'shoulderR' : 'shoulderL'; }, 900);
+  });
+  useEffect(() => () => { window.clearTimeout(lookTimer.current); t.steer = 0; t.throttle = 0; t.brake = 0; t.clutchHeld = false; t.clutchLatch = null; t.horn = false; t.glance = null; }, [t]);
   const cmd = (c: Parameters<GameEngine['command']>[0]) => engine.command(c);
-  const gears: (1 | 2 | 3 | 4 | 5 | 'N' | 'R')[] = [1, 3, 5, 'N', 2, 4, 'R'];
+  const reverse = hud.gear === 'R';
   return (
     <div className="touch">
+      <div className="touch-top">
+        <button className={`tbtn ${(hud.indicator === 'left' || hud.hazards) && hud.blink ? 'blink' : hud.indicator === 'left' ? 'armed' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'left' })} aria-label="Лев покажувач">◀</button>
+        <button ref={lookRef} className="tbtn look" aria-label="Погледни: огледало, подолго — преку рамо"><Icon name="eye" size={18} /></button>
+        <button className={`tbtn ${(hud.indicator === 'right' || hud.hazards) && hud.blink ? 'blink' : hud.indicator === 'right' ? 'armed' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'right' })} aria-label="Десен покажувач">▶</button>
+      </div>
       <div className="touch-left">
-        <div className="t-row">
-          <button className={`tbtn ${hud.indicator === 'left' && hud.blink ? 'blink' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'left' })} aria-label="Лев покажувач">◀</button>
-          <button ref={slRef} className="tbtn" aria-label="Преку лево рамо">↶</button>
-          <button ref={mlRef} className="tbtn" aria-label="Лево огледало">◧</button>
-          <button ref={mcRef} className="tbtn" aria-label="Внатрешно огледало">▭</button>
-          <button ref={mrRef} className="tbtn" aria-label="Десно огледало">◨</button>
-          <button ref={srRef} className="tbtn" aria-label="Преку десно рамо">↷</button>
-          <button className={`tbtn ${hud.indicator === 'right' && hud.blink ? 'blink' : ''}`} onClick={() => cmd({ type: 'indicator', dir: 'right' })} aria-label="Десен покажувач">▶</button>
-        </div>
-        <div ref={steerRef} className="steer-pad" aria-label="Волан: лизгај лево-десно"><span className="steer-track" /><span ref={knob} className="steer-knob"><Icon name="wheel" size={26} /></span></div>
+        <div ref={steerRef} className="steer-pad" aria-label="Волан: лизгај лево-десно"><span className="steer-track" /><span ref={knob} className="steer-knob"><Icon name="wheel" size={24} /></span></div>
       </div>
       <div className="touch-right">
-        <div className="t-row">
-          <button className={`tbtn ${hud.engine !== 'running' ? 'warn' : ''}`} onClick={() => cmd({ type: 'engine' })} aria-label="Мотор">⏻</button>
-          <button className={`tbtn ${hud.parkingBrake ? 'on-red' : ''}`} onClick={() => cmd({ type: 'parkingBrake' })} aria-label="Рачна">P</button>
-          <div className="t-gears">{gears.map((g) => <button key={String(g)} className={`tg ${hud.gear === String(g) ? 'on' : ''}`} onClick={() => cmd({ type: 'gear', gear: g })}>{g}</button>)}</div>
-        </div>
-        <div className="t-row pedals-row">
-          <div ref={cRef} className="tpedal clutch"><i /><b>К</b><small>кумплунг</small></div>
-          <div ref={bRef} className="tpedal brake"><i /><b>С</b><small>сопирачка</small></div>
-          <div ref={gRef} className="tpedal gas"><i /><b>Г</b><small>гас</small></div>
-        </div>
+        <button className={`tbtn dr ${reverse ? 'rev' : ''}`} onClick={() => cmd({ type: 'gear', gear: reverse ? 1 : 'R' })} aria-label="Напред / рикверц"><b className={!reverse ? 'on' : ''}>D</b><b className={reverse ? 'on' : ''}>R</b></button>
+        <div ref={bRef} className="tpedal brake"><i /><b>СОП</b></div>
+        <div ref={gRef} className="tpedal gas"><i /><b>ГАС</b></div>
       </div>
     </div>
   );
