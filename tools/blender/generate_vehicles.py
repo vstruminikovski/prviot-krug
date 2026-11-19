@@ -321,6 +321,7 @@ def build_vehicle(v):
     bmesh.ops.create_circle(bm, cap_ends=False, segments=20, radius=0.18)
     ring = mesh_obj("SteeringRim", bm, M["Interior"], parent=sw)
     mod = ring.modifiers.new("sk", "SKIN")
+    for sv in ring.data.skin_vertices[0].data: sv.radius = (0.016, 0.016)  # default 0.25 m made a giant doughnut
     box("SteeringSpoke", (0.02, 0.34, 0.03), (0, 0, 0), M["Interior"], sw)
     gl = link(bpy.data.objects.new("GearLever", None), root)
     gl.location = (ex + 0.32, 0.02, zb + 0.3)

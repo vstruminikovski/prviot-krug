@@ -28,6 +28,8 @@ export interface VehicleRig extends CarRig {
   setPlate(text: string, layout: PlateLayout): void;
   glb: boolean;
   interior?: THREE.Object3D[];
+  /** parts hidden only in the first-person view (e.g. a roof too low for the eye point) */
+  cockpitHidden?: THREE.Object3D[];
 }
 
 /** Two-row plate texture (stylised layout, see README). */
@@ -58,13 +60,35 @@ function longTexture(text: string) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
+const SPIN = new THREE.Quaternion(), AXIS_Y = new THREE.Vector3(0, 1, 0);
+const RIM_GEO = new THREE.TorusGeometry(0.18, 0.016, 8, 32).rotateX(-Math.PI / 2);
+/** Body panels are single-sided shells; from the cabin their back faces would vanish and you'd see
+ *  straight through doors and pillars. Back faces render as a matte interior trim colour instead. */
+export function withCabinBackfaces<T extends THREE.MeshStandardMaterial>(m: T, trim = '#2a2622'): T {
+  m.side = THREE.DoubleSide;
+  const col = new THREE.Color(trim);
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uTrim = { value: col };
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uTrim;')
+      // back faces (door cards, pillars from inside) and downward faces (headliner, underside) → trim
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nif (!gl_FrontFacing || (vec4(normal, 0.0) * viewMatrix).y < -0.6) diffuseColor.rgb = uTrim;');
+  };
+  m.customProgramCacheKey = () => 'cabin-trim-2';
+  return m;
+}
+
 const GATE: Record<string, [number, number]> = { N: [0, 0], 1: [-0.22, 0.22], 2: [-0.22, -0.22], 3: [0, 0.22], 4: [0, -0.22], 5: [0.22, 0.22], R: [0.22, -0.22] };
 
 export function rigFromGLB(gltf: GLTF, def: VehicleDef, paint: string, finish: 'solid' | 'metallic', plate: string, layout: PlateLayout): VehicleRig {
   const group = new THREE.Group();
   const body = gltf.scene.clone(true);
   group.add(body);
-  const paintMat = new THREE.MeshStandardMaterial({ color: paint, metalness: finish === 'metallic' ? 0.55 : 0.12, roughness: finish === 'metallic' ? 0.32 : 0.48, flatShading: true });
+  const paintBase = new THREE.MeshStandardMaterial({ color: paint, metalness: finish === 'metallic' ? 0.55 : 0.12, roughness: finish === 'metallic' ? 0.32 : 0.48, flatShading: true });
+  // the truck cab is a closed shell with glass laid over it: keep it single-sided so the driver sees out
+  const paintMat = def.family === 'truck' ? paintBase : withCabinBackfaces(paintBase);
+  const guestWheel: THREE.Object3D[] = [];
+  const cockpitHidden: THREE.Object3D[] = [];
   const indL = new THREE.MeshStandardMaterial({ color: '#c9861c', emissive: '#1a0e00', roughness: 0.4 });
   const indR = indL.clone();
   const tail = new THREE.MeshStandardMaterial({ color: '#6a1410', emissive: '#200000', roughness: 0.4 });
@@ -75,12 +99,16 @@ export function rigFromGLB(gltf: GLTF, def: VehicleDef, paint: string, finish: '
   body.traverse((o) => {
     if (o.name.startsWith('Wheel_')) wheels[o.name.slice(6)] = o;
     if (o.name === 'SteeringWheel') steering = o;
+    if (def.id === 'spectral' && (o.name === 'Steering_Wheel' || o.name.startsWith('Wheel_Spoke'))) guestWheel.push(o);
+    if (def.id === 'spectral' && o.name === 'CABIN_Roof_Shell') cockpitHidden.push(o);
     if (o.name === 'GearLever') gear = o;
     if (o.name.startsWith('PlateMount_')) mounts[o.name.slice(11)] = o;
     if (o.name.startsWith('Interior') || o.name.startsWith('Steering') || o.name.startsWith('Gear')) interior.push(o);
     const m = o as THREE.Mesh;
     if (!m.isMesh) return;
     m.castShadow = true; m.receiveShadow = true;
+    // exported rims carry the Skin modifier's default 0.25 m tube — rebuild as a real 36 cm wheel
+    if (m.name === 'SteeringRim') { m.geometry = RIM_GEO; m.castShadow = false; }
     const name = (m.material as THREE.Material).name;
     if (name === 'Paint') m.material = paintMat;
     else if (name === 'IndL') m.material = indL;
@@ -88,11 +116,31 @@ export function rigFromGLB(gltf: GLTF, def: VehicleDef, paint: string, finish: '
     else if (name === 'TailLamp') m.material = tail;
     else if (name === 'Glass') { const g = (m.material as THREE.MeshStandardMaterial); g.transparent = true; g.opacity = 0.62; g.depthWrite = false; m.renderOrder = 2; m.castShadow = false; }
   });
+  // guest model: its wheel faces the door and sits on the right — replace it with a rigged one at the
+  // left-hand driver seat (Macedonia drives on the right)
+  if (guestWheel.length) {
+    for (const o of guestWheel) o.parent?.remove(o);
+    const sw = new THREE.Object3D(); sw.name = 'SteeringWheel';
+    sw.position.set(def.eye.x + 0.68, def.eye.y - 0.2, def.eye.z);
+    sw.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(-0.9, 0.44, 0).normalize());
+    body.add(sw); steering = sw;
+  }
+  // every rigged wheel gets a proper rim (some exports carried none, or a malformed one)
+  if (steering) {
+    const sw = steering as THREE.Object3D;
+    let hasRim = false; sw.traverse((o) => { if (o.name === 'SteeringRim') hasRim = true; });
+    const trimMat = new THREE.MeshStandardMaterial({ color: '#1d1b19', roughness: 0.55 });
+    if (!hasRim) {
+      const rim = new THREE.Mesh(RIM_GEO, trimMat); rim.name = 'SteeringRim'; sw.add(rim);
+      if (!sw.children.some((c) => c.name.startsWith('SteeringSpoke'))) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.025, 0.03), trimMat); sp.name = 'SteeringSpoke'; sw.add(sp); }
+      interior.push(sw);
+    }
+  }
   const steerBase = steering ? (steering as THREE.Object3D).quaternion.clone() : null;
   const gearBase = gear ? (gear as THREE.Object3D).quaternion.clone() : null;
   const plateMeshes: THREE.Mesh[] = [];
   const rig: VehicleRig = {
-    group, body: body as unknown as THREE.Group, wheels: Object.values(wheels), glb: true, interior,
+    group, body: body as unknown as THREE.Group, wheels: Object.values(wheels), glb: true, interior, cockpitHidden,
     setIndicators(l, r) { indL.emissive.set(l ? '#ffb020' : '#1a0e00'); indL.color.set(l ? '#ffc040' : '#c9861c'); indR.emissive.set(r ? '#ffb020' : '#1a0e00'); indR.color.set(r ? '#ffc040' : '#c9861c'); },
     setBrake(on) { tail.emissive.set(on ? '#ff1a10' : '#200000'); tail.color.set(on ? '#ff4030' : '#6a1410'); },
     setReverse() {},
@@ -100,7 +148,8 @@ export function rigFromGLB(gltf: GLTF, def: VehicleDef, paint: string, finish: '
     setSteer(angle, spin) {
       for (const [k, w] of Object.entries(wheels)) { w.rotation.set(0, k.startsWith('F') ? angle : 0, -spin); }
     },
-    setSteeringWheel(a) { if (steering && steerBase) (steering as THREE.Object3D).quaternion.copy(steerBase).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), a)); },
+    // the rim is modelled in Blender's XY plane, so after the Z-up → Y-up export its own normal is local +Y
+    setSteeringWheel(a) { if (steering && steerBase) (steering as THREE.Object3D).quaternion.copy(steerBase).multiply(SPIN.setFromAxisAngle(AXIS_Y, -a)); },
     setGear(gName) {
       if (!gear || !gearBase) return;
       const [lat, fwd] = GATE[gName] ?? [0, 0];

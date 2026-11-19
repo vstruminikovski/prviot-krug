@@ -9,7 +9,7 @@ import { decorateOpenRoad } from './render/kenneyProps';
 import { GameAudio } from './audio/audio';
 import { Input, type Command, type Glance } from './input';
 import { Autopilot } from './sim/autopilot';
-import { vehicleById, type VehicleDef } from './vehicles/defs';
+import { vehicleById, VEHICLES, type VehicleDef } from './vehicles/defs';
 import { load, save, type Save, type GarageChoice } from './store';
 import { randomSeed } from './sim/seed';
 import { emitComplete } from './host';
@@ -71,6 +71,8 @@ export class GameEngine {
   onFatal: ((msg: string) => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
+    // a saved car that is no longer in the garage falls back to the default one
+    if (!VEHICLES.some((v) => v.id === this.store.garage.vehicle)) { this.store.garage = { ...this.store.garage, vehicle: VEHICLES[0].id, paint: VEHICLES[0].paint, trims: [], load: 0 }; save(this.store); }
     this.view = new View(canvas);
     this.config = { v: CONTENT_VERSION, env: 'polygon', mission: 'polygon', mode: 'lesson', seed: randomSeed(), vehicle: this.store.garage.vehicle, assist: this.store.settings.assist, load: this.store.garage.load };
     this.view.camMode = this.store.settings.camera;

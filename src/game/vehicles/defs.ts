@@ -173,6 +173,11 @@ export const VEHICLES: VehicleDef[] = [
     rearWindow: false, plates: ['long', 'twoRow'], trims: ['Цирада', 'Сандак', 'Ладилник'],
     simplifications: 'Пневматските сопирачки се приближени со доцнење од 0,3 с; без моторна сопирачка и без мерење на оска по оска.',
   },
+];
+
+/** CC0 guest model kept out of the garage: its body shell is incomplete after optimisation, it takes no
+ *  paint, and its cabin is too low for a first-person eye point. Re-enable only after a model pass. */
+export const GUEST_VEHICLES: VehicleDef[] = [
   {
     id: 'spectral', name: 'Spectral GT-RS (гостин)', family: 'coupe', familyLabel: 'Гостин: модерно спортско купе', era: '2020-ти', paint: '#22304f',
     blurb: 'Модел CC0 од трета страна — широк, низок и силен. Тешко се гледа наоколу; во маалото е тесно.',
@@ -186,8 +191,8 @@ export const VEHICLES: VehicleDef[] = [
     brakes: { decel: 9.5, parkDecel: 3.0, lag: 0.05 },
     tyre: { mu: 1.05, cornerF: 80000, cornerR: 90000 },
     aero: { cdA: 0.62, rolling: 0.011 },
-    eye: { x: -0.35, y: 1.08, z: -0.4 },
-    mirrors: { left: { x: 0.55, y: 1.0, z: -1.15 }, right: { x: 0.55, y: 1.0, z: 1.15 }, interior: { x: 0.1, y: 1.25, z: 0 } },
+    eye: { x: -0.42, y: 1.29, z: -0.43 }, // driver seat of the model (left-hand drive), below the low roof
+    mirrors: { left: { x: 0.55, y: 1.0, z: -1.15 }, right: { x: 0.55, y: 1.0, z: 1.15 }, interior: { x: 0.35, y: 1.36, z: 0 } },
     rearWindow: true, plates: ['long'], trims: [],
     simplifications: 'Гостин-модел: физиката е проценета за модерно купе, не е мерена.',
   } as VehicleDef,

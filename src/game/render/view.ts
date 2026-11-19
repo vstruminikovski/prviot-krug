@@ -540,6 +540,7 @@ export class View {
       if (key !== this.glassShot) {
         this.glassShot = key;
         this.player.group.traverse((o) => { const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m && m.name === 'Glass') m.opacity = shot === 'driver' ? 0.12 : 0.62; });
+        for (const o of this.player.cockpitHidden ?? []) o.visible = shot !== 'driver';
       }
     }
   }
