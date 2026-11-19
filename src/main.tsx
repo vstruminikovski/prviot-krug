@@ -26,6 +26,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 }
 // keep the browser's install prompt so the game can offer it from its own button
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); (window as unknown as { __installPrompt?: Event }).__installPrompt = e; window.dispatchEvent(new Event('krug-installable')); });
+window.addEventListener('appinstalled', () => { (window as unknown as { __installPrompt?: Event }).__installPrompt = undefined; });
 
 const rootEl = document.getElementById('root');
 if (rootEl && !rootEl.dataset.manual) {

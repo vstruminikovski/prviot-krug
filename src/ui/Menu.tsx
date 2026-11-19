@@ -8,6 +8,7 @@ import { incomingChallenge } from '../game/host';
 import type { EnvId } from '../game/env/types';
 import type { Assist } from '../game/vehicles/vehicle';
 import { Sources } from './Sources';
+import { InstallButton } from './MobileGate';
 import { Booklet } from './Booklet';
 import { Settings } from './Settings';
 import { earnedStamps, nextStamp, STAMP_SETUP, STAMPS } from '../game/career';
@@ -63,6 +64,7 @@ export function Menu({ engine }: { engine: GameEngine }) {
         <header className="menu-top">
           <Logo />
           <nav className="menu-icons">
+            <InstallButton />
             <FullscreenButton />
             <button className="btn icon glass badge-wrap" onClick={() => setSheet('book')} title="Возачка книшка"><Icon name="book" />{stamps > 0 && <span className="badge-dot">{stamps}</span>}</button>
             <button className="btn icon glass" onClick={() => setSheet('settings')} title="Поставки"><Icon name="sliders" /></button>
