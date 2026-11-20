@@ -257,9 +257,13 @@ function makeHud(level: LevelData, failed: string[]) {
   el.innerHTML = `
     <div class="mg-top">
       <div class="mg-task"><b>Zoo parking → junction</b><span class="mg-msg"></span></div>
-      <div class="mg-sig" hidden><i></i><i></i><i></i></div>
+      <div class="mg-sig" hidden title="Simulated timing — not the real signal plan"><i></i><i></i><i></i><small>SIM</small></div>
     </div>
     <div class="mg-speed"><b>0</b><span>km/h</span><em>D</em></div>
+    <div class="mg-source" role="note">
+      Signs, markings and traffic-light positions: OpenStreetMap via MapNG, <b>not verified</b> against an official inventory.
+      Light timing is <b>simulated</b>. Map data © OpenStreetMap contributors (ODbL).
+    </div>
     <div class="mg-help">W/↑ gas · S/↓ brake/reverse · A D steer · Space handbrake · R reset · C camera</div>
     <div class="mg-done" hidden>
       <h2>Through the junction</h2><p></p><button>Drive again</button>

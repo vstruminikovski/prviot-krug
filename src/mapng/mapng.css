@@ -127,6 +127,27 @@ body {
   color: var(--mg-amber);
   margin-left: 6px;
 }
+.mg-sig small {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  color: #ffd38a;
+  letter-spacing: 0.05em;
+}
+.mg-source {
+  position: absolute;
+  left: 16px;
+  right: 140px;
+  bottom: 50px;
+  max-width: 560px;
+  font-size: 12px;
+  line-height: 1.35;
+  background: var(--mg-glass);
+  padding: 6px 10px;
+  border-radius: 8px;
+  opacity: 0.9;
+}
 .mg-help {
   position: absolute;
   left: 16px;
@@ -165,6 +186,11 @@ body {
   display: none;
 }
 @media (max-width: 720px) {
+  .mg-source {
+    bottom: 160px;
+    right: 16px;
+    font-size: 11px;
+  }
   .mg-help {
     display: none;
   }
