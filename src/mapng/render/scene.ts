@@ -1,6 +1,7 @@
 // Renderer, camera, sky and light for the MapNG level.
 
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export interface SceneKit {
   renderer: THREE.WebGLRenderer;
@@ -36,6 +37,10 @@ export function createScene(canvasHost: HTMLElement): SceneKit {
   sky.renderOrder = -1;
   scene.add(sky);
   scene.fog = new THREE.Fog(0xe9dcc4, 250, 1100);
+  // soft image-based light so glass and wet asphalt pick up reflections
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.35;
 
   scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5b5040, 1.1));
   const sun = new THREE.DirectionalLight(0xffe2b8, 2.4);

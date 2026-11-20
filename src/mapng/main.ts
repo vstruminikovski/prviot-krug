@@ -59,7 +59,7 @@ async function boot() {
   const failed: string[] = [];
   await Promise.all(
     near.map((m) =>
-      loadModel(LEVEL_BASE, m)
+      loadModel(LEVEL_BASE, m, level.terrain.heightAt)
         .then((lm) => {
           scene.add(lm.object);
           physics.addTrimesh(lm.collision.vertices, lm.collision.indices);

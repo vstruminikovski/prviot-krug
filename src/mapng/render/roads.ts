@@ -2,6 +2,9 @@
 
 import * as THREE from 'three';
 import type { ImportedRoad, Vec3 } from '../import/types';
+import { asphalt, asphaltPhoto } from './materials';
+
+let asphaltTex: ReturnType<typeof asphalt> | null = null;
 
 interface Style {
   color: number;
@@ -9,6 +12,7 @@ interface Style {
   order: number;
   dashed?: boolean;
   stripes?: boolean;
+  asphalt?: boolean;
 }
 function styleFor(r: ImportedRoad): Style | null {
   const m = r.material;
@@ -19,7 +23,7 @@ function styleFor(r: ImportedRoad): Style | null {
   if (/dirt/.test(m)) return { color: 0x8a7458, lift: 0.025, order: 1 };
   if (/concrete/.test(m)) return { color: 0x9d9c97, lift: 0.03, order: 1 };
   if (r.kind === 'path') return { color: 0xb3a892, lift: 0.025, order: 1 };
-  if (/asphalt/.test(m)) return { color: r.kind === 'service' ? 0x4a4b4d : 0x3a3c3f, lift: r.kind === 'carriageway' ? 0.045 : 0.035, order: 2 };
+  if (/asphalt/.test(m)) return { asphalt: true, color: r.kind === 'service' ? 0x4a4b4d : 0x3a3c3f, lift: r.kind === 'carriageway' ? 0.045 : 0.035, order: 2 };
   return null;
 }
 
@@ -51,7 +55,7 @@ export function buildRoads(roads: ImportedRoad[]): THREE.Group {
   for (const r of roads) {
     const st = styleFor(r);
     if (!st || r.points.length < 2) continue;
-    const key = `${st.color}|${st.lift}|${st.dashed ? 'd' : ''}${st.stripes ? 's' : ''}`;
+    const key = `${st.color}|${st.lift}|${st.dashed ? 'd' : ''}${st.stripes ? 's' : ''}${st.asphalt ? 'a' : ''}`;
     if (!buckets.has(key)) buckets.set(key, { style: st, pos: [], uv: [], idx: [] });
     const b = buckets.get(key)!;
     const { pos, along } = ribbon(r.points, st.lift);
@@ -76,6 +80,28 @@ export function buildRoads(roads: ImportedRoad[]): THREE.Group {
       polygonOffsetFactor: -b.style.order,
       polygonOffsetUnits: -b.style.order * 2,
     });
+    if (b.style.asphalt) {
+      // u runs 0→1 across the road, v is metres along it
+      asphaltTex ??= asphalt();
+      const map = asphaltTex.map.clone(), rough = asphaltTex.rough.clone();
+      for (const t of [map, rough]) t.repeat.set(1.4, 1 / 4);
+      mat.map = map;
+      mat.roughnessMap = rough;
+      mat.roughness = 1;
+      mat.color.set(b.style.color === 0x4a4b4d ? 0xd6d6d6 : 0xffffff);
+      // photographed CC0 asphalt once loaded (u across the road is 0..1 ≈ 7.5 m, i.e. 3 tiles)
+      asphaltPhoto()
+        .then((t) => {
+          for (const tx of [t.map, t.normal, t.rough]) tx.repeat.set(3, 1 / 2.5);
+          mat.map = t.map;
+          mat.normalMap = t.normal;
+          mat.roughnessMap = t.rough;
+          // Asphalt033 is a light, sun-bleached sample; city asphalt reads darker
+          mat.color.set(b.style.color === 0x4a4b4d ? 0x8a8a8a : 0x6e6e6e);
+          mat.needsUpdate = true;
+        })
+        .catch(() => {});
+    }
     if (b.style.dashed || b.style.stripes) {
       mat.alphaMap = b.style.dashed ? dashTexture() : stripeTexture();
       mat.transparent = true;
