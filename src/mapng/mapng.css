@@ -180,6 +180,13 @@ body {
   padding: 8px 10px 8px 14px;
   font-size: 16px;
 }
+.mg-photo-credit a {
+  all: unset;
+  pointer-events: auto;
+  color: var(--mg-amber);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .mg-photo-bar button {
   min-height: 40px;
   font-size: 16px;

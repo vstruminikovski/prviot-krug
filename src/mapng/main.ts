@@ -197,7 +197,7 @@ async function boot() {
       photoClock = 0;
       const ll = g.toLatLng(wx, wy);
       hud.setMapsLink(ll.lat, ll.lng, heading);
-      if (photos) hud.setPhotoState(photos.follow(wx, wy, heading));
+      if (photos) hud.setPhotoState(photos.follow(wx, wy, heading), photos.current);
     }
 
     // camera
@@ -314,6 +314,7 @@ function makeHud(level: LevelData, failed: string[]) {
       <div class="mg-photo-view"></div>
       <div class="mg-photo-bar">
         <span class="mg-photo-info">Street photos</span>
+        <span class="mg-photo-credit" hidden>Photo: <a class="mg-photo-src" target="_blank" rel="noopener noreferrer" href="https://www.mapillary.com/">this image</a> · <a target="_blank" rel="noopener noreferrer" href="https://www.mapillary.com/">Mapillary</a>, <a target="_blank" rel="noopener noreferrer" href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a></span>
         <button class="mg-photo-size" type="button">Bigger</button>
       </div>
     </div>
@@ -345,6 +346,7 @@ function makeHud(level: LevelData, failed: string[]) {
   const q = <T extends HTMLElement>(s: string) => el.querySelector<T>(s)!;
   const msg = q('.mg-msg'), sp = q('.mg-speed b'), gear = q('.mg-speed em'), sig = q('.mg-sig'), done = q('.mg-done');
   const photo = q('.mg-photo'), info = q('.mg-photo-info'), sizeBtn = q<HTMLButtonElement>('.mg-photo-size');
+  const credit = q('.mg-photo-credit'), src = q<HTMLAnchorElement>('.mg-photo-src');
   const camBtn = q<HTMLButtonElement>('.mg-cam'), gmaps = q<HTMLAnchorElement>('.mg-gmaps'), howto = q('.mg-howto');
   const camNames: Record<string, string> = { driver: 'Camera: driver', chase: 'Camera: behind', top: 'Camera: above' };
   // buttons must not steal keyboard focus from driving
@@ -363,10 +365,12 @@ function makeHud(level: LevelData, failed: string[]) {
       info.textContent = s;
       photo.dataset.state = /off|unavailable/.test(s) ? 'off' : photo.dataset.state ?? '';
     },
-    setPhotoState(s: 'photo' | 'none') {
+    setPhotoState(s: 'photo' | 'none', imageId?: string | null) {
       photo.dataset.state = s;
+      credit.hidden = s !== 'photo';
+      info.hidden = s === 'photo';
       if (s === 'none') info.textContent = 'No street photo at this spot';
-      else info.textContent = 'Street photo · Mapillary, CC BY-SA 4.0';
+      if (imageId) src.href = `https://www.mapillary.com/app/?pKey=${encodeURIComponent(imageId)}&focus=photo`;
     },
     setMapsLink(lat: number, lng: number, heading: number) {
       const compass = Math.round((((90 - (heading * 180) / Math.PI) % 360) + 360) % 360);

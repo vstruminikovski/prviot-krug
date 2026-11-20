@@ -52,7 +52,11 @@ export async function createStreetPhotos(
   const url =
     `https://graph.mapillary.com/images?fields=id,computed_geometry,geometry,compass_angle,computed_compass_angle` +
     `&bbox=${sw.lng.toFixed(6)},${sw.lat.toFixed(6)},${ne.lng.toFixed(6)},${ne.lat.toFixed(6)}&limit=2000`;
+  // One Graph API request per page load (limit: 60,000 entity requests/min per app);
+  // the viewer then loads only the images the car actually reaches.
   const res = await fetch(url, { headers: { Authorization: `OAuth ${MAPILLARY_TOKEN}` } });
+  if (res.status === 401 || res.status === 403) throw new Error('Mapillary token was rejected');
+  if (res.status === 429) throw new Error('Mapillary rate limit reached, try later');
   if (!res.ok) throw new Error(`Mapillary API ${res.status}`);
   const body = await res.json();
   const images: StreetImage[] = (body.data ?? [])
