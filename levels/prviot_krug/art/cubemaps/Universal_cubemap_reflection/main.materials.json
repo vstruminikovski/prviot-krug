@@ -1,0 +1,31 @@
+{
+  "cubemap_Universal_cubemap_reflection": {
+    "name": "cubemap_Universal_cubemap_reflection",
+    "class": "CubemapData",
+    "persistentId": "45f966b4-c1b0-4b9a-baa6-c4a3222c4c0e",
+    "cubeFace": [
+      "/levels/prviot_krug/art/cubemaps/Universal_cubemap_reflection/cubemap/skybox0.hdr.dds",
+      "/levels/prviot_krug/art/cubemaps/Universal_cubemap_reflection/cubemap/skybox1.hdr.dds",
+      "/levels/prviot_krug/art/cubemaps/Universal_cubemap_reflection/cubemap/skybox2.hdr.dds",
+      "/levels/prviot_krug/art/cubemaps/Universal_cubemap_reflection/cubemap/skybox3.hdr.dds",
+      "/levels/prviot_krug/art/cubemaps/Universal_cubemap_reflection/cubemap/skybox4.hdr.dds",
+      "/levels/prviot_krug/art/cubemaps/Universal_cubemap_reflection/cubemap/skybox5.hdr.dds"
+    ]
+  },
+  "Universal_cubemap_reflection": {
+    "name": "Universal_cubemap_reflection",
+    "mapTo": "unmapped_mat",
+    "class": "Material",
+    "persistentId": "eda9af25-ead9-4380-ab60-2b56586f4d5b",
+    "Stages": [
+      {},
+      {},
+      {},
+      {}
+    ],
+    "cubemap": "cubemap_Universal_cubemap_reflection",
+    "materialTag0": "beamng",
+    "materialTag1": "Natural",
+    "materialTag2": "BNG_sky"
+  }
+}

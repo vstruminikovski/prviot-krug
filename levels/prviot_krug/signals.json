@@ -1,0 +1,1387 @@
+{
+  "instances": [
+    {
+      "id": 4,
+      "name": "trafficLight 4",
+      "controllerId": 1,
+      "sequenceId": 3,
+      "pos": [
+        341.575,
+        230.296,
+        3.04
+      ],
+      "dir": [
+        0.8148,
+        -0.579742,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_4_5_6_7"
+    },
+    {
+      "id": 5,
+      "name": "trafficLight 5",
+      "controllerId": 1,
+      "sequenceId": 3,
+      "pos": [
+        364.178,
+        214.326,
+        2.819
+      ],
+      "dir": [
+        -0.815863,
+        0.578246,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_4_5_6_7"
+    },
+    {
+      "id": 6,
+      "name": "trafficLight 6",
+      "controllerId": 2,
+      "sequenceId": 3,
+      "pos": [
+        361.692,
+        235.429,
+        3.064
+      ],
+      "dir": [
+        -0.592686,
+        -0.805433,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_4_5_6_7"
+    },
+    {
+      "id": 7,
+      "name": "trafficLight 7",
+      "controllerId": 2,
+      "sequenceId": 3,
+      "pos": [
+        344.781,
+        211.933,
+        2.851
+      ],
+      "dir": [
+        0.579646,
+        0.814869,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_4_5_6_7"
+    },
+    {
+      "id": 13,
+      "name": "trafficLight 13",
+      "controllerId": 8,
+      "sequenceId": 12,
+      "pos": [
+        37.954,
+        -318.96,
+        4.391
+      ],
+      "dir": [
+        0.975006,
+        -0.222178,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_13_14_15_16"
+    },
+    {
+      "id": 14,
+      "name": "trafficLight 14",
+      "controllerId": 9,
+      "sequenceId": 12,
+      "pos": [
+        63.312,
+        -307.851,
+        3.854
+      ],
+      "dir": [
+        -0.966494,
+        0.25669,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_13_14_15_16"
+    },
+    {
+      "id": 15,
+      "name": "trafficLight 15",
+      "controllerId": 10,
+      "sequenceId": 12,
+      "pos": [
+        47.908,
+        -332.946,
+        4.042
+      ],
+      "dir": [
+        0.207001,
+        0.978341,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_13_14_15_16"
+    },
+    {
+      "id": 16,
+      "name": "trafficLight 16",
+      "controllerId": 11,
+      "sequenceId": 12,
+      "pos": [
+        55.651,
+        -296.565,
+        3.988
+      ],
+      "dir": [
+        -0.222709,
+        -0.974885,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_13_14_15_16"
+    },
+    {
+      "id": 21,
+      "name": "trafficLight 21",
+      "controllerId": 17,
+      "sequenceId": 20,
+      "pos": [
+        -105.507,
+        376.017,
+        2.965
+      ],
+      "dir": [
+        -0.173274,
+        -0.984874,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_21_22_23_24"
+    },
+    {
+      "id": 22,
+      "name": "trafficLight 22",
+      "controllerId": 17,
+      "sequenceId": 20,
+      "pos": [
+        -112.699,
+        337.233,
+        3.55
+      ],
+      "dir": [
+        0.181622,
+        0.983368,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_21_22_23_24"
+    },
+    {
+      "id": 23,
+      "name": "trafficLight 23",
+      "controllerId": 18,
+      "sequenceId": 20,
+      "pos": [
+        -89.659,
+        364.301,
+        3.037
+      ],
+      "dir": [
+        -0.99628,
+        0.086174,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_21_22_23_24"
+    },
+    {
+      "id": 24,
+      "name": "trafficLight 24",
+      "controllerId": 19,
+      "sequenceId": 20,
+      "pos": [
+        -127.914,
+        355.573,
+        3.595
+      ],
+      "dir": [
+        0.997443,
+        -0.071467,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_21_22_23_24"
+    },
+    {
+      "id": 28,
+      "name": "trafficLight 28",
+      "controllerId": 25,
+      "sequenceId": 27,
+      "pos": [
+        -453.64,
+        -211.426,
+        8.434
+      ],
+      "dir": [
+        -0.982479,
+        0.186373,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_28_29"
+    },
+    {
+      "id": 29,
+      "name": "trafficLight 29",
+      "controllerId": 26,
+      "sequenceId": 27,
+      "pos": [
+        -475.417,
+        -202.968,
+        8.511
+      ],
+      "dir": [
+        -0.925298,
+        -0.379241,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_28_29"
+    },
+    {
+      "id": 31,
+      "name": "trafficLight 31",
+      "controllerId": 30,
+      "sequenceId": 0,
+      "pos": [
+        -221.833,
+        -252.678,
+        7.394
+      ],
+      "dir": [
+        -0.982605,
+        0.185706,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_31_32"
+    },
+    {
+      "id": 32,
+      "name": "trafficLight 32",
+      "controllerId": 30,
+      "sequenceId": 0,
+      "pos": [
+        -251.918,
+        -244.235,
+        8.474
+      ],
+      "dir": [
+        -0.986401,
+        -0.164355,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_31_32"
+    },
+    {
+      "id": 37,
+      "name": "trafficLight 37",
+      "controllerId": 33,
+      "sequenceId": 36,
+      "pos": [
+        -128.215,
+        186.599,
+        4.422
+      ],
+      "dir": [
+        -0.979079,
+        0.203483,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_37_38_39_40"
+    },
+    {
+      "id": 38,
+      "name": "trafficLight 38",
+      "controllerId": 34,
+      "sequenceId": 36,
+      "pos": [
+        -149.318,
+        190.563,
+        4.102
+      ],
+      "dir": [
+        0.985462,
+        -0.169897,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_37_38_39_40"
+    },
+    {
+      "id": 39,
+      "name": "trafficLight 39",
+      "controllerId": 35,
+      "sequenceId": 36,
+      "pos": [
+        -141.583,
+        181.558,
+        4.477
+      ],
+      "dir": [
+        0.182651,
+        0.983178,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_37_38_39_40"
+    },
+    {
+      "id": 40,
+      "name": "trafficLight 40",
+      "controllerId": 35,
+      "sequenceId": 36,
+      "pos": [
+        -138.969,
+        195.665,
+        4.122
+      ],
+      "dir": [
+        -0.175697,
+        -0.984444,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_37_38_39_40"
+    },
+    {
+      "id": 46,
+      "name": "trafficLight 46",
+      "controllerId": 41,
+      "sequenceId": 45,
+      "pos": [
+        253.789,
+        56.346,
+        1.419
+      ],
+      "dir": [
+        -0.803028,
+        0.595941,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_46_47_48_49"
+    },
+    {
+      "id": 47,
+      "name": "trafficLight 47",
+      "controllerId": 42,
+      "sequenceId": 45,
+      "pos": [
+        228.037,
+        75.743,
+        1.354
+      ],
+      "dir": [
+        0.79302,
+        -0.609195,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_46_47_48_49"
+    },
+    {
+      "id": 48,
+      "name": "trafficLight 48",
+      "controllerId": 43,
+      "sequenceId": 45,
+      "pos": [
+        249.23,
+        77.415,
+        1.331
+      ],
+      "dir": [
+        -0.558467,
+        -0.829527,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_46_47_48_49"
+    },
+    {
+      "id": 49,
+      "name": "trafficLight 49",
+      "controllerId": 44,
+      "sequenceId": 45,
+      "pos": [
+        232.936,
+        53.8,
+        1.518
+      ],
+      "dir": [
+        0.550628,
+        0.834751,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_46_47_48_49"
+    },
+    {
+      "id": 54,
+      "name": "trafficLight 54",
+      "controllerId": 50,
+      "sequenceId": 53,
+      "pos": [
+        494.737,
+        122.462,
+        3.394
+      ],
+      "dir": [
+        0.827506,
+        -0.561457,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_54_55_56"
+    },
+    {
+      "id": 55,
+      "name": "trafficLight 55",
+      "controllerId": 51,
+      "sequenceId": 53,
+      "pos": [
+        508.099,
+        113.262,
+        3.509
+      ],
+      "dir": [
+        -0.817593,
+        0.575797,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_54_55_56"
+    },
+    {
+      "id": 56,
+      "name": "trafficLight 56",
+      "controllerId": 52,
+      "sequenceId": 53,
+      "pos": [
+        507.872,
+        127.598,
+        3.537
+      ],
+      "dir": [
+        -0.538588,
+        -0.842569,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_54_55_56"
+    },
+    {
+      "id": 58,
+      "name": "trafficLight 58",
+      "controllerId": 57,
+      "sequenceId": 0,
+      "pos": [
+        -458.665,
+        -223.152,
+        8.538
+      ],
+      "dir": [
+        0.982596,
+        -0.185757,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_58"
+    },
+    {
+      "id": 60,
+      "name": "trafficLight 60",
+      "controllerId": 59,
+      "sequenceId": 0,
+      "pos": [
+        -227.409,
+        -266.686,
+        7.32
+      ],
+      "dir": [
+        0.982616,
+        -0.185652,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_60"
+    },
+    {
+      "id": 62,
+      "name": "trafficLight 62",
+      "controllerId": 61,
+      "sequenceId": 0,
+      "pos": [
+        112.995,
+        343.542,
+        2.578
+      ],
+      "dir": [
+        -0.974408,
+        0.224789,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_62_63"
+    },
+    {
+      "id": 63,
+      "name": "trafficLight 63",
+      "controllerId": 61,
+      "sequenceId": 0,
+      "pos": [
+        105.314,
+        335.314,
+        2.753
+      ],
+      "dir": [
+        0.982059,
+        -0.188575,
+        0
+      ],
+      "startDisabled": false,
+      "group": "group_62_63"
+    }
+  ],
+  "controllers": [
+    {
+      "id": 1,
+      "name": "cluster_1_ns_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "cluster_1_ew_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "cluster_2_ns_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "cluster_2_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "cluster_2_ew_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "cluster_2_ew",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "cluster_3_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "cluster_3_ew_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "name": "cluster_3_ew",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "name": "cluster_4_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "name": "cluster_4_ew",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "name": "cluster_5_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "name": "cluster_6_ns_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "name": "cluster_6_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "name": "cluster_6_ew",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "name": "cluster_7_ns_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "name": "cluster_7_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "name": "cluster_7_ew_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "name": "cluster_7_ew",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "name": "cluster_8_ns_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "name": "cluster_8_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "name": "cluster_8_ew_left_turn",
+      "type": "lightsBasicProtectedGreen",
+      "isSimple": false,
+      "defaultIndex": 3,
+      "states": [
+        {
+          "state": "greenFlashingTrafficLight",
+          "duration": 9
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "name": "cluster_9_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "name": "cluster_10_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "name": "cluster_11_ns",
+      "type": "lightsBasicEU",
+      "isSimple": false,
+      "defaultIndex": 4,
+      "states": [
+        {
+          "state": "redYellowTrafficLight",
+          "duration": 1.5
+        },
+        {
+          "state": "greenTrafficLight",
+          "duration": 12
+        },
+        {
+          "state": "yellowTrafficLight",
+          "duration": 4
+        },
+        {
+          "state": "redTrafficLight",
+          "duration": 1.5
+        }
+      ]
+    }
+  ],
+  "sequences": [
+    {
+      "id": 3,
+      "name": "trafficLights_cluster_1",
+      "startTime": 0,
+      "startDisabled": false,
+      "ignoreTimer": false,
+      "phases": [
+        {
+          "startTime": 0,
+          "controllerIds": [
+            1
+          ],
+          "totalDuration": 7
+        },
+        {
+          "startTime": 7,
+          "controllerIds": [
+            1
+          ],
+          "totalDuration": 12.14
+        },
+        {
+          "startTime": 19.14,
+          "controllerIds": [
+            2
+          ],
+          "totalDuration": 7
+        },
+        {
+          "startTime": 26.14,
+          "controllerIds": [
+            2
+          ],
+          "totalDuration": 12.14
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "trafficLights_cluster_2",
+      "startTime": 0,
+      "startDisabled": false,
+      "ignoreTimer": false,
+      "phases": [
+        {
+          "startTime": 0,
+          "controllerIds": [
+            8
+          ],
+          "totalDuration": 5.478
+        },
+        {
+          "startTime": 5.478,
+          "controllerIds": [
+            8,
+            9
+          ],
+          "totalDuration": 19.602
+        },
+        {
+          "startTime": 25.08,
+          "controllerIds": [
+            10
+          ],
+          "totalDuration": 5.478
+        },
+        {
+          "startTime": 30.558,
+          "controllerIds": [
+            10,
+            11
+          ],
+          "totalDuration": 19.602
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "name": "trafficLights_cluster_3",
+      "startTime": 0,
+      "startDisabled": false,
+      "ignoreTimer": false,
+      "phases": [
+        {
+          "startTime": 0,
+          "controllerIds": [
+            17
+          ],
+          "totalDuration": 25.08
+        },
+        {
+          "startTime": 25.08,
+          "controllerIds": [
+            18
+          ],
+          "totalDuration": 5.478
+        },
+        {
+          "startTime": 30.558,
+          "controllerIds": [
+            18,
+            19
+          ],
+          "totalDuration": 19.602
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "name": "trafficLights_cluster_4",
+      "startTime": 0,
+      "startDisabled": false,
+      "ignoreTimer": false,
+      "phases": [
+        {
+          "controllerIds": [
+            25
+          ],
+          "totalDuration": 19
+        },
+        {
+          "controllerIds": [
+            26
+          ],
+          "totalDuration": 19
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "name": "trafficLights_cluster_6",
+      "startTime": 0,
+      "startDisabled": false,
+      "ignoreTimer": false,
+      "phases": [
+        {
+          "startTime": 0,
+          "controllerIds": [
+            33
+          ],
+          "totalDuration": 6.469
+        },
+        {
+          "startTime": 6.469,
+          "controllerIds": [
+            33,
+            34
+          ],
+          "totalDuration": 18.611
+        },
+        {
+          "startTime": 23.56,
+          "controllerIds": [
+            35
+          ],
+          "totalDuration": 25.08
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "name": "trafficLights_cluster_7",
+      "startTime": 0,
+      "startDisabled": false,
+      "ignoreTimer": false,
+      "phases": [
+        {
+          "startTime": 0,
+          "controllerIds": [
+            41
+          ],
+          "totalDuration": 5.478
+        },
+        {
+          "startTime": 5.478,
+          "controllerIds": [
+            41,
+            42
+          ],
+          "totalDuration": 19.602
+        },
+        {
+          "startTime": 25.08,
+          "controllerIds": [
+            43
+          ],
+          "totalDuration": 5.478
+        },
+        {
+          "startTime": 30.558,
+          "controllerIds": [
+            43,
+            44
+          ],
+          "totalDuration": 19.602
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "name": "trafficLights_cluster_8",
+      "startTime": 0,
+      "startDisabled": false,
+      "ignoreTimer": false,
+      "phases": [
+        {
+          "startTime": 0,
+          "controllerIds": [
+            50
+          ],
+          "totalDuration": 5.478
+        },
+        {
+          "startTime": 5.478,
+          "controllerIds": [
+            50,
+            51
+          ],
+          "totalDuration": 19.602
+        },
+        {
+          "startTime": 25.08,
+          "controllerIds": [
+            52
+          ],
+          "totalDuration": 7
+        },
+        {
+          "startTime": 32.08,
+          "controllerIds": [
+            52
+          ],
+          "totalDuration": 7.5
+        }
+      ]
+    }
+  ]
+}

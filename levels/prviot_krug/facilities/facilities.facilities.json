@@ -1,0 +1,22 @@
+{
+  "gasStations": [
+    {
+      "id": "fuel_1",
+      "name": "Charging Station 1",
+      "description": "Electric charging station.",
+      "energyTypes": [
+        "electricEnergy"
+      ],
+      "pumps": [
+        [
+          "fuel_1_pump_area_1",
+          "fuel_1_pump_icon_1"
+        ],
+        [
+          "fuel_1_pump_area_2",
+          "fuel_1_pump_icon_2"
+        ]
+      ]
+    }
+  ]
+}

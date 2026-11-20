@@ -8,6 +8,11 @@ const base = process.env.VITE_BASE || './';
 export default defineConfig({
   base,
   plugins: [react()],
-  build: { target: 'es2020', chunkSizeWarningLimit: 1200 },
+  build: {
+    target: 'es2020',
+    chunkSizeWarningLimit: 2600,
+    // mapng.html: the MapNG level route (src/mapng), separate from the main game
+    rollupOptions: { input: { main: 'index.html', mapng: 'mapng.html' } },
+  },
   test: { environment: 'node', include: ['tests/**/*.test.ts'] },
 } as never);

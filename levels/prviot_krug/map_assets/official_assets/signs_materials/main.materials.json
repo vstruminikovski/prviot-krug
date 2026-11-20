@@ -1,0 +1,53 @@
+{
+  "signs_usa": {
+    "name": "signs_usa",
+    "mapTo": "signs_usa",
+    "class": "Material",
+    "Stages": [
+      {
+        "colorMap": "/assets/materials/signage/signs_usa/eca_roadsigns_d.dds",
+        "specularMap": "/assets/materials/signage/signs_usa/eca_roadsigns_s.dds",
+        "pixelSpecular": true,
+        "roughnessFactor": 0.607767701,
+        "useAnisotropic": true,
+        "vertColor": true
+      },
+      {},
+      {},
+      {}
+    ],
+    "alphaRef": 64,
+    "alphaTest": true,
+    "annotation": "TRAFFIC_SIGNS",
+    "groundType": "METAL",
+    "materialTag0": "beamng",
+    "materialTag1": "vehicle",
+    "translucentBlendOp": "None"
+  },
+  "eca_bld_metalbeams": {
+    "name": "eca_bld_metalbeams",
+    "mapTo": "eca_bld_metalbeams",
+    "class": "Material",
+    "Stages": [
+      {
+        "colorMap": "/assets/materials/trim/metal/eca_bld_metalbeams/eca_bld_metalbeams_d.dds",
+        "normalMap": "/assets/materials/trim/metal/eca_bld_metalbeams/eca_bld_metalbeams_n.dds",
+        "specularMap": "/assets/materials/trim/metal/eca_bld_metalbeams/eca_bld_metalbeams_s.dds",
+        "detailMap": "/assets/materials/trim/metal/eca_bld_metalbeams/detail_grunge_01_low_desat.dds",
+        "detailScale": [
+          0.2,
+          0.2
+        ],
+        "useAnisotropic": true
+      },
+      {},
+      {},
+      {}
+    ],
+    "annotation": "TRAFFIC_SIGNS",
+    "groundType": "METAL",
+    "materialTag0": "beamng",
+    "materialTag1": "building",
+    "translucentBlendOp": "None"
+  }
+}

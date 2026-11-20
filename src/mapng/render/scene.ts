@@ -1,0 +1,72 @@
+// Renderer, camera, sky and light for the MapNG level.
+
+import * as THREE from 'three';
+
+export interface SceneKit {
+  renderer: THREE.WebGLRenderer;
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  sun: THREE.DirectionalLight;
+  resize(): void;
+}
+
+export function createScene(canvasHost: HTMLElement): SceneKit {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  canvasHost.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  // Late-afternoon sky gradient (the level's HDR cubemaps are not browser-readable).
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(1800, 32, 16),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: { top: { value: new THREE.Color(0x6fa3d8) }, horizon: { value: new THREE.Color(0xf3dcb4) } },
+      vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+      fragmentShader:
+        'uniform vec3 top; uniform vec3 horizon; varying vec3 vP; void main(){ float t = pow(clamp(vP.y*1.6,0.,1.),0.6); gl_FragColor = vec4(mix(horizon, top, t),1.); }',
+    }),
+  );
+  sky.renderOrder = -1;
+  scene.add(sky);
+  scene.fog = new THREE.Fog(0xe9dcc4, 250, 1100);
+
+  scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5b5040, 1.1));
+  const sun = new THREE.DirectionalLight(0xffe2b8, 2.4);
+  sun.position.set(-120, 160, 80);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  const sc = sun.shadow.camera;
+  sc.left = -70;
+  sc.right = 70;
+  sc.top = 70;
+  sc.bottom = -70;
+  sc.near = 10;
+  sc.far = 500;
+  sun.shadow.bias = -0.0004;
+  scene.add(sun, sun.target);
+
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2500);
+  const resize = () => {
+    const w = canvasHost.clientWidth || window.innerWidth;
+    const h = canvasHost.clientHeight || window.innerHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  };
+  window.addEventListener('resize', resize);
+  resize();
+  return { renderer, scene, camera, sun, resize };
+}
+
+/** Keep the shadow frustum centred on the car. */
+export function followSun(sun: THREE.DirectionalLight, target: THREE.Vector3) {
+  sun.target.position.copy(target);
+  sun.position.set(target.x - 120, target.y + 160, target.z + 80);
+}

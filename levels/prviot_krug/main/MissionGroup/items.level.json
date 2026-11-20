@@ -1,0 +1,14 @@
+{"__parent":"MissionGroup","class":"SimGroup","name":"sky_and_sun","persistentId":"02e04527-036f-4cff-a061-bca49558d2a5"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"level_objects","persistentId":"9951c16f-bdd7-4e45-949c-3fcf9d8bec3b"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"PlayerDropPoints","persistentId":"bba97b24-0628-48b7-91b6-56cf60c21eb2"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"AIWaypointsGroup","persistentId":"8a61363b-dd42-4ec1-a9da-fb8621496fbb"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"AIDecalWaypointsGroup","persistentId":"7f534711-fc4e-4145-9250-a1af9ac6e58f"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"CameraBookmarks","persistentId":"bb1b2c0a-ee6d-4519-a73e-bf953de834ac"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"Water","persistentId":"143a1426-732f-40d6-8b8e-436fcaef2174"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"vegetation","persistentId":"9e1acd06-0d34-4c96-ac4c-819ab010f3a3"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"barriers","persistentId":"f2206516-7495-46a5-93e3-fa3d52b217b4"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"signs","persistentId":"5221a7ee-b0a7-4d98-86e2-786fee1cb8e4"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"street_furniture","persistentId":"f8c00eb3-7d83-4b6a-98f2-d3ad53fd002a"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"traffic_signals","persistentId":"9ade171a-1e80-49bb-8bd7-f3aab76075c8"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"gasStations","persistentId":"d20bb8ee-f3dc-44ee-900e-acdc1903349e"}
+{"__parent":"MissionGroup","class":"SimGroup","name":"Decal_Roads","persistentId":"4bc4c010-0176-40ea-bdac-1af9b052347e"}

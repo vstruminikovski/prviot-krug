@@ -10,9 +10,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "matrix": "vite-node scripts/matrix-md.ts"
+    "matrix": "vite-node scripts/matrix-md.ts",
+    "mapng:import": "vite-node tools/mapng-import/importLevel.ts"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "0.21.0",
     "@fontsource-variable/manrope": "^5.1.0",
     "@fontsource-variable/unbounded": "^5.1.0",
     "react": "18.3.1",

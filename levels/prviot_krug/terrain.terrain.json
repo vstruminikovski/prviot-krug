@@ -1,0 +1,23 @@
+{
+  "binaryFormat": "version(char), size(unsigned int), heightMap(heightMapSize * heightMapItemSize), layerMap(layerMapSize * layerMapItemSize), layerTextureMap(layerMapSize * layerMapItemSize), materialNames",
+  "datafile": "/levels/prviot_krug/art/terrains/terrain.ter",
+  "heightMapItemSize": 2,
+  "heightMapSize": 1048576,
+  "heightmapImage": "/levels/prviot_krug/art/terrains/terrain.terrainheightmap.png",
+  "layerMapItemSize": 1,
+  "layerMapSize": 1048576,
+  "materials": [
+    "DefaultMaterial",
+    "Grass",
+    "Dirt",
+    "BeachSand",
+    "ROCK",
+    "asphalt",
+    "GRAVEL",
+    "Concrete",
+    "DirtGrass",
+    "Lawn"
+  ],
+  "size": 1024,
+  "version": 9
+}

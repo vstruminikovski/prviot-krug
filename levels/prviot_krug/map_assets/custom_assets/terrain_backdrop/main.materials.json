@@ -1,0 +1,154 @@
+{
+  "backdrop_NW": {
+    "class": "Material",
+    "name": "backdrop_NW",
+    "mapTo": "backdrop_NW",
+    "annotation": "TERRAIN",
+    "Stages": [
+      {
+        "diffuseMap": "levels/prviot_krug/map_assets/custom_assets/terrain_backdrop/Textures/backdrop_NW.png",
+        "diffuseColor": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "doubleSided": true,
+    "translucentBlendOp": "None"
+  },
+  "backdrop_N": {
+    "class": "Material",
+    "name": "backdrop_N",
+    "mapTo": "backdrop_N",
+    "annotation": "TERRAIN",
+    "Stages": [
+      {
+        "diffuseMap": "levels/prviot_krug/map_assets/custom_assets/terrain_backdrop/Textures/backdrop_N.png",
+        "diffuseColor": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "doubleSided": true,
+    "translucentBlendOp": "None"
+  },
+  "backdrop_NE": {
+    "class": "Material",
+    "name": "backdrop_NE",
+    "mapTo": "backdrop_NE",
+    "annotation": "TERRAIN",
+    "Stages": [
+      {
+        "diffuseMap": "levels/prviot_krug/map_assets/custom_assets/terrain_backdrop/Textures/backdrop_NE.png",
+        "diffuseColor": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "doubleSided": true,
+    "translucentBlendOp": "None"
+  },
+  "backdrop_W": {
+    "class": "Material",
+    "name": "backdrop_W",
+    "mapTo": "backdrop_W",
+    "annotation": "TERRAIN",
+    "Stages": [
+      {
+        "diffuseMap": "levels/prviot_krug/map_assets/custom_assets/terrain_backdrop/Textures/backdrop_W.png",
+        "diffuseColor": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "doubleSided": true,
+    "translucentBlendOp": "None"
+  },
+  "backdrop_E": {
+    "class": "Material",
+    "name": "backdrop_E",
+    "mapTo": "backdrop_E",
+    "annotation": "TERRAIN",
+    "Stages": [
+      {
+        "diffuseMap": "levels/prviot_krug/map_assets/custom_assets/terrain_backdrop/Textures/backdrop_E.png",
+        "diffuseColor": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "doubleSided": true,
+    "translucentBlendOp": "None"
+  },
+  "backdrop_SW": {
+    "class": "Material",
+    "name": "backdrop_SW",
+    "mapTo": "backdrop_SW",
+    "annotation": "TERRAIN",
+    "Stages": [
+      {
+        "diffuseMap": "levels/prviot_krug/map_assets/custom_assets/terrain_backdrop/Textures/backdrop_SW.png",
+        "diffuseColor": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "doubleSided": true,
+    "translucentBlendOp": "None"
+  },
+  "backdrop_S": {
+    "class": "Material",
+    "name": "backdrop_S",
+    "mapTo": "backdrop_S",
+    "annotation": "TERRAIN",
+    "Stages": [
+      {
+        "diffuseMap": "levels/prviot_krug/map_assets/custom_assets/terrain_backdrop/Textures/backdrop_S.png",
+        "diffuseColor": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "doubleSided": true,
+    "translucentBlendOp": "None"
+  },
+  "backdrop_SE": {
+    "class": "Material",
+    "name": "backdrop_SE",
+    "mapTo": "backdrop_SE",
+    "annotation": "TERRAIN",
+    "Stages": [
+      {
+        "diffuseMap": "levels/prviot_krug/map_assets/custom_assets/terrain_backdrop/Textures/backdrop_SE.png",
+        "diffuseColor": [
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "doubleSided": true,
+    "translucentBlendOp": "None"
+  }
+}

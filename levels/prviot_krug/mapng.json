@@ -1,0 +1,82 @@
+{
+ "generator": "MapNG",
+ "format": 1,
+ "appVersion": null,
+ "platform": "web",
+ "build": "5c46066",
+ "buildTime": "2026-11-20T17:24:07.695Z",
+ "exportedAt": "2026-11-20T18:46:17.292Z",
+ "levelName": "prviot_krug",
+ "center": {
+  "lat": 42.00347442049409,
+  "lng": 21.412621736526493
+ },
+ "bounds": {
+  "north": 42.0081198283681,
+  "south": 41.998828670911365,
+  "west": 21.406403607562424,
+  "east": 21.41886132316271
+ },
+ "resolution": 1024,
+ "metersPerPixel": 1,
+ "sizeMeters": 1024,
+ "elevationSource": "mapterhorn",
+ "options": {
+  "contentOff": [
+   "railwaysAbandoned"
+  ],
+  "excludeTags": [],
+  "sessionCode": "mapng:1:XVTBctowEP0XnT0ZMA4JvjUlTWdSChNI22kmh7W1Niqy5JFkDM3k37OSwUBOnn1a7b59--Q3ZvM1VvALjRVasXQYsUpzZCmzQpUSWcRyVA4NS9-YBMfSJL4aDEbJTZLEg2SSDCYRk6pkaTy8SobxOB7ejMbX8TiZjN4j9l_rioqOI2bQatm4rskgTiImVC4bjvPljKXONBgxlLgFn7LUjck9iQpq6r3WRhGRxuLz8mHJ0gKkxRA_LP78PY8fn-Y_b8c9Uhudo_WTzJDq2AWahdihDHMaaFdoDAjV55dQfxNS9u2pKZ3IDPJNj1kHioPh7IzvsxJuvqViIkgHjdN0DHwLKkc-C4IeWmhKc43Bu0ZITsTscfgKwRL-pIH_Ftyt-4NWm00hdUuFqR-Rp8a7WhvnV5KBxRXufEU6X-8zokAJpdGN4jOgoQX1pSNtK8INVfcRxxx8oewzixbCrrvAGcT-pNC0QjdFZYXbUwmlTRVqbAW2U-Flyc-GJ-U3_V0LBX6Fuo_zxmTfUZRrdymop7dsTAGh0pFk-C5J2hakr3lQMqMJJc5prp6hJJno_hb3RwysbSpcgNkIb9LjVVKpPI3mGqVQft4EvwtZHc9TbmeZey48xsgdxNCuocbeTIeZPfbU6X2G3F22Dpi3Tk1MP8GrS1oBu985A5fQFB0IeYS8V7nRNXErpc5AjgZ-8RbhhzfPvCgskuoDWoKmd60cISx9odcgZAt7-yWjbWiFnL16n4UnugJvkJfXzhGPQnHb3Togyzbs9hh6v8tTBllU5Asyj-8bBKMfQ62F8gK-vDEybMryPZT_EiJKe_KxraH1b15BdXiIp5_P9WgyPv_p3NzG1xFbI_CwYxpN2CkW0EjXqfL--v4B",
+  "baseTexture": "hybrid",
+  "includeBackdrop": true,
+  "backdropElevationSource": "global30m",
+  "backdropImagery": "standard",
+  "backdropStitchLimit": 8192,
+  "includeBuildings": true,
+  "pbrSource": "osm",
+  "includeWater": true,
+  "seaLevelOffset": 0,
+  "includeTrees": true,
+  "forestDensity": "normal",
+  "viewDistance": "auto",
+  "includeRocks": true,
+  "safeCaps": true,
+  "assumeParking": false,
+  "roadsFollowSurvey": true,
+  "bundleOsm": true,
+  "sidewalkStyle": "mesh",
+  "roadSurface": "decal",
+  "curbHeight": "standard",
+  "treeKindsOff": [],
+  "treeSwaps": [],
+  "treeModelsOff": [],
+  "includeBridges": true,
+  "includeTunnels": true,
+  "shapeTerrain": true,
+  "shapeRoads": true,
+  "shapeBridges": true,
+  "shapeOverpasses": true,
+  "shapeTunnels": true,
+  "shapeExtras": true,
+  "shapeDetail": true,
+  "lidarDecks": true,
+  "roadType": "decal",
+  "levelName": "prviot-krug",
+  "elevationSource": "mapterhorn",
+  "requestedResolution": 1024,
+  "requestedProcessingMetersPerPixel": 1,
+  "dataStepDone": true,
+  "structureSolver": "v2",
+  "points": [
+   {
+    "id": "cyagj4",
+    "kind": "spawn",
+    "name": "",
+    "lat": 42.005396,
+    "lng": 21.417825,
+    "heading": 0,
+    "isDefault": true
+   }
+  ]
+ }
+}

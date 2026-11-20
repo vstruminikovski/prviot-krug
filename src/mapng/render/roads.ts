@@ -1,0 +1,181 @@
+// Road surfaces, markings and crossings as ribbons along the DecalRoad nodes.
+
+import * as THREE from 'three';
+import type { ImportedRoad, Vec3 } from '../import/types';
+
+interface Style {
+  color: number;
+  lift: number;
+  order: number;
+  dashed?: boolean;
+  stripes?: boolean;
+}
+function styleFor(r: ImportedRoad): Style | null {
+  const m = r.material;
+  if (m === 'road_invisible' || r.kind === 'gutter') return null;
+  if (r.kind === 'zebra') return { color: 0xf2f2ee, lift: 0.07, order: 4, stripes: true };
+  if (r.kind === 'marking') return { color: 0xf4f4ef, lift: 0.06, order: 3, dashed: /discontinue/.test(m) };
+  if (/pavers/.test(m)) return { color: 0xa39582, lift: 0.025, order: 1 };
+  if (/dirt/.test(m)) return { color: 0x8a7458, lift: 0.025, order: 1 };
+  if (/concrete/.test(m)) return { color: 0x9d9c97, lift: 0.03, order: 1 };
+  if (r.kind === 'path') return { color: 0xb3a892, lift: 0.025, order: 1 };
+  if (/asphalt/.test(m)) return { color: r.kind === 'service' ? 0x4a4b4d : 0x3a3c3f, lift: r.kind === 'carriageway' ? 0.045 : 0.035, order: 2 };
+  return null;
+}
+
+/** Left/right offset ribbon; returns positions (three axes) and v along length. */
+function ribbon(points: [number, number, number, number][], lift: number, widthScale = 1) {
+  const pos: number[] = [];
+  const along: number[] = [];
+  let acc = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
+    let dx = b[0] - a[0], dy = b[1] - a[1];
+    const L = Math.hypot(dx, dy) || 1;
+    dx /= L;
+    dy /= L;
+    const hw = (p[3] * widthScale) / 2;
+    if (i) acc += Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]);
+    // right = (dy, -dx)
+    pos.push(p[0] - dy * hw, p[2] + lift, -(p[1] + dx * hw), p[0] + dy * hw, p[2] + lift, -(p[1] - dx * hw));
+    along.push(acc, acc);
+  }
+  return { pos, along };
+}
+
+export function buildRoads(roads: ImportedRoad[]): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'roads';
+  const buckets = new Map<string, { style: Style; pos: number[]; uv: number[]; idx: number[] }>();
+  for (const r of roads) {
+    const st = styleFor(r);
+    if (!st || r.points.length < 2) continue;
+    const key = `${st.color}|${st.lift}|${st.dashed ? 'd' : ''}${st.stripes ? 's' : ''}`;
+    if (!buckets.has(key)) buckets.set(key, { style: st, pos: [], uv: [], idx: [] });
+    const b = buckets.get(key)!;
+    const { pos, along } = ribbon(r.points, st.lift);
+    const base = b.pos.length / 3;
+    b.pos.push(...pos);
+    along.forEach((s, k) => b.uv.push(k % 2, s));
+    for (let i = 0; i < r.points.length - 1; i++) {
+      const a = base + i * 2;
+      b.idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); // counter-clockwise seen from above
+    }
+  }
+  for (const b of buckets.values()) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+    g.setIndex(b.idx);
+    g.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({
+      color: b.style.color,
+      roughness: 0.9,
+      polygonOffset: true,
+      polygonOffsetFactor: -b.style.order,
+      polygonOffsetUnits: -b.style.order * 2,
+    });
+    if (b.style.dashed || b.style.stripes) {
+      mat.alphaMap = b.style.dashed ? dashTexture() : stripeTexture();
+      mat.transparent = true;
+      mat.alphaTest = 0.5;
+      mat.depthWrite = false;
+    }
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.receiveShadow = true;
+    mesh.renderOrder = b.style.order;
+    group.add(mesh);
+  }
+  return group;
+}
+
+function dashTexture() {
+  // 3 m paint, 3 m gap; uv.y is metres along the line
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 64;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#000';
+  x.fillRect(0, 0, 4, 64);
+  x.fillStyle = '#fff';
+  x.fillRect(0, 0, 4, 32);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1, 1 / 6);
+  return t;
+}
+function stripeTexture() {
+  // zebra bars across the crossing direction (0.5 m bar, 0.5 m gap)
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 4;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#000';
+  x.fillRect(0, 0, 64, 4);
+  x.fillStyle = '#fff';
+  x.fillRect(0, 0, 32, 4);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(4, 1);
+  return t;
+}
+
+/** Glowing guide ribbon with chevrons along the route, plus a gate at the junction. */
+export function buildRouteGuide(points: Vec3[], junction: Vec3): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'route';
+  const pts = points.map((p) => [p[0], p[1], p[2], 1.1] as [number, number, number, number]);
+  const { pos, along } = ribbon(pts, 0.11);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(along.flatMap((s, k) => [k % 2, s]), 2));
+  const idx: number[] = [];
+  for (let i = 0; i < pts.length - 1; i++) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+  geo.setIndex(idx);
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const x = c.getContext('2d')!;
+  x.fillStyle = 'rgba(255,190,60,0.35)';
+  x.fillRect(0, 0, 64, 64);
+  x.fillStyle = 'rgba(255,214,120,1)';
+  x.beginPath();
+  x.moveTo(8, 18);
+  x.lineTo(32, 46);
+  x.lineTo(56, 18);
+  x.lineTo(56, 30);
+  x.lineTo(32, 58);
+  x.lineTo(8, 30);
+  x.fill();
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 1 / 3);
+  tex.rotation = Math.PI; // chevrons point along +v (direction of travel)
+  tex.center.set(0.5, 0.5);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -6 });
+  const ribbonMesh = new THREE.Mesh(geo, mat);
+  ribbonMesh.renderOrder = 6;
+  ribbonMesh.userData.tex = tex;
+  g.add(ribbonMesh);
+
+  // junction gate: two posts and a banner
+  const gate = new THREE.Group();
+  const post = new THREE.MeshStandardMaterial({ color: 0xf2a93b, emissive: 0x6a3a00 });
+  for (const s of [-1, 1]) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 4), post);
+    m.position.set(0, 2, s * 6.5);
+    gate.add(m);
+  }
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(6.6, 0.12, 8, 48, Math.PI),
+    new THREE.MeshBasicMaterial({ color: 0xffc35a, transparent: true, opacity: 0.85 }),
+  );
+  ring.rotation.y = Math.PI / 2;
+  ring.position.y = 4;
+  gate.add(ring);
+  gate.position.set(junction[0], junction[2], -junction[1]);
+  g.add(gate);
+  g.userData.gate = gate;
+  return g;
+}

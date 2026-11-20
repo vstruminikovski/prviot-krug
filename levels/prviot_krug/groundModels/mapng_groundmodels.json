@@ -1,0 +1,133 @@
+{
+  "ASPHALT": {
+    "staticFrictionCoefficient": 0.98,
+    "slidingFrictionCoefficient": 0.7,
+    "hydrodynamicFriction": 0,
+    "stribeckVelocity": 4.5,
+    "strength": 1,
+    "roughnessCoefficient": 0,
+    "defaultDepth": 0,
+    "collisiontype": "ASPHALT",
+    "skidMarks": true,
+    "aliases": [
+      "groundmodel_asphalt1",
+      "grid",
+      "concrete",
+      "concrete2"
+    ]
+  },
+  "GRASS": {
+    "staticFrictionCoefficient": 0.61,
+    "slidingFrictionCoefficient": 0.65,
+    "hydrodynamicFriction": 0.005,
+    "stribeckVelocity": 4,
+    "strength": 1,
+    "roughnessCoefficient": 0.43,
+    "fluidDensity": 8000,
+    "flowConsistencyIndex": 1500,
+    "flowBehaviorIndex": 0.7,
+    "dragAnisotropy": 0,
+    "shearStrength": 4000,
+    "defaultDepth": 0.05,
+    "collisiontype": "GRASS",
+    "skidMarks": false,
+    "aliases": [
+      "grass",
+      "grass2",
+      "grass3",
+      "grass4",
+      "forest",
+      "forest_floor"
+    ]
+  },
+  "DIRT": {
+    "staticFrictionCoefficient": 0.7,
+    "slidingFrictionCoefficient": 0.73,
+    "hydrodynamicFriction": 0.0067,
+    "stribeckVelocity": 5,
+    "strength": 1,
+    "roughnessCoefficient": 0.42,
+    "fluidDensity": 14000,
+    "flowConsistencyIndex": 2100,
+    "flowBehaviorIndex": 0.75,
+    "dragAnisotropy": 0.5,
+    "shearStrength": 2500,
+    "defaultDepth": 0,
+    "collisiontype": "DIRT",
+    "skidMarks": false,
+    "aliases": [
+      "dirt_grass",
+      "derby_dirt"
+    ]
+  },
+  "GRAVEL": {
+    "staticFrictionCoefficient": 0.69,
+    "slidingFrictionCoefficient": 0.74,
+    "hydrodynamicFriction": 0.0072,
+    "stribeckVelocity": 6,
+    "strength": 1,
+    "roughnessCoefficient": 0.44,
+    "fluidDensity": 16000,
+    "flowConsistencyIndex": 2500,
+    "flowBehaviorIndex": 0.75,
+    "dragAnisotropy": 0.5,
+    "shearStrength": 4000,
+    "defaultDepth": 0,
+    "collisiontype": "GRAVEL",
+    "skidMarks": false,
+    "aliases": [
+      "dirt_loose"
+    ]
+  },
+  "ROCK": {
+    "staticFrictionCoefficient": 0.93,
+    "slidingFrictionCoefficient": 0.65,
+    "hydrodynamicFriction": 0,
+    "stribeckVelocity": 4,
+    "strength": 1,
+    "roughnessCoefficient": 0.15,
+    "defaultDepth": 0,
+    "collisiontype": "ROCK",
+    "skidMarks": false,
+    "aliases": [
+      "rock_cliff",
+      "rocks_large"
+    ]
+  },
+  "SAND": {
+    "staticFrictionCoefficient": 0.6,
+    "slidingFrictionCoefficient": 0.6,
+    "hydrodynamicFriction": 0.02,
+    "stribeckVelocity": 6,
+    "strength": 1,
+    "roughnessCoefficient": 0.5,
+    "fluidDensity": 25000,
+    "flowConsistencyIndex": 5000,
+    "flowBehaviorIndex": 0.25,
+    "dragAnisotropy": 0.5,
+    "shearStrength": 12000,
+    "defaultDepth": 0.1,
+    "collisiontype": "SAND",
+    "skidMarks": false,
+    "aliases": [
+      "beachsand",
+      "sandtrap"
+    ]
+  },
+  "MUD": {
+    "staticFrictionCoefficient": 0.55,
+    "slidingFrictionCoefficient": 0.55,
+    "hydrodynamicFriction": 0.01,
+    "stribeckVelocity": 6,
+    "strength": 1,
+    "roughnessCoefficient": 0.5,
+    "fluidDensity": 7000,
+    "flowConsistencyIndex": 2000,
+    "flowBehaviorIndex": 0.5,
+    "dragAnisotropy": 0.75,
+    "shearStrength": 4000,
+    "defaultDepth": 0.15,
+    "collisiontype": "MUD",
+    "skidMarks": false
+  }
+}

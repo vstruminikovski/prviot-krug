@@ -1,0 +1,32 @@
+{
+  "mapng_roadmarkings": {
+    "name": "mapng_roadmarkings",
+    "mapTo": "mapng_roadmarkings",
+    "class": "Material",
+    "persistentId": "7c1f5a90-44a1-4b62-9c11-0a8e62d41a01",
+    "Stages": [
+      {
+        "ambientOcclusionMap": "/assets/materials/decalroad/lines/roadmarkings1/t_decal_roadmarkings_ao.data.png",
+        "baseColorMap": "/assets/materials/decalroad/lines/roadmarkings1/t_decal_roadmarkings_b.color.png",
+        "metallicFactor": 0.5,
+        "metallicMap": "/assets/materials/decalroad/lines/roadmarkings1/t_decal_roadmarkings_m.data.png",
+        "normalMap": "/assets/materials/decalroad/lines/roadmarkings1/t_decal_roadmarkings_nm.normal.png",
+        "opacityMap": "/assets/materials/decalroad/lines/roadmarkings1/t_decal_roadmarkings_o.data.png",
+        "roughnessMap": "/assets/materials/decalroad/lines/roadmarkings1/t_decal_roadmarkings_r.data.png"
+      },
+      {},
+      {},
+      {}
+    ],
+    "alphaRef": 8,
+    "alphaTest": true,
+    "annotation": "DRIVING_INSTRUCTIONS",
+    "castShadows": false,
+    "materialTag0": "decal",
+    "materialTag1": "road",
+    "materialTag2": "beamng",
+    "translucent": true,
+    "translucentZWrite": true,
+    "version": 1.5
+  }
+}

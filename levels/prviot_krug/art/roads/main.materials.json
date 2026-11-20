@@ -1,0 +1,27 @@
+{
+  "mapng_road_pavers": {
+    "class": "Material",
+    "alphaRef": 150,
+    "annotation": "ASPHALT",
+    "castShadows": false,
+    "materialTag0": "RoadAndPath",
+    "materialTag1": "beamng",
+    "translucent": true,
+    "translucentZWrite": true,
+    "name": "mapng_road_pavers",
+    "mapTo": "mapng_road_pavers",
+    "persistentId": "c5a1e7f2-3b84-4d0e-9a61-5f2d8b0c7a13",
+    "Stages": [
+      {
+        "colorMap": "/assets/materials/tileable/tile/italy_bld_hpaver/italy_hpaver_d.dds",
+        "normalMap": "/assets/materials/tileable/tile/italy_bld_hpaver/italy_hpaver_n.dds",
+        "specularMap": "/assets/materials/tileable/tile/italy_bld_hpaver/italy_hpaver_s.dds",
+        "specularPower": 19,
+        "useAnisotropic": true
+      },
+      {},
+      {},
+      {}
+    ]
+  }
+}
