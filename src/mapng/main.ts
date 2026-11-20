@@ -305,6 +305,7 @@ function makeHud(level: LevelData, failed: string[]) {
   const el = document.createElement('div');
   el.className = 'mg-hud';
   el.innerHTML = `
+    <div class="mg-stack">
     <div class="mg-top">
       <div class="mg-task"><b>Zoo parking → junction</b><span class="mg-msg"></span></div>
       <div class="mg-sig" hidden><i></i><i></i><i></i></div>
@@ -315,6 +316,7 @@ function makeHud(level: LevelData, failed: string[]) {
         <span class="mg-photo-info">Street photos</span>
         <button class="mg-photo-size" type="button">Bigger</button>
       </div>
+    </div>
     </div>
     <div class="mg-buttons">
       <button class="mg-cam" type="button">Camera</button>

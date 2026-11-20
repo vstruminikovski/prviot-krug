@@ -51,6 +51,9 @@ body {
   inset: 0;
   pointer-events: none;
 }
+.mg-stack {
+  display: contents;
+}
 .mg-hud [hidden] {
   display: none !important;
 }
@@ -272,13 +275,20 @@ body {
   :root {
     --mg-gap: 12px;
   }
-  .mg-top {
+  /* task, signal and photo stack in flow so long text never overlaps */
+  .mg-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: absolute;
+    top: var(--mg-gap);
+    left: var(--mg-gap);
     right: var(--mg-gap);
   }
-  .mg-photo {
-    left: var(--mg-gap);
+  .mg-stack > .mg-top,
+  .mg-stack > .mg-photo {
+    position: static;
     width: auto;
-    top: 118px;
   }
   .mg-photo-view {
     aspect-ratio: 16 / 9;
@@ -288,9 +298,8 @@ body {
   }
   .mg-buttons {
     max-width: none;
-    right: var(--mg-gap);
-    bottom: auto;
-    top: auto;
+    right: 170px; /* leave room for the speedometer */
+    bottom: var(--mg-gap);
   }
 }
 
