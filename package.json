@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "matrix": "vite-node scripts/matrix-md.ts",
-    "mapng:import": "vite-node tools/mapng-import/importLevel.ts"
+    "mapng:import": "vite-node tools/mapng-import/importLevel.ts",
+    "citygis": "vite-node tools/mapng-import/cityGis.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",

@@ -6,3 +6,6 @@ dist
 .env
 .env.local
 tools/assets/
+
+# local caches (City GIS responses are not published)
+.cache/
