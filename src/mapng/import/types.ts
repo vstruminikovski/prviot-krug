@@ -112,6 +112,8 @@ export interface TerrainMeta {
 export interface LevelIndex {
   name: string;
   center: { lat: number; lng: number };
+  /** lat/lng extent; world x,y map linearly onto it (±sizeMeters/2) */
+  bounds: { north: number; south: number; east: number; west: number };
   sizeMeters: number;
   terrain: TerrainMeta;
   models: PlacedModel[];
