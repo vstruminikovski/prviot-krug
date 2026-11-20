@@ -94,7 +94,7 @@ export async function createStreetPhotos(
       if (best.id !== current && !moving) {
         current = best.id;
         if (!viewer) {
-          viewer = new Viewer({ accessToken: MAPILLARY_TOKEN!, container, imageId: best.id, component: { cover: false, sequence: false } });
+          viewer = new Viewer({ accessToken: MAPILLARY_TOKEN!, container, imageId: best.id, component: { cover: false, sequence: false, direction: false, zoom: false } });
         } else {
           moving = true;
           viewer

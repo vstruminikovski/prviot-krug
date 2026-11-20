@@ -118,6 +118,7 @@ async function boot() {
     createStreetPhotos(hud.photoBox, level.index, area)
       .then((p) => {
         photos = p;
+        (window as unknown as { __mapngPhotos?: StreetPhotos }).__mapngPhotos = p; // test hook (ids only)
         hud.setPhotoInfo(`${p.images.length} Mapillary photos near the route`);
       })
       .catch((e) => hud.setPhotoInfo(`Street photos unavailable: ${e.message}`));
