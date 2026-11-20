@@ -35,6 +35,9 @@ export interface HudState {
   throttle: number; brake: number; clutch: number; bite: [number, number]; parkingBrake: boolean;
   indicator: 'off' | 'left' | 'right'; hazards: boolean; blink: boolean;
   assist: string; mode: Mode; env: EnvId;
+  /** live score (Часови: game score; Полагање: official negative points) and the latest signed changes */
+  canRetryScene: boolean;
+  score: number | null; scoreKind: 'game' | 'exam'; deltas: { id: number; amount: number; reason: string; label: string; until: number }[];
   log: { id: number; text: string; tone: 'bad' | 'warn' | 'ok' | 'info' | 'say' }[];
   task: TaskInfo | null; /** id of the latest reached waypoint while its confirmation shows (0 = none) */ arrive: number; say: Say | null; prompt: string | null; toast: { text: string; tone: 'bad' | 'warn' | 'ok' | 'info' } | null;
   bubbles: Bubble[]; camMode: CamMode; muted: boolean; paused: boolean; glance: Glance;
@@ -97,7 +100,90 @@ export class GameEngine {
   finishT: number | null = null;
   /** Часови: a safety-critical mistake stopped the exercise — offer to repeat it */
   private retryCard: HudState['retry'] = null;
+  // ---- "Повтори сцена": the same scene from its original starting conditions.
+  // The sim is deterministic: rebuilding it from the same config and replaying the recorded inputs up
+  // to the scene's mark restores position, car, gearbox, traffic, signal phase, hazard timing and the
+  // ledger exactly as they were — earlier scenes keep their results, the failed attempt is cut off.
+  private rec: { ctl: import('./vehicles/vehicle').Controls[]; cmds: { i: number; c: Command }[]; obs: { i: number; kind: string; t0: number; t1: number }[] } = { ctl: [], cmds: [], obs: [] };
+  private stepIdx = 0; private replaying = false;
+  private sceneMarks = new Map<string, number>(); private lastScene: string | null = null; private retryScene: string | null = null;
+  private sceneOf(sim: Sim, key: string): string | null {
+    if (sim.config.env === 'polygon') { const ex = key.split('-')[0]; return this.sceneMarks.has('poly-' + ex) ? 'poly-' + ex : this.lastScene; }
+    const m = /^scn-(s\d)/.exec(key); return m && this.sceneMarks.has(m[1]) ? m[1] : this.lastScene;
+  }
+  /** Rebuild the attempt up to the scene's mark. Returns false if the scene has no mark. */
+  restartScene(id = this.retryScene ?? this.lastScene): boolean {
+    const old = this.sim; if (!old || !id) return false;
+    const mark = this.sceneMarks.get(id); if (mark === undefined) return false;
+    const sim = createSim(old.config);
+    const ctx = this.audio.ctx; this.audio.ctx = null; // silent rebuild
+    this.replaying = true; this.sim = sim; this.paused = false;
+    try {
+      const cmds = this.rec.cmds.filter((x) => x.i < mark), obs = this.rec.obs.filter((x) => x.i < mark);
+      let ci = 0, oi = 0;
+      for (let i = 0; i < mark; i++) {
+        this.stepIdx = i;
+        while (ci < cmds.length && cmds[ci].i === i) this.command(cmds[ci++].c);
+        while (oi < obs.length && obs[oi].i === i) { const o = obs[oi++]; sim.observe(o.kind as never, o.t0, o.t1); }
+        sim.step(1 / 60, this.rec.ctl[i]);
+      }
+      this.stepIdx = mark;
+      sim.drainEvents(); // history, already shown the first time
+    } finally { this.replaying = false; this.audio.ctx = ctx; }
+    // cut the recording and every later scene mark at this point
+    this.rec.ctl.length = mark; this.rec.cmds = this.rec.cmds.filter((x) => x.i < mark); this.rec.obs = this.rec.obs.filter((x) => x.i < mark);
+    for (const [k, v] of this.sceneMarks) if (v > mark) this.sceneMarks.delete(k);
+    this.lastScene = id; this.retryScene = null;
+    // presentation state follows the restored attempt: no stale instruction, toast, coach or score chip
+    this.sayQueue = []; this.current = null; this.toast = null; this.coachShown = null; this.bubbles = [];
+    this.navAt = null; this.focusId = null; this.navKind = undefined; this.view.nav.setTarget(null);
+    this.retryCard = null; this.finishT = null; this.countdown = null; this.result = null;
+    this.scoreSeen = new Set(sim.ledger.incidents.map((i) => i.id)); this.itemSeen = this.itemKeys(sim); this.deltas = []; this.liveScore = this.computeScore(sim);
+    this.input.clear(); this.input.parkingBrake = sim.player.parkingBrake > 0.5; this.input.clutch = sim.player.clutchPedal;
+    this.view.resetInterp(); this.view.resetShot(); this.acc = 0; this.cleanSince = sim.t;
+    this.logMsg('Повтори сцена — истиот почеток.', 'info');
+    this.emitHud();
+    return true;
+  }
+
+  // ---- live score: every change comes from the ledger / mission state, once per event and attempt
+  private scoreSeen = new Set<number>(); private itemSeen = new Set<string>();
+  private deltas: HudState['deltas'] = []; private deltaId = 0; private liveScore: number | null = null;
+  private itemKeys(sim: Sim) { return new Set(sim.mission.items(sim).filter((i) => i.status === 'pass' && (sim.config.env === 'polygon' || (i.points ?? 0) > 0)).map((i) => i.id)); }
+  /** Часови: the game score exactly as the final review computes it. Полагање: official negative points. */
+  private computeScore(sim: Sim) { return sim.config.mode === 'exam' ? sim.ledger.examTotal(sim.mission.examForm ?? undefined) : sim.result().gameScore; }
+  private trackScore(sim: Sim, nowS: number) {
+    const exam = sim.config.mode === 'exam';
+    let changed = false;
+    const LAYER: Record<string, string> = { safety: 'безбедност', technique: 'техника', mission: 'задача' };
+    for (const inc of sim.ledger.incidents) {
+      if (this.scoreSeen.has(inc.id)) continue;
+      this.scoreSeen.add(inc.id); changed = true;
+      if (exam) {
+        const pts = (inc.exam ?? []).reduce((a, x) => a + x.points, 0);
+        if (pts) this.pushDelta(-pts, inc.text, `нег. поени · ${(inc.exam ?? []).map((x) => x.item).join(', ')}`, nowS);
+      } else if (inc.points > 0) this.pushDelta(-inc.points, inc.text, `поени · ${LAYER[inc.layer]}`, nowS);
+    }
+    if (!exam) {
+      const items = sim.mission.items(sim);
+      const live = items.filter((i) => i.status !== 'unscored').length || 1;
+      for (const it of items) {
+        const done = it.status === 'pass' && (sim.config.env === 'polygon' || (it.points ?? 0) > 0);
+        if (!done || this.itemSeen.has(it.id)) continue;
+        this.itemSeen.add(it.id); changed = true;
+        const amount = sim.config.env === 'polygon' ? Math.round(100 / live) : it.points ?? 0;
+        this.pushDelta(amount, it.title, 'поени · задача', nowS);
+      }
+    }
+    if (changed || this.liveScore === null) this.liveScore = this.computeScore(sim);
+    this.deltas = this.deltas.filter((d) => d.until > nowS);
+  }
+  private pushDelta(amount: number, reason: string, label: string, nowS: number) {
+    this.deltas = [...this.deltas.slice(-2), { id: ++this.deltaId, amount, reason, label, until: nowS + 3.2 }];
+  }
+
   retryExercise() {
+    if (this.restartScene()) return;
     const sim = this.sim; if (!sim) return;
     if (sim.config.env === 'polygon') { (sim.mission as PolygonMission).retry(sim); this.input.parkingBrake = true; }
     else sim.rewind(MATRIX_CONFIG.cityRetryRewind, 'Вратено пред ситуацијата — пробај повторно.'); sim.rewound = false;
@@ -223,6 +309,7 @@ export class GameEngine {
     const why = compatibility(this.config.vehicle, this.config.env);
     if (why) { this.flash(why, 'warn'); return false; }
     const sim = createSim(this.config);
+    this.rec = { ctl: [], cmds: [], obs: [] }; this.stepIdx = 0; this.sceneMarks.clear(); this.lastScene = null; this.scoreSeen.clear(); this.itemSeen.clear(); this.deltas = []; this.liveScore = null;
     this.sim = sim; this.result = null; this.replay = null; this.paused = false; this.auto = null; this.finishT = null;
     this.navAt = null; this.focusId = null; this.navKind = undefined; this.view.nav.setTarget(null); this.arriveUntil = 0; this.log = [];
     this.retryCard = null; this.feed = []; this.goodCool.clear(); this.cleanSince = 0; this.indOnSince = -1; this.turnArmed = true; this.stopTrack = { from: 0, maxDecel: 0, prevV: 0 };
@@ -261,7 +348,7 @@ export class GameEngine {
     if (c.type === 'mute') { this.toggleMute(); return; }
     if (c.type === 'camera') { this.toggleCamera(); return; }
     const sim = this.sim;
-    if (!sim || this.phase !== 'drive' || this.paused) return;
+    if (!sim || this.phase !== 'drive' || (this.paused && !this.replaying)) return;
     const p = sim.player;
     let msg: string | null = null;
     switch (c.type) {
@@ -279,8 +366,7 @@ export class GameEngine {
       case 'engine': msg = p.requestEngine(); break;
       case 'reset': if (sim.config.env === 'polygon') { (sim.mission as PolygonMission).retry(sim); this.input.parkingBrake = true; } else if (sim.rewind(3)) { this.view.resetInterp(); this.view.resetShot(); } else msg = 'Нема безбедно место за враќање.'; break;
     }
-    if (msg) this.flash(msg, 'warn');
-    this.emitHud();
+    if (!this.replaying) { this.rec.cmds.push({ i: this.stepIdx, c }); if (msg) this.flash(msg, 'warn'); this.emitHud(); }
   }
   toggleCamera() { const order: CamMode[] = ['chase', 'high', 'driver']; this.view.setCamMode(order[(order.indexOf(this.view.camMode) + 1) % order.length]); this.store.settings.camera = this.view.camMode; this.persist(); this.emitHud(); }
   toggleMute() { this.audio.setMuted(!this.audio.muted); this.store.settings.muted = this.audio.muted; this.persist(); this.emitHud(); }
@@ -361,7 +447,8 @@ export class GameEngine {
           const inp = this.auto ? { ...this.auto.input(sim), parkingBrake: false } : ctl;
           if (this.auto) this.input.parkingBrake = false;
           v.capture(sim);
-          sim.step(1 / 60, inp);
+          this.rec.ctl.push({ ...inp });
+          sim.step(1 / 60, inp); this.stepIdx++;
           this.acc -= 1 / 60; n++;
         }
         if (n === maxSteps) this.acc = 0;
@@ -430,17 +517,19 @@ export class GameEngine {
   /** Glances count as observation only while the view is actually displayed (proxy, not eye tracking). */
   private trackGlance(sim: Sim, g: Glance) {
     const cur = this.glanceStart;
-    if (cur && cur.kind !== g) { if (cur.kind) sim.observe(cur.kind as never, cur.t, sim.t); this.glanceStart = null; }
+    if (cur && cur.kind !== g) { if (cur.kind) { this.rec.obs.push({ i: this.stepIdx, kind: cur.kind, t0: cur.t, t1: sim.t }); sim.observe(cur.kind as never, cur.t, sim.t); } this.glanceStart = null; }
     if (g && (!this.glanceStart || this.glanceStart.kind !== g)) { this.glanceStart = { kind: g, t: sim.t }; if (g.startsWith('mirror') && sim.player.indicator !== 'off') this.good('mirror', 'Провери огледало пред маневар', 10); }
   }
 
   private handleEvents(sim: Sim) {
     for (const e of sim.drainEvents()) {
+      if (e.type === 'sceneStart') { if (!this.sceneMarks.has(e.id)) this.sceneMarks.set(e.id, Math.max(0, Math.round((e.t - e.leadS) * 60))); this.lastScene = e.id; continue; }
       if (e.type === 'say') this.sayQueue.push({ text: e.text, who: e.who ?? 'Инструктор', priority: e.priority, until: 0 });
       else if (e.type === 'retryOffer') {
         if (sim.config.mode !== 'exam') {
           const c = e.incident.cls; const m = c ? mistakeById(c.mistake) : null;
-          this.retryCard = { title: e.incident.text, say: m?.say ?? '', source: c?.source ?? '', status: c?.status ?? 'confirmed' };
+          this.retryScene = this.sceneOf(sim, e.incident.key);
+          this.retryCard = { title: e.incident.text, say: (sim.config.assist === 'auto' ? m?.sayAuto : undefined) ?? m?.say ?? '', source: c?.source ?? '', status: c?.status ?? 'confirmed' };
           this.paused = true; this.input.clear();
         }
       }
@@ -492,6 +581,7 @@ export class GameEngine {
     }
     const nowS = performance.now() / 1000;
     const task = s ? s.mission.task(s) : null;
+    if (s && p && this.phase === 'drive') this.trackScore(s, nowS);
     if (s && p && this.phase === 'drive') { this.trackNav(task?.nav?.at ?? null, p, nowS, task?.nav?.heading, task?.nav?.kind); this.focusId = task?.nav?.focus ?? null; }
     return {
       phase: this.phase,
@@ -499,7 +589,7 @@ export class GameEngine {
       throttle: p?.throttle ?? 0, brake: p?.brake ?? 0, clutch: p?.clutchPedal ?? 0, bite: [def?.clutch.biteLow ?? 0.34, def?.clutch.biteHigh ?? 0.66], parkingBrake: (p?.parkingBrake ?? 0) > 0.5,
       indicator: p?.indicator ?? 'off', hazards: !!p?.hazards, blink: (this.blinkT % 0.66) < 0.36,
       assist: this.config.assist, mode: this.config.mode, env: this.config.env,
-      log: this.log, task, arrive: nowS < this.arriveUntil ? this.arriveId : 0, say: this.current && this.current.until > nowS ? this.current : null,
+      canRetryScene: this.config.mode !== 'exam' && !!(this.lastScene && this.sceneMarks.has(this.lastScene)), score: this.liveScore, scoreKind: this.config.mode === 'exam' ? 'exam' : 'game', deltas: this.deltas.filter((d) => d.until > nowS), log: this.log, task, arrive: nowS < this.arriveUntil ? this.arriveId : 0, say: this.current && this.current.until > nowS ? this.current : null,
       prompt: p && this.config.assist !== 'exam' && this.config.mode !== 'exam' ? p.whyNotMoving() : null, toast: this.toast,
       bubbles: this.bubbles.map((b) => ({ ...b })), camMode: this.view.camMode, muted: this.audio.muted, paused: this.paused, glance: this.input.glance(),
       limit: s && p ? (p.def.family === 'truck' ? Math.min(80, s.world.speedLimitAt(p.x, p.y).kmh) : s.world.speedLimitAt(p.x, p.y).kmh) : 50,

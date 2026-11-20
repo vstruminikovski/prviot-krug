@@ -29,6 +29,18 @@ export const TASK_BRIEFS: Record<string, Brief> = {
   x1: { objective: 'Паркирано возило тргнува од работ.', success: 'Забележуваш и му оставаш простор.', failure: 'Судир или нагло сопирање.', pass: 'Добро предвидено.', fail: 'Гледај ги тркалата и покажувачите на паркираните возила.' },
 };
 
+/** Automatic: the same tasks without clutch and shifting. */
+const AUTO_BRIEFS: Record<string, Partial<Brief>> = {
+  lane: { objective: 'Тргни мазно и запри пред СТОП линијата.', success: 'Без газење линии, запирање ≤ 1 m пред линијата.', pass: 'Мазно тргнување и точно запирање — така и на испит.' },
+  hill: { objective: 'Запри на угорнината, обезбеди го возилото со рачна и тргни без враќање.', success: 'Рачна при запирање, тргнување без враќање.', failure: 'Без рачна (6-А) или враќање назад (6-В).',
+    pass: 'Рачна, па гас — рачната сама попушта, без враќање.', fail: 'Со автоматски: држи ја кочницата или рачната додека не притиснеш гас; не пуштај ја кочницата пред гасот.' },
+};
+/** The brief for this task as told for the chosen gearbox. */
+export function briefFor(id: string, assist: string): Brief | undefined {
+  const b = TASK_BRIEFS[id];
+  return b && assist === 'auto' && AUTO_BRIEFS[id] ? { ...b, ...AUTO_BRIEFS[id] } : b;
+}
+
 /** What the drive is about, per place and mode — shown in the opening card. */
 export const PLACE_BRIEFS: Record<'lesson' | 'exam', Record<'polygon' | 'city' | 'openRoad', string>> = {
   lesson: {

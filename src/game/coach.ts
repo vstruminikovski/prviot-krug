@@ -17,6 +17,13 @@ export function coachTip(p: Vehicle, touch: boolean): CoachTip | null {
   if (auto) {
     if (p.engine !== 'running') return null; // restarts itself
     if (p.parkingBrake > 0.5 && p.throttle > 0.05) return null; // releasing itself
+    const gas = touch ? 'гас' : 'W', brake = touch ? 'кочница' : 'S';
+    // hill start, the automatic way: hold it on the handbrake, then gas — the handbrake lets go by itself
+    if (p.grade > 0.03 && sp < 0.3 && p.gear !== 'R') {
+      if (p.parkingBrake < 0.5 && p.brake > 0.2) return tip('a-hill-pb', touch ? [] : ['P'], touch ? 'Угорнина: крени ја рачната (P) пред да ја пуштиш кочницата.' : 'Угорнина: крени ја рачната (P) пред да ја пуштиш кочницата (S).');
+      if (p.parkingBrake > 0.5 && p.throttle < 0.05) return tip('a-hill-go', touch ? [] : ['W'], `Тргнување: притисни ${gas} — рачната сама попушта.`, 'good');
+    }
+    if (p.grade > 0.03 && v < -0.3 && p.gear !== 'R' && p.brake < 0.2) return tip('a-rollback', touch ? [] : ['S'], `Се враќаш назад — ${brake}!`, 'warn');
     if (gear === 'R') return sp < 0.3 && p.throttle < 0.05
       ? tip('a-r', touch ? [] : ['W'], touch ? 'Рикверц: гасот вози назад. D — напред.' : 'Рикверц: W вози назад, 1 — назад во D.')
       : null;

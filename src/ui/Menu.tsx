@@ -155,22 +155,40 @@ export function Menu({ engine }: { engine: GameEngine }) {
       {sheet === 'sources' && <Sources onClose={() => setSheet(null)} />}
       {sheet === 'book' && <Booklet history={engine.store.history} plate={engine.store.garage.plate} onClose={() => setSheet(null)} />}
       {sheet === 'settings' && <Settings engine={engine} onClose={() => setSheet(null)} />}
-      {sheet === 'help' && <HowTo onClose={() => setSheet(null)} />}
+      {sheet === 'help' && <HowTo assist={assist} onClose={() => setSheet(null)} />}
     </div>
   );
 }
 
-export function HowTo({ onClose }: { onClose: () => void }) {
+export function HowTo({ onClose, assist = 'manual' }: { onClose: () => void; assist?: Assist }) {
   const touch = matchMedia('(pointer: coarse)').matches;
+  const auto = assist === 'auto';
   return (
-    <Modal title="Како се вози" kicker="Рачен менувач · 30 секунди" onClose={onClose}>
+    <Modal title="Како се вози" kicker={auto ? 'Автоматски менувач · 20 секунди' : 'Рачен менувач · 30 секунди'} onClose={onClose}>
       <div className="howto">
-        <div className="howto-anim" aria-hidden>
-          <div className="ap ap-c"><span>К</span><i /></div>
-          <div className="ap ap-g"><span>Г</span><i /></div>
-          <div className="ap-gear">1</div>
-        </div>
-        {touch ? (
+        {!auto && (
+          <div className="howto-anim" aria-hidden>
+            <div className="ap ap-c"><span>К</span><i /></div>
+            <div className="ap ap-g"><span>Г</span><i /></div>
+            <div className="ap-gear">1</div>
+          </div>
+        )}
+        {auto ? (touch ? (
+          <ol className="steps">
+            <li><b>Лев палец</b> лизга по подлогата — волан.</li>
+            <li><b>Десно</b>: тесната педала е гас, широката кочи. Подлабоко = повеќе.</li>
+            <li><b>D / R</b> — напред или рикверц (кога стоиш). Брзините се менуваат сами.</li>
+            <li><b>(P)</b> рачна. На угорнина: крени ја пред да ја пуштиш кочницата; со гас сама попушта.</li>
+            <li>Стрелките горе се покажувачи, <b>окото</b> — огледало, подолго преку рамо.</li>
+          </ol>
+        ) : (
+          <ol className="steps">
+            <li><kbd>W</kbd> гас, <kbd>S</kbd> кочница, <kbd>A</kbd>/<kbd>D</kbd> волан.</li>
+            <li><kbd>1</kbd> напред (D), <kbd>6</kbd> рикверц (R) — кога стоиш. Брзините се менуваат сами.</li>
+            <li><kbd>P</kbd> рачна. На угорнина: крени ја пред да ја пуштиш кочницата; со гас сама попушта.</li>
+            <li><kbd>Q</kbd>/<kbd>E</kbd> покажувач, <kbd>J</kbd>/<kbd>K</kbd>/<kbd>M</kbd> огледала, <kbd>U</kbd>/<kbd>I</kbd> преку рамо, <kbd>V</kbd> камера.</li>
+          </ol>
+        )) : touch ? (
           <ol className="steps">
             <li><b>Лев палец</b> лизга по подлогата — волан.</li>
             <li><b>Десно</b>: широката педала кочи, тесната е гас. Подлабоко = повеќе.</li>
@@ -186,7 +204,7 @@ export function HowTo({ onClose }: { onClose: () => void }) {
             <li><kbd>Q</kbd>/<kbd>E</kbd> покажувач, <kbd>J</kbd>/<kbd>K</kbd>/<kbd>M</kbd> огледала, <kbd>U</kbd>/<kbd>I</kbd> преку рамо, <kbd>V</kbd> камера.</li>
           </ol>
         )}
-        <p className="hint">{touch ? 'Изгасна? Кумплунг до дното, па клучот. Не тргнува? Пораката горе кажува зошто.' : <>Изгасна? Кумплунг + <kbd>R</kbd>. Не тргнува? Жолтата порака под инструкторот кажува зошто.</>}</p>
+        <p className="hint">{auto ? 'Не тргнува? Пораката горе кажува зошто (најчесто: рачната или кочницата).' : touch ? 'Изгасна? Кумплунг до дното, па клучот. Не тргнува? Пораката горе кажува зошто.' : <>Изгасна? Кумплунг + <kbd>R</kbd>. Не тргнува? Жолтата порака под инструкторот кажува зошто.</>}</p>
         {!touch && (
           <details className="all-keys"><summary>Сите контроли</summary>
             <div className="keys-grid">{BINDINGS.map((b) => <div key={b.keys}><kbd>{b.keys}</kbd><span>{b.action}</span></div>)}</div>

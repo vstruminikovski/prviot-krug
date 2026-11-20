@@ -71,7 +71,11 @@ export class CityMission implements Mission {
   update(sim: Sim, dt: number) {
     const p = sim.player;
     this.intro += dt;
-    for (const s of this.scenarios) if (s.enabled && !s.finished) s.update(sim, dt);
+    for (const s of this.scenarios) if (s.enabled && !s.finished) {
+      const was = s.armed; s.update(sim, dt);
+      // retry point: a few seconds before the situation armed, so the approach and the first sight repeat
+      if (!was && s.armed) sim.emit({ type: 'sceneStart', id: s.id, leadS: 4, t: sim.t });
+    }
     this.traffic.update(sim, dt);
     if (!this.retry && !this.ambientB && this.checkpoint >= 4 && p.x < 3.3 && p.y < 238) {
       this.ambientB = true;

@@ -41,6 +41,8 @@ export type SimEvent =
   | { type: 'scenario'; id: string; outcome: string }
   | { type: 'note'; id: string; text: string }
   | { type: 'checkpoint'; index: number }
+  /** a scene (polygon exercise / city situation) has its starting conditions now — the retry point */
+  | { type: 'sceneStart'; id: string; leadS: number; t: number }
   | { type: 'fail'; incident: Incident }
   | { type: 'retryOffer'; incident: Incident }
   | { type: 'finish' };
@@ -62,6 +64,9 @@ export interface AttemptResult {
 }
 
 export type ActorMeta = { kind: 'car'; type: CarType | string; color: string; plate: string } | { kind: 'ped'; look: Pedestrian['look'] };
+
+/** vehicle events that only a manual-gearbox driver can cause */
+const MANUAL_ONLY = new Set(['stall', 'jerk', 'startInGear', 'gearRefusedClutch', 'gearRefusedSpeed', 'clutchRiding', 'overRev']);
 
 export class Sim {
   t = 0;
@@ -143,8 +148,9 @@ export class Sim {
       this.emit({ type: 'incident', incident: inc });
       if (c && !c.exam) {
         const a = inc.cls!.action as Action;
-        if (c.m.say && a !== 'note' && a !== 'none' && a !== 'gameOnly') this.say(c.m.say, a === 'warn' ? 2 : 3);
-        else if (c.m.say && a === 'note') this.coach(c.m.say);
+        const say = (this.player.assist === 'auto' ? c.m.sayAuto : undefined) ?? c.m.say;
+        if (say && a !== 'note' && a !== 'none' && a !== 'gameOnly') this.say(say, a === 'warn' ? 2 : 3);
+        else if (say && a === 'note') this.coach(say);
         if (MATRIX_CONFIG.lessonRetry.includes(a)) this.emit({ type: 'retryOffer', incident: inc });
       }
       if (inc.severity === 'critical' && (this.config.mode === 'exam' || this.config.mode === 'challenge') && !this.failed && (this.config.mode !== 'exam' || MATRIX_CONFIG.examEndOnCritical)) {
@@ -237,6 +243,8 @@ export class Sim {
 
   private onVehicleEvent(e: VehicleEvent) {
     this.emit({ type: 'vehicle', e });
+    // automatic: no clutch and no shifting by the driver — manual-only penalties do not exist here
+    if (this.player.assist === 'auto' && MANUAL_ONLY.has(e.type)) { this.mission.onVehicleEvent?.(this, e); return; }
     const road = this.env.id !== 'polygon';
     const tx = (key: string, sev: Incident['severity'], text: string, exam: string[] = [], rules: string[] = ['tech.smooth'], debounce = 5) =>
       this.incident(key, { layer: 'technique', severity: sev, ruleIds: rules, text, exam }, debounce);

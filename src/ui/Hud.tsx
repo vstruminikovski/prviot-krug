@@ -175,6 +175,14 @@ export function Hud({ engine, hud }: { engine: GameEngine; hud: HudState }) {
       <Minimap engine={engine} />
       <div className="feed">{hud.feed.map((f) => <div key={f.id} className="feed-item"><Icon name="check" size={14} />{f.text}</div>)}</div>
       {hud.mode !== 'exam' && <div key={hud.clean < 1 ? 'reset' : 'run'} className={`clean ${hud.clean < 1 ? 'broke' : ''}`} title="Време без казнени грешки"><Icon name="bolt" size={13} />Чисто {Math.floor(hud.clean / 60)}:{String(Math.floor(hud.clean % 60)).padStart(2, '0')}</div>}
+      {hud.score !== null && !intro && (
+        <div className={`score ${hud.scoreKind}`} aria-live="polite">
+          <div className="score-total"><small>{hud.scoreKind === 'exam' ? 'нег. поени' : 'поени'}</small><b>{hud.score}</b>{hud.scoreKind === 'exam' && <i>/ 50</i>}</div>
+          {hud.deltas.map((d) => (
+            <div key={d.id} className={`delta ${d.amount > 0 ? 'up' : 'down'}`}><b>{d.amount > 0 ? `+${d.amount}` : `−${Math.abs(d.amount)}`}</b><span>{d.reason}</span><small>{d.label}</small></div>
+          ))}
+        </div>
+      )}
       <TouchControls engine={engine} hud={hud} />
       <div className="tspeed"><b>{Math.round(hud.speed)}</b><small>км/ч</small>
         <span className={`tgear ${hud.gear === 'R' ? 'r' : ''}`} aria-label={`Брзина ${hud.gear}`}>{hud.gear === 'R' || hud.gear === 'N' ? hud.gear : hud.assist === 'auto' ? <>D<sub>{hud.gear}</sub></> : hud.gear}</span>
@@ -263,7 +271,7 @@ function RetrySheet({ engine, r, env }: { engine: GameEngine; r: NonNullable<Hud
         <div className="sheet-b pause-list">
           {r.say && <p className="retry-say">„{r.say}“</p>}
           <p className="fine">{r.source}{r.status === 'needsInstructorReview' ? ' · класификацијата е за проверка од инструктор' : ''}</p>
-          <button className="btn primary block" onClick={() => engine.retryExercise()}><Icon name="retry" size={18} />{env === 'polygon' ? 'Повтори ја вежбата' : 'Повтори ја ситуацијата'}</button>
+          <button className="btn primary block" onClick={() => engine.retryExercise()}><Icon name="retry" size={18} />Повтори сцена</button>
           <button className="btn glass block" onClick={() => engine.continueLesson()}><Icon name="play" size={18} />Продолжи го часот<kbd>Esc</kbd></button>
         </div>
       </div>
@@ -279,9 +287,10 @@ function PauseMenu({ engine, hud, onSettings }: { engine: GameEngine; hud: HudSt
         <header className="sheet-h"><div><div className="kicker">{ENV_INFO[hud.env].title} · {MODE_LABEL[hud.mode]}</div><h2>Пауза</h2></div></header>
         <div className="sheet-b pause-list">
           <button className="btn primary block" onClick={resume}><Icon name="play" size={18} />Продолжи<kbd>Esc</kbd></button>
-          <button className="btn glass block" onClick={() => engine.retrySame()}><Icon name="retry" size={18} />Истата ситуација одново</button>
+          {hud.canRetryScene && <button className="btn glass block" onClick={() => engine.retryExercise()}><Icon name="retry" size={18} />Повтори сцена</button>}
+          <button className="btn glass block" onClick={() => engine.retrySame()}><Icon name="flag" size={18} />Почни го часот одново</button>
           <button className="btn glass block" onClick={() => engine.retryNew()}><Icon name="shuffle" size={18} />Нова варијација</button>
-          <button className="btn glass block" onClick={() => { engine.command({ type: 'pause' }); engine.command({ type: 'reset' }); }}><Icon name="flag" size={18} />{hud.env === 'polygon' ? 'На почеток на вежбата' : 'Врати на безбедно место'}<kbd>T</kbd></button>
+          {hud.env !== 'polygon' && <button className="btn glass block" onClick={() => { engine.command({ type: 'pause' }); engine.command({ type: 'reset' }); }}><Icon name="back" size={18} />Врати на безбедно место<kbd>T</kbd></button>}
           <button className="btn glass block" onClick={onSettings}><Icon name="sliders" size={18} />Поставки</button>
           <button className="btn ghost block" data-sound="back" onClick={() => engine.backToMenu()}><Icon name="home" size={18} />Главно мени</button>
         </div>

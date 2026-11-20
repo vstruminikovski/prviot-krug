@@ -729,3 +729,22 @@ kbd { font-family: var(--f-text); font-size: 11px; font-weight: 700; padding: 1p
   .touch.manual .tcol { width: 184px; margin-left: auto; }
   .touch.manual .tcol .tbtn.shift { flex: none; width: 128px; }
 }
+
+/* ---------- live score: total + signed changes straight from the ledger ---------- */
+.score { position: absolute; z-index: 4; right: max(16px, var(--safe-r)); top: calc(max(14px, var(--safe-t)) + 214px); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; animation: hudIn var(--t3) var(--ease) 2.3s both; }
+.score-total { display: flex; align-items: baseline; gap: 6px; padding: 5px 12px; border-radius: 16px; background: rgba(28,30,32,.55); border: .5px solid rgba(255,255,255,.16); backdrop-filter: blur(18px) saturate(170%); -webkit-backdrop-filter: blur(18px) saturate(170%); color: #fff; }
+.score-total small { font-size: 10.5px; color: rgba(255,255,255,.6); font-weight: 600; } .score-total b { font: 700 18px var(--f-text); font-variant-numeric: tabular-nums; } .score-total i { font-style: normal; font-size: 11px; color: rgba(255,255,255,.55); }
+.score.exam .score-total b { color: #ffb3a5; }
+.delta { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: baseline; max-width: 260px; padding: 6px 12px; border-radius: 14px; background: rgba(28,30,32,.62); border: .5px solid rgba(255,255,255,.14); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); color: #fff; animation: deltaIn 3.2s var(--ease) both; }
+.delta b { grid-row: span 2; font: 800 17px var(--f-text); font-variant-numeric: tabular-nums; } .delta.up b { color: #63e6a0; } .delta.down b { color: #ff6b61; }
+.delta span { font-size: 12px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .delta small { font-size: 10px; color: rgba(255,255,255,.55); }
+@keyframes deltaIn { 0% { opacity: 0; transform: translateY(-6px) scale(.96); } 8% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
+@media (pointer: coarse) {
+  .score { top: calc(max(10px, var(--safe-t)) + 206px); right: max(12px, var(--safe-r)); } .delta { max-width: 52vw; }
+  .help { max-width: min(300px, 40vw); }
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  .score { top: calc(max(10px, var(--safe-t)) + 172px); }
+  .help { max-width: calc(100vw - 2 * max(12px, var(--safe-l)) - 110px); }
+}
+@media (pointer: coarse) and (orientation: landscape) { .score { top: auto; bottom: calc(max(10px, var(--safe-b)) + 58px); right: auto; left: 50%; transform: translateX(-50%); align-items: center; } }

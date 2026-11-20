@@ -147,7 +147,8 @@ export class Vehicle {
     if (inGear && !clutchDown) {
       // Starter turns with the gear engaged: the car lurches and the engine does not catch.
       this.emit('startInGear');
-      if (this.assist === 'learn' || this.assist === 'auto') return 'Пред палење: притисни кумплунг (Space) или стави во празен (N).';
+      if (this.assist === 'auto') return 'Автоматски: моторот се пали сам.';
+      if (this.assist === 'learn') return 'Пред палење: притисни кумплунг (Space) или стави во празен (N).';
       this.vx += (this.gear === 'R' ? -1 : 1) * 0.35;
       return 'Возилото трзна — палење со вклучена брзина.';
     }
@@ -585,10 +586,16 @@ export class Vehicle {
   /** Short, state-aware reason why throttle is not moving the car (or null). */
   whyNotMoving(): string | null {
     if (this.throttle < 0.2 || Math.abs(this.vx) > 0.3) return null;
+    if (this.assist === 'auto') {
+      if (this.engine !== 'running') return null; // restarts itself
+      if (this.parkingBrake > 0.5) return 'Рачната е крената — спушти ја (P).';
+      if (this.brake > 0.2) return 'Ја држиш сопирачката.';
+      return null;
+    }
     if (this.engine === 'off' || this.engine === 'stalled') return this.engine === 'stalled' ? 'Изгасна моторот — притисни кумплунг и R за палење.' : 'Моторот е изгасен — притисни кумплунг и R.';
     if (this.engine === 'starting') return null;
     if (this.gear === 'N') return 'Избери прва брзина (1) со притиснат кумплунг.';
-    if (this.assist !== 'auto' && this.clutchPedal > this.def.clutch.biteHigh) return 'Пушти го кумплунгот полека (пушти Space или држи X).';
+    if (this.clutchPedal > this.def.clutch.biteHigh) return 'Пушти го кумплунгот полека (пушти Space или држи X).';
     if (this.parkingBrake > 0.5) return 'Рачната е крената — спушти ја (P).';
     if (this.brake > 0.2) return 'Ја држиш сопирачката.';
     return null;

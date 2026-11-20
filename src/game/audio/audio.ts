@@ -38,7 +38,10 @@ export class GameAudio {
     this.ctx = ctx;
     document.addEventListener('visibilitychange', this.onVis);
     for (const ev of ['pointerdown', 'touchend', 'keydown'] as const) window.addEventListener(ev, this.revive, { capture: true, passive: true });
-    this.master = ctx.createGain(); this.master.gain.value = this.muted ? 0 : this.volume * this.duck; this.master.connect(ctx.destination);
+    this.master = ctx.createGain(); this.master.gain.value = this.muted ? 0 : this.volume * this.duck; 
+    // safety limiter: the summed synth voices must never clip the output (clipping = crackle)
+    this.limiter = ctx.createDynamicsCompressor(); this.limiter.threshold.value = -6; this.limiter.knee.value = 4; this.limiter.ratio.value = 20; this.limiter.attack.value = 0.002; this.limiter.release.value = 0.12;
+    this.master.connect(this.limiter).connect(ctx.destination);
     // noise
     const len = ctx.sampleRate * 2;
     this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -54,13 +57,17 @@ export class GameAudio {
     this.engOsc1 = ctx.createOscillator(); this.engOsc1.setPeriodicWave(wave); this.engOsc1.frequency.value = 27;
     this.engOsc2 = ctx.createOscillator(); this.engOsc2.type = 'triangle'; this.engOsc2.frequency.value = 13.5;
     const o2g = ctx.createGain(); o2g.gain.value = 0.42;
-    this.drive = ctx.createWaveShaper(); this.drive.oversample = '2x'; this.setDrive(0.2);
+    // load "bark": ONE fixed soft-clip curve; the amount is the (smoothly ramped) gain into it, with a
+    // matching make-up gain after. Rebuilding the curve while it plays made discontinuities = crackle.
+    this.drive = ctx.createWaveShaper(); this.drive.oversample = '2x';
+    { const n = 2048, c = new Float32Array(n); for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(3 * x) / Math.tanh(3); } this.drive.curve = c; }
+    this.driveIn = ctx.createGain(); this.driveOut = ctx.createGain(); this.setDrive(0.2);
     // combustion irregularity: slow random-ish amplitude wobble, strongest at idle
     this.wobble = ctx.createGain(); this.wobble.gain.value = 1;
     const wob = ctx.createOscillator(); wob.frequency.value = 6.3; this.wobbleDepth = ctx.createGain(); this.wobbleDepth.gain.value = 0.12;
     wob.connect(this.wobbleDepth).connect(this.wobble.gain); wob.start();
-    this.engOsc1.connect(this.drive); this.engOsc2.connect(o2g).connect(this.drive);
-    this.drive.connect(this.wobble).connect(this.engFilter);
+    this.engOsc1.connect(this.driveIn); this.engOsc2.connect(o2g).connect(this.driveIn);
+    this.driveIn.connect(this.drive).connect(this.driveOut).connect(this.wobble).connect(this.engFilter);
     this.engFilter.connect(this.engGain).connect(this.master);
     this.engOsc1.start(); this.engOsc2.start();
     // intake / induction roar
@@ -194,15 +201,15 @@ export class GameAudio {
   ratchet() { if (!this.ctx) return; const t = this.ctx.currentTime; for (let i = 0; i < 5; i++) this.noiseBurst(t + i * 0.035, 0.02, 2600, 8, 0.35, 'bandpass', -0.2); }
   stall() { if (!this.ctx) return; const t = this.ctx.currentTime; const o = this.tone(t, 70, 0.5, 0.25, 'sawtooth'); o.frequency.exponentialRampToValueAtTime(25, t + 0.45); this.noiseBurst(t, 0.3, 300, 2, 0.4, 'lowpass'); this.engineOn = false; }
   started() { this.engineOn = true; }
-  private drive!: WaveShaperNode; private driveK = -1; private wobble!: GainNode; private wobbleDepth!: GainNode;
+  private drive!: WaveShaperNode; private driveIn!: GainNode; private driveOut!: GainNode; private limiter!: DynamicsCompressorNode; private wobble!: GainNode; private wobbleDepth!: GainNode;
   private intakeF!: BiquadFilterNode; private intakeG!: GainNode;
   private squealF!: BiquadFilterNode; private squealG!: GainNode; private squealOsc!: OscillatorNode; private squealToneG!: GainNode;
   private rumbleG!: GainNode; private windF!: BiquadFilterNode; private windG!: GainNode;
   private setDrive(k: number) {
-    const q = Math.round(k * 20) / 20; if (q === this.driveK) return; this.driveK = q;
-    const n = 1024, c = new Float32Array(n), a = 1 + q * 6;
-    for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(a * x) / Math.tanh(a); }
-    this.drive.curve = c;
+    // input drive 0.35…2.3 into the fixed tanh(3x) curve; make-up keeps the level roughly constant
+    const g = 0.35 + clamp(k, 0, 1) * 1.95, t = this.ctx!.currentTime;
+    this.driveIn.gain.setTargetAtTime(g, t, 0.05);
+    this.driveOut.gain.setTargetAtTime(1 / Math.max(0.8, Math.tanh(3 * g) / Math.tanh(3) * 1.6), t, 0.05);
   }
   /** gear change: a short mechanical clunk */
   clunk() { if (!this.ctx) return; const t = this.ctx.currentTime; this.noiseBurst(t, 0.07, 700, 4, 0.35, 'bandpass', 0.1); this.tone(t, 120, 0.08, 0.1, 'triangle'); }

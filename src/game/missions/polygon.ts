@@ -22,6 +22,13 @@ interface Ex {
   stopT: number; maxGear: number; segments: number; lastDir: number; stoppedOnHill: boolean; pbUsed: boolean; stalls: number; reversed: boolean; flags: Set<string>;
 }
 
+/** Automatic: no clutch, no shifting — the same exercises, told with the controls that exist. */
+const EX_AUTO: Partial<Record<ExId, { title?: string; howTo: string }>> = {
+  lane: { title: 'Тргнување и запирање пред СТОП', howTo: 'Спушти ја рачната (P), тргни мазно со малку гас и запри пред СТОП линијата (најмногу 1 m пред неа).' },
+  reverse: { howTo: 'Вклучи рикверц (R), гледај во огледалата, држи ја средината на лентата и запри пред линијата.' },
+  hill: { howTo: 'Запри пред СТОП линијата на угорнината и крени рачна (P). Тргни со гас — рачната сама се спушта — без враќање назад.' },
+};
+
 const EX_INFO: Record<ExId, { title: string; official: boolean; howTo: string }> = {
   lane: { title: 'Тргнување, прва→втора, запирање пред СТОП', official: true, howTo: 'Кумплунг, прва, спушти рачна, тргни мазно. Во лентата смени во втора, па запри пред СТОП линијата (најмногу 1 m пред неа).' },
   reverse: { title: 'Возење назад по лента и запирање', official: true, howTo: 'Рикверц (6), гледај во огледалата, држи ја средината на лентата и запри пред линијата.' },
@@ -63,10 +70,12 @@ export class PolygonMission implements Mission {
       for (const e of this.ex) if (e.id === 'lane') { e.title = 'Тргнување, втора→трета, запирање (вежба за камион)'; e.official = false; e.howTo = 'Лента 3,5 m (чл. 33 т. 1 за останатите категории): тргни, смени од втора во трета и запри пред линијата. Само вежба.'; }
       for (const e of this.ex) if (e.id === 'reverse') { e.official = false; }
     }
+    if (sim.player.assist === 'auto') for (const e of this.ex) { const a = EX_AUTO[e.id]; if (a) { e.howTo = a.howTo; if (a.title) e.title = a.title; } }
     // start in the first exercise box, engine running, neutral, parking brake applied
     sim.player.place(this.ex[0].start, 0, 'N');
     sim.player.parkingBrake = 1;
     this.ex[0].status = 'ready';
+    sim.emit({ type: 'sceneStart', id: 'poly-' + this.ex[0].id, leadS: 0, t: sim.t });
     sim.say(`Вежба 1: ${this.ex[0].howTo}`, 1);
   }
 
@@ -136,7 +145,7 @@ export class PolygonMission implements Mission {
     const p = sim.player;
     if (e.status === 'toStart') {
       const inBox = Math.hypot(p.x - e.start.x, p.y - e.start.y) < START_RADIUS && Math.abs(angleDiff(p.h, e.start.h)) < START_HEADING_TOL;
-      if (inBox && Math.abs(p.vx) < 0.2) { e.status = 'ready'; sim.say(`Вежба: ${e.howTo}`, 1); }
+      if (inBox && Math.abs(p.vx) < 0.2) { e.status = 'ready'; sim.emit({ type: 'sceneStart', id: 'poly-' + e.id, leadS: 0, t: sim.t }); sim.say(`Вежба: ${e.howTo}`, 1); }
       return;
     }
     if (e.status === 'ready') {
@@ -260,6 +269,8 @@ export class PolygonMission implements Mission {
   }
 
   onVehicleEvent(sim: Sim, ev: VehicleEvent) {
+    // automatic: clutch / ignition / shifting events are not the driver's doing
+    if (sim.player.assist === 'auto' && ['stall', 'jerk', 'startInGear', 'gearRefusedClutch', 'gearRefusedSpeed', 'clutchRiding'].includes(ev.type)) return;
     const e = this.active;
     if (!e || e.status !== 'running') {
       if (e && ev.type === 'startInGear') this.examInc(sim, e, 'exam1.1A', 'Палење со вклучен степен на пренос.');

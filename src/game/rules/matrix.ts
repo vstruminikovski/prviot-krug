@@ -39,6 +39,7 @@ export interface Mistake {
   status: 'confirmed' | 'needsInstructorReview';
   why: string; // reason for the classification
   say?: string; // instructor explanation in Часови
+  sayAuto?: string; // the same for the automatic gearbox (no clutch / shifting advice)
   /** named thresholds used by the detection (see sim/params.ts) and the false-positive caveat */
   params?: (keyof typeof DETECT)[];
   caveat?: string;
@@ -188,7 +189,7 @@ export const MISTAKES: Mistake[] = [
     match: { keys: /^rollback$/, rules: ['exam1.6V', 'exam4.1O'] }, law: [], game: ['tech.smooth'],
     lesson: { polygon: C('note'), city: C('note') }, exam: { polygon: C('examMinor', ['exam1.6V']), city: C('examMinor', ['exam4.1O']) },
     status: 'needsInstructorReview', why: 'Образец бр. 1, 6-В (30); Образец бр. 4, 1-О (30). Прагот 0,3 m е проценка.',
-    say: 'На угорнина: рачна, гас, кумплунг до зафаќање, па рачната.' },
+    say: 'На угорнина: рачна, гас, кумплунг до зафаќање, па рачната.', sayAuto: 'На угорнина: рачна, па гас — рачната сама попушта. Не пуштај ја кочницата пред тоа.' },
   { id: 'riding', title: 'Нога на кумплунг', did: 'Возеше со нога на кумплунгот.', detect: 'Кумплунг > 25 % на брзина > 3 m/s подолго од 3 с.', detected: true,
     match: { keys: /^riding$/, rules: ['exam4.1R'] }, law: [], game: ['tech.smooth'],
     lesson: { polygon: C('note'), city: C('note') }, exam: { polygon: C('gameOnly'), city: C('examMinor', ['exam4.1R']) },
@@ -203,7 +204,7 @@ export const MISTAKES: Mistake[] = [
     match: { keys: /-stopover-/ }, law: [], game: [],
     lesson: { polygon: C('exerciseFail'), city: NA }, exam: { polygon: C('examCritical', ['exam1.1E']), city: NA },
     status: 'needsInstructorReview', why: 'Образец бр. 1, 1-Е / 2-Б „газење или преминување на линиите“ (51). Дека СТОП линијата спаѓа во „линиите на лентата“ е толкување — за проверка.',
-    say: 'Ја помина СТОП линијата. Кочи порано и помеко — и кумплунгот пред да застанеш.' },
+    say: 'Ја помина СТОП линијата. Кочи порано и помеко — и кумплунгот пред да застанеш.', sayAuto: 'Ја помина СТОП линијата. Кочи порано и помеко.' },
   { id: 'poly.lines', title: 'Газење линии (полигон)', did: 'Тркало преку линијата на лентата / просторот.', detect: 'Тркало надвор од означениот простор на вежбата.', detected: true,
     match: { rules: ['exam1.1E', 'exam1.2B', 'exam1.4A', 'exam1.5B'] }, law: [], game: [],
     lesson: { polygon: C('exerciseFail'), city: NA }, exam: { polygon: C('examCritical', ['exam1.1E']), city: NA },

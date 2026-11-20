@@ -8,7 +8,7 @@ import { vehicleById } from '../game/vehicles/defs';
 import { challengeUrl, isHosted } from '../game/host';
 import { Sources } from './Sources';
 import { STAMPS, nextStamp } from '../game/career';
-import { TASK_BRIEFS } from '../game/content/briefs';
+import { briefFor } from '../game/content/briefs';
 import { ACTION_LABEL, MATRIX_CONFIG, type Action } from '../game/rules/matrix';
 import { CountUp, Icon, Seg } from './kit';
 
@@ -72,7 +72,7 @@ export function Result({ engine }: { engine: GameEngine }) {
           {tab === 'items' && r.items.map((it, i) => (
             <div key={it.id} className={`item-row ${STATUS[it.status].cls}`} style={{ ['--i' as string]: i }}>
               <span className={`badge ${STATUS[it.status].cls}`}>{STATUS[it.status].label}{it.points !== undefined && it.max ? ` · ${it.points}/${it.max}` : it.points ? ` · ${it.points} нег.` : ''}</span>
-              <div className="item-t"><b>{it.title}</b><small>{it.detail}</small>{TASK_BRIEFS[it.id] && (it.status === 'pass' || it.status === 'fail' || it.status === 'partial') && <small className={`debrief ${it.status === 'pass' ? 'ok' : 'bad'}`}>{it.status === 'pass' ? TASK_BRIEFS[it.id].pass : TASK_BRIEFS[it.id].fail}</small>}</div>
+              <div className="item-t"><b>{it.title}</b><small>{it.detail}</small>{(() => { const b = briefFor(it.id, r.config.assist); return b && (it.status === 'pass' || it.status === 'fail' || it.status === 'partial') ? <small className={`debrief ${it.status === 'pass' ? 'ok' : 'bad'}`}>{it.status === 'pass' ? b.pass : b.fail}</small> : null; })()}</div>
               {it.t0 !== undefined && <button className="btn icon glass sm" title="Погледни повторно" onClick={() => engine.startReplay((it.cueT ?? it.t0!) - 4, (it.t1 ?? it.t0! + 10) + 3, { title: it.title, detail: it.detail, status: it.status, cueT: it.cueT ?? null, decisionT: it.t1 ?? null, focus: it.focus ?? null })}><Icon name="play" size={16} /></button>}
             </div>
           ))}
