@@ -16,6 +16,7 @@ import { buildTerrain } from './render/terrain';
 import { SignalSystem } from './traffic/signals';
 import { Traffic } from './traffic/traffic';
 import type { Vec3 } from './import/types';
+import { convertSurvey, frameOf, mergeSurvey, surveyPath, type SurveyCollection } from './import/manualSurvey';
 
 const LEVEL_BASE = `${import.meta.env.BASE_URL}mapng/prviot_krug`.replace(/\/+/g, '/');
 const app = document.getElementById('app')!;
@@ -31,6 +32,20 @@ boot().catch((e) => {
 async function boot() {
   status('Loading map data…');
   const level = await loadLevel(LEVEL_BASE, (m) => status(`Loading ${m}…`));
+
+  // Manual field-survey override layer (optional file; never edits levels/).
+  status('Loading surveyed traffic control…');
+  const surveyUrl = `${import.meta.env.BASE_URL}${surveyPath('prviot_krug')}`.replace(/\/+/g, '/');
+  const fc: SurveyCollection | null = await fetch(surveyUrl)
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+  const merged = mergeSurvey(level, convertSurvey(fc, frameOf(level.index), level.terrain.heightAt));
+  level.objects = merged.objects;
+  level.roads = merged.roads;
+  const sv = merged.summary;
+  if (sv.rejected.length) console.warn('Survey features rejected (not placed):', sv.rejected);
+  if (sv.unmodelledSigns.length) console.info('Surveyed signs placed without a dedicated 3D sign model:', sv.unmodelledSigns);
+  const darkLights = merged.lights.filter((l) => l.controllerId === null);
   status('Starting physics…');
   const R = await initRapier();
   const physics = createWorld(R, level.terrain);
@@ -48,7 +63,7 @@ async function boot() {
   orientGate(guide.userData.gate, route.points, route.end.p);
   scene.add(guide);
   scene.add(buildProps(level.objects, center, 420));
-  const signalMeshes = buildSignals(level.objects);
+  const signalMeshes = buildSignals(level.objects, darkLights);
   scene.add(signalMeshes.group);
 
   // Buildings + sidewalks near the route: visuals and Rapier trimeshes.
@@ -97,7 +112,7 @@ async function boot() {
   let topDown = false;
   controls.onCamera = () => (topDown = !topDown);
 
-  const hud = makeHud(level, failed);
+  const hud = makeHud(level, failed, merged.summary);
   const progress = makeProgress(route.points, route.end.p);
   const playerSignal = findApproachSignal(level, route.points, route.end.p);
   let phase: 'drive' | 'done' = 'drive';
@@ -188,7 +203,7 @@ async function boot() {
     elapsed = 0;
   };
   // test hook
-  (window as unknown as Record<string, unknown>).__mapng = { level, vehicle, traffic, failed, scene };
+  (window as unknown as Record<string, unknown>).__mapng = { level, vehicle, traffic, failed, scene, survey: merged };
 }
 
 function orientGate(gate: THREE.Object3D, pts: Vec3[], end: Vec3) {
@@ -251,7 +266,9 @@ function findApproachSignal(level: LevelData, pts: Vec3[], junction: Vec3): numb
   return best;
 }
 
-function makeHud(level: LevelData, failed: string[]) {
+function makeHud(level: LevelData, failed: string[], sv: ReturnType<typeof mergeSurvey>['summary']) {
+  const n = (k: 'signs' | 'lights' | 'markings') => sv[k].survey;
+  const surveyed = n('signs') + n('lights') + n('markings');
   const el = document.createElement('div');
   el.className = 'mg-hud';
   el.innerHTML = `
@@ -261,7 +278,8 @@ function makeHud(level: LevelData, failed: string[]) {
     </div>
     <div class="mg-speed"><b>0</b><span>km/h</span><em>D</em></div>
     <div class="mg-source" role="note">
-      Signs, markings and traffic-light positions: OpenStreetMap via MapNG, <b>not verified</b> against an official inventory.
+      ${surveyed ? `Field survey: ${n('signs')} signs, ${n('lights')} lights, ${n('markings')} markings. ` : 'No field-survey data yet. '}
+      Other signs, markings and lights: OpenStreetMap via MapNG, <b>not verified</b>.
       Light timing is <b>simulated</b>. Map data © OpenStreetMap contributors (ODbL).
     </div>
     <div class="mg-help">W/↑ gas · S/↓ brake/reverse · A D steer · Space handbrake · R reset · C camera</div>

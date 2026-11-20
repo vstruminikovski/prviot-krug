@@ -44,6 +44,16 @@ export interface ArcQueryResult {
 
 export type Provenance =
   | { source: 'city-gis'; verified: true; layer: number; objectId: number; code?: string; name?: string; surveyDate?: string; condition?: string; authority?: string; street?: string }
+  | {
+      source: 'manual-survey';
+      verified: boolean;
+      featureId: string;
+      code: string;
+      surveyDate: string;
+      surveyor: string;
+      roadSide?: 'left' | 'right' | 'centre' | 'overhead';
+      note?: string;
+    }
   | { source: 'osm-mapng'; verified: false };
 
 export type TrafficSign = PropInstance & { provenance: Provenance; yawVerified: boolean };

@@ -54,9 +54,10 @@ export function buildProps(objects: LevelObjects, center: [number, number], radi
     const grp = new THREE.Group();
     const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.4, 6), new THREE.MeshStandardMaterial({ color: 0x777777 }));
     stick.position.y = 1.2;
+    const modelled = s.type in signColor;
     const plate = new THREE.Mesh(
-      s.type === 'give_way' ? new THREE.CylinderGeometry(0.45, 0.45, 0.04, 3) : s.type === 'priorityroad' ? new THREE.BoxGeometry(0.5, 0.04, 0.5) : new THREE.CylinderGeometry(0.33, 0.33, 0.04, 20),
-      new THREE.MeshStandardMaterial({ color: signColor[s.type] ?? 0xeeeeee }),
+      !modelled ? new THREE.BoxGeometry(0.6, 0.04, 0.6) : s.type === 'give_way' ? new THREE.CylinderGeometry(0.45, 0.45, 0.04, 3) : s.type === 'priorityroad' ? new THREE.BoxGeometry(0.5, 0.04, 0.5) : new THREE.CylinderGeometry(0.33, 0.33, 0.04, 20),
+      modelled ? new THREE.MeshStandardMaterial({ color: signColor[s.type] }) : codePlate(s.type),
     );
     plate.rotation.x = Math.PI / 2;
     if (s.type === 'priorityroad') plate.rotation.z = Math.PI / 4;
@@ -69,13 +70,17 @@ export function buildProps(objects: LevelObjects, center: [number, number], radi
   return g;
 }
 
-/** Traffic light heads; call update() each frame with lamp states. */
-export function buildSignals(objects: LevelObjects) {
+/**
+ * Traffic light heads; call update() each frame with lamp states. `dark` heads are
+ * surveyed lights with no simulated programme: drawn unlit, never given a made-up cycle.
+ */
+export function buildSignals(objects: LevelObjects, dark: { pos: number[]; dir: number[] }[] = []) {
   const g = new THREE.Group();
   g.name = 'signals';
   const heads = new Map<number, THREE.MeshStandardMaterial[]>();
   const housing = new THREE.MeshStandardMaterial({ color: 0x1d1f22 });
-  for (const s of objects.signals.instances) {
+  const list = [...objects.signals.instances.map((s) => ({ ...s, lit: true })), ...dark.map((d, k) => ({ id: -1 - k, pos: d.pos, dir: d.dir, lit: false }))];
+  for (const s of list) {
     const grp = new THREE.Group();
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 3.2, 8), housing);
     pole.position.y = 1.6;
@@ -88,7 +93,7 @@ export function buildSignals(objects: LevelObjects) {
       lens.position.set(0, 3.8 - k * 0.3, 0.16);
       grp.add(lens);
     });
-    heads.set(s.id, mats);
+    if (s.lit) heads.set(s.id, mats);
     grp.position.set(s.pos[0], s.pos[2], -s.pos[1]);
     // lenses (+Z local) face along the instance dir
     grp.rotation.y = Math.atan2(s.dir[0], -s.dir[1]);
@@ -105,4 +110,31 @@ export function buildSignals(objects: LevelObjects) {
       }
     },
   };
+}
+
+/** Plain plate showing the official code: a sign that is placed but has no dedicated 3D model yet. */
+const plateCache = new Map<string, THREE.MeshStandardMaterial>();
+function codePlate(code: string) {
+  let m = plateCache.get(code);
+  if (m) return m;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#f2f2f2';
+  x.fillRect(0, 0, 128, 128);
+  x.strokeStyle = '#555';
+  x.lineWidth = 6;
+  x.strokeRect(3, 3, 122, 122);
+  x.fillStyle = '#222';
+  x.font = 'bold 30px system-ui, sans-serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.fillText(code.toUpperCase(), 64, 56);
+  x.font = '15px system-ui, sans-serif';
+  x.fillText('no model', 64, 92);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  m = new THREE.MeshStandardMaterial({ map: t });
+  plateCache.set(code, m);
+  return m;
 }

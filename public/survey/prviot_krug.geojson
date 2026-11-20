@@ -1,0 +1,6 @@
+{
+  "type": "FeatureCollection",
+  "name": "prviot_krug manual traffic-control survey",
+  "description": "Field-surveyed signs, traffic lights and road markings (WGS84). Empty until a survey is done; see docs/MANUAL_SURVEY.md. Do not add estimated or invented features.",
+  "features": []
+}
