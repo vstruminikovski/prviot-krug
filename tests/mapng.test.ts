@@ -68,17 +68,6 @@ describe.skipIf(!have)('MapNG import (run npm run mapng:import first)', () => {
     }
   });
 
-  it('world ↔ lat/lng conversion round-trips and puts the start at the zoo lot', async () => {
-    const { geo } = await import('../src/mapng/imagery/mapillary');
-    const g = geo(index);
-    const ll = g.toLatLng(route.start.p[0], route.start.p[1]);
-    expect(ll.lat).toBeCloseTo(42.0053, 3); // Parking Zone C, Zoo Skopje
-    expect(ll.lng).toBeCloseTo(21.4179, 3);
-    const w = g.toWorld(ll.lat, ll.lng);
-    expect(w.x).toBeCloseTo(route.start.p[0], 6);
-    expect(w.y).toBeCloseTo(route.start.p[1], 6);
-  });
-
   it('signal programs cycle through green, yellow and red', () => {
     const sys = new SignalSystem(objects.signals);
     const id = objects.signals.instances[0].id;

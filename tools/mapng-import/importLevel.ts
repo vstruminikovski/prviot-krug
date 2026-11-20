@@ -361,7 +361,6 @@ for (const f of allFiles) {
 const index: LevelIndex = {
   name: info.title ?? LEVEL,
   center: mapng.center,
-  bounds: mapng.bounds,
   sizeMeters: SIZE,
   terrain: {
     file: 'terrain_height.u16',

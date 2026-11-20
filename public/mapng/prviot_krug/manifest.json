@@ -1,8 +1,8 @@
 {
  "level": "prviot_krug",
  "source": "levels/prviot_krug",
- "sourceTreeSha256": "12a199896d88c2c97cd0edb993122131a1aa17f085c24eb653522662db9835f0",
- "importedAt": "2026-11-20T20:10:22.722Z",
+ "sourceTreeSha256": "a93629661b414253af53b3be9e265d1d2a5c9625c6eb8abbc38ffe3b982a260d",
+ "importedAt": "2026-11-20T19:06:36.235Z",
  "tally": {
   "unreadable": 113,
   "not-needed": 52,
@@ -12,7 +12,7 @@
  "outputs": [
   {
    "file": "level.json",
-   "bytes": 5672
+   "bytes": 5537
   },
   {
    "file": "models/buildings/bld_-1_-1.dae",

@@ -16,9 +16,6 @@ import { buildTerrain } from './render/terrain';
 import { SignalSystem } from './traffic/signals';
 import { Traffic } from './traffic/traffic';
 import type { Vec3 } from './import/types';
-import { createStreetPhotos, geo, MAPILLARY_TOKEN, type StreetPhotos } from './imagery/mapillary';
-
-type CamMode = 'driver' | 'chase' | 'top';
 
 const LEVEL_BASE = `${import.meta.env.BASE_URL}mapng/prviot_krug`.replace(/\/+/g, '/');
 const app = document.getElementById('app')!;
@@ -97,34 +94,10 @@ async function boot() {
 
   const controls = new Controls(app);
   controls.onReset = () => vehicle.reset(startPos(), start.heading);
-  const modes: CamMode[] = ['driver', 'chase', 'top'];
-  let cam: CamMode = 'driver';
-  controls.onCamera = () => {
-    cam = modes[(modes.indexOf(cam) + 1) % modes.length];
-    hud.setCamera(cam);
-  };
+  let topDown = false;
+  controls.onCamera = () => (topDown = !topDown);
 
   const hud = makeHud(level, failed);
-  hud.onCamera = () => controls.onCamera?.();
-  hud.onReset = () => controls.onReset?.();
-  hud.setCamera(cam);
-
-  // Street photos (Mapillary), only with a build-time client token.
-  const g = geo(level.index);
-  let photos: StreetPhotos | null = null;
-  const xs = route.points.map((p) => p[0]), ys = route.points.map((p) => p[1]);
-  const area = { x0: Math.min(...xs) - 60, y0: Math.min(...ys) - 60, x1: Math.max(...xs) + 60, y1: Math.max(...ys) + 60 };
-  if (MAPILLARY_TOKEN) {
-    createStreetPhotos(hud.photoBox, level.index, area)
-      .then((p) => {
-        photos = p;
-        (window as unknown as { __mapngPhotos?: StreetPhotos }).__mapngPhotos = p; // test hook (ids only)
-        hud.setPhotoInfo(`${p.images.length} Mapillary photos near the route`);
-      })
-      .catch((e) => hud.setPhotoInfo(`Street photos unavailable: ${e.message}`));
-  } else hud.setPhotoInfo('Street photos off: no Mapillary token in this build');
-  hud.onPhotoSize = () => setTimeout(() => photos?.resize(), 50);
-  let photoClock = 0;
   const progress = makeProgress(route.points, route.end.p);
   const playerSignal = findApproachSignal(level, route.points, route.end.p);
   let phase: 'drive' | 'done' = 'drive';
@@ -192,43 +165,19 @@ async function boot() {
       phase,
     });
 
-    // street photo follows the car (twice a second)
-    photoClock += dt;
-    if (photoClock > 0.5) {
-      photoClock = 0;
-      const ll = g.toLatLng(wx, wy);
-      hud.setMapsLink(ll.lat, ll.lng, heading);
-      if (photos) hud.setPhotoState(photos.follow(wx, wy, heading), photos.current);
-    }
-
     // camera
     const target = new THREE.Vector3(t.x, t.y, t.z);
     const flat = new THREE.Vector3(fwd.x, 0, fwd.z).normalize();
-    car.visible = cam !== 'driver';
-    if (cam === 'driver') {
-      // driver's eye: left seat, 1.2 m above the road, looking down the bonnet
-      const eye = new THREE.Vector3(0.15, 1.2, -0.38).applyQuaternion(car.quaternion).add(car.position);
-      const ahead = eye.clone().add(new THREE.Vector3(1, -0.04, 0).applyQuaternion(car.quaternion).multiplyScalar(10));
-      camera.fov = 72;
-      camera.position.copy(eye);
-      camera.lookAt(ahead);
-      camPos.copy(eye);
-      camLook.copy(ahead);
-    } else {
-      const want =
-        cam === 'top'
-          ? target.clone().add(new THREE.Vector3(0, 60, 0.01))
-          : target.clone().addScaledVector(flat, -6.5).add(new THREE.Vector3(0, 2.4, 0));
-      const look = cam === 'top' ? target : target.clone().addScaledVector(flat, 4).add(new THREE.Vector3(0, 0.8, 0));
-      const k = first ? 1 : 1 - Math.exp(-dt * 5);
-      camPos.lerp(want, k);
-      camLook.lerp(look, k);
-      camera.fov = 60;
-      camera.position.copy(camPos);
-      camera.lookAt(camLook);
-    }
-    camera.updateProjectionMatrix();
+    const want = topDown
+      ? target.clone().add(new THREE.Vector3(0, 60, 0.01))
+      : target.clone().addScaledVector(flat, -7.5).add(new THREE.Vector3(0, 2.9, 0));
+    const look = topDown ? target : target.clone().addScaledVector(flat, 4).add(new THREE.Vector3(0, 0.8, 0));
+    const k = first ? 1 : 1 - Math.exp(-dt * 5);
+    camPos.lerp(want, k);
+    camLook.lerp(look, k);
     first = false;
+    camera.position.copy(camPos);
+    camera.lookAt(camLook);
     followSun(sun, target);
     renderer.render(scene, camera);
   });
@@ -306,85 +255,39 @@ function makeHud(level: LevelData, failed: string[]) {
   const el = document.createElement('div');
   el.className = 'mg-hud';
   el.innerHTML = `
-    <div class="mg-stack">
     <div class="mg-top">
       <div class="mg-task"><b>Zoo parking → junction</b><span class="mg-msg"></span></div>
       <div class="mg-sig" hidden><i></i><i></i><i></i></div>
     </div>
-    <div class="mg-photo" data-size="small">
-      <div class="mg-photo-view"></div>
-      <div class="mg-photo-bar">
-        <span class="mg-photo-info">Street photos</span>
-        <span class="mg-photo-credit" hidden>Photo: <a class="mg-photo-src" target="_blank" rel="noopener noreferrer" href="https://www.mapillary.com/">this image</a> · <a target="_blank" rel="noopener noreferrer" href="https://www.mapillary.com/">Mapillary</a>, <a target="_blank" rel="noopener noreferrer" href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a></span>
-        <button class="mg-photo-size" type="button">Bigger</button>
-      </div>
-    </div>
-    </div>
-    <div class="mg-buttons">
-      <button class="mg-cam" type="button">Camera</button>
-      <button class="mg-reset" type="button">Restart</button>
-      <a class="mg-gmaps" target="_blank" rel="noopener noreferrer" href="https://www.google.com/maps">Open in Google Maps ↗</a>
-      <button class="mg-howto-open" type="button">Help</button>
-    </div>
     <div class="mg-speed"><b>0</b><span>km/h</span><em>D</em></div>
-    <div class="mg-howto">
-      <div class="mg-card">
-        <h2>How to drive</h2>
-        <ul>
-          <li><b>Goal:</b> leave the zoo car park and drive through the junction. Follow the amber arrows.</li>
-          <li><b>Keyboard:</b> W or ↑ to go, S or ↓ to brake (hold S when stopped to reverse), A D or ← → to steer, Space handbrake.</li>
-          <li><b>Phone:</b> left pad steers, right buttons are gas ▲ and brake ■.</li>
-          <li><b>Camera</b> switches driver seat, behind the car and map-from-above. <b>Restart</b> puts you back at the start.</li>
-          <li>Watch the traffic light at the junction and give way to people on crossings.</li>
-        </ul>
-        <button class="mg-start" type="button">Start driving</button>
-      </div>
-    </div>
+    <div class="mg-help">W/↑ gas · S/↓ brake/reverse · A D steer · Space handbrake · R reset · C camera</div>
     <div class="mg-done" hidden>
-      <div class="mg-card"><h2>Through the junction</h2><p></p><button type="button">Drive again</button></div>
+      <h2>Through the junction</h2><p></p><button>Drive again</button>
     </div>`;
   document.getElementById('app')!.appendChild(el);
-  const q = <T extends HTMLElement>(s: string) => el.querySelector<T>(s)!;
-  const msg = q('.mg-msg'), sp = q('.mg-speed b'), gear = q('.mg-speed em'), sig = q('.mg-sig'), done = q('.mg-done');
-  const photo = q('.mg-photo'), info = q('.mg-photo-info'), sizeBtn = q<HTMLButtonElement>('.mg-photo-size');
-  const credit = q('.mg-photo-credit'), src = q<HTMLAnchorElement>('.mg-photo-src');
-  const camBtn = q<HTMLButtonElement>('.mg-cam'), gmaps = q<HTMLAnchorElement>('.mg-gmaps'), howto = q('.mg-howto');
-  const camNames: Record<string, string> = { driver: 'Camera: driver', chase: 'Camera: behind', top: 'Camera: above' };
-  // buttons must not steal keyboard focus from driving
-  el.querySelectorAll('button').forEach((b) => b.addEventListener('mouseup', () => b.blur()));
-
+  const msg = el.querySelector<HTMLElement>('.mg-msg')!;
+  const sp = el.querySelector<HTMLElement>('.mg-speed b')!;
+  const gear = el.querySelector<HTMLElement>('.mg-speed em')!;
+  const sig = el.querySelector<HTMLElement>('.mg-sig')!;
+  const done = el.querySelector<HTMLElement>('.mg-done')!;
   const api = {
-    photoBox: q('.mg-photo-view'),
     onRestart: () => {},
-    onCamera: () => {},
-    onReset: () => {},
-    onPhotoSize: () => {},
-    setCamera(c: string) {
-      camBtn.textContent = camNames[c] ?? 'Camera';
-    },
-    setPhotoInfo(s: string) {
-      info.textContent = s;
-      photo.dataset.state = /off|unavailable/.test(s) ? 'off' : photo.dataset.state ?? '';
-    },
-    setPhotoState(s: 'photo' | 'none', imageId?: string | null) {
-      photo.dataset.state = s;
-      credit.hidden = s !== 'photo';
-      info.hidden = s === 'photo';
-      if (s === 'none') info.textContent = 'No street photo at this spot';
-      if (imageId) src.href = `https://www.mapillary.com/app/?pKey=${encodeURIComponent(imageId)}&focus=photo`;
-    },
-    setMapsLink(lat: number, lng: number, heading: number) {
-      const compass = Math.round((((90 - (heading * 180) / Math.PI) % 360) + 360) % 360);
-      gmaps.href = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat.toFixed(6)},${lng.toFixed(6)}&heading=${compass}`;
-    },
-    update(s: { speed: number; reverse: boolean; toJunction: number; remaining: number; offRoute: boolean; signal: string | null; phase: string }) {
+    update(s: {
+      speed: number;
+      reverse: boolean;
+      toJunction: number;
+      remaining: number;
+      offRoute: boolean;
+      signal: string | null;
+      phase: string;
+    }) {
       sp.textContent = String(Math.round(Math.abs(s.speed) * 3.6));
       gear.textContent = s.reverse ? 'R' : 'D';
       if (s.phase === 'done') msg.textContent = 'Route complete';
-      else if (s.offRoute) msg.textContent = 'Off the route. Follow the amber arrows, or press Restart.';
-      else if (s.toJunction > 45) msg.textContent = `Leave the car park. Junction in ${Math.round(s.toJunction)} m`;
-      else if (s.toJunction > 0) msg.textContent = `Junction in ${Math.round(s.toJunction)} m. Check left and right.`;
-      else msg.textContent = `Through the junction. ${Math.max(0, Math.round(s.remaining))} m to go`;
+      else if (s.offRoute) msg.textContent = 'Off the route — follow the amber arrows (R to reset)';
+      else if (s.toJunction > 45) msg.textContent = `Leave the lot · junction in ${Math.round(s.toJunction)} m`;
+      else if (s.toJunction > 0) msg.textContent = `Junction ahead · ${Math.round(s.toJunction)} m — check left and right`;
+      else msg.textContent = `Through the junction · ${Math.max(0, Math.round(s.remaining))} m`;
       sig.hidden = !s.signal || s.toJunction < -5 || s.toJunction > 80;
       sig.dataset.state = s.signal ?? '';
     },
@@ -393,16 +296,6 @@ function makeHud(level: LevelData, failed: string[]) {
       done.querySelector('p')!.textContent = `${seconds.toFixed(1)} s from ${level.route.start.label}${failed.length ? ` · ${failed.length} model tiles failed to load` : ''}`;
     },
   };
-  sizeBtn.addEventListener('click', () => {
-    const big = photo.dataset.size !== 'big';
-    photo.dataset.size = big ? 'big' : 'small';
-    sizeBtn.textContent = big ? 'Smaller' : 'Bigger';
-    api.onPhotoSize();
-  });
-  camBtn.addEventListener('click', () => api.onCamera());
-  q('.mg-reset').addEventListener('click', () => api.onReset());
-  q('.mg-start').addEventListener('click', () => (howto.hidden = true));
-  q('.mg-howto-open').addEventListener('click', () => (howto.hidden = false));
   done.querySelector('button')!.addEventListener('click', () => {
     done.hidden = true;
     api.onRestart();

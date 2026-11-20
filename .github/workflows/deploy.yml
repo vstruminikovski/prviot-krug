@@ -29,9 +29,6 @@ jobs:
         env:
           # Project pages live under https://<user>.github.io/<repo>/
           VITE_BASE: /${{ github.event.repository.name }}/
-          # Optional Mapillary client token (repo secret MAPILLARY_TOKEN). Without it the
-          # game builds and runs, just without street photos. Never commit the token.
-          VITE_MAPILLARY_TOKEN: ${{ secrets.MAPILLARY_TOKEN }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -56,11 +56,7 @@ export class Controls {
       const zone = (e.target as HTMLElement).closest<HTMLElement>('[data-zone]')?.dataset.zone;
       if (!zone) return;
       e.preventDefault();
-      try {
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      } catch {
-        /* capture is a nicety; the pedal still works without it */
-      }
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
       track.set(e.pointerId, zone);
       apply(e, zone);
     });
