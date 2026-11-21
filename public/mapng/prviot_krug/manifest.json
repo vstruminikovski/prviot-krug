@@ -2,7 +2,7 @@
  "level": "prviot_krug",
  "source": "levels/prviot_krug",
  "sourceTreeSha256": "12a199896d88c2c97cd0edb993122131a1aa17f085c24eb653522662db9835f0",
- "importedAt": "2026-11-20T22:02:55.477Z",
+ "importedAt": "2026-11-21T11:19:29.008Z",
  "tally": {
   "unreadable": 113,
   "not-needed": 52,
@@ -152,7 +152,7 @@
   },
   {
    "file": "objects.json",
-   "bytes": 341507
+   "bytes": 341463
   },
   {
    "file": "roads.json",

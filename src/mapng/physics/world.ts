@@ -39,6 +39,8 @@ export interface PhysicsWorld {
   R: Rapier;
   world: RAPIER.World;
   addTrimesh(vertices: Float32Array, indices: Uint32Array): void;
+  addBoundary(t: Terrain): void;
+  addBox(x: number, y: number, z: number, yaw: number, half: [number, number, number]): void;
   step(dt: number): void;
 }
 
@@ -52,6 +54,22 @@ export function createWorld(R: Rapier, terrain: Terrain): PhysicsWorld {
     addTrimesh(vertices, indices) {
       if (!indices.length) return;
       world.createCollider(R.ColliderDesc.trimesh(vertices, indices).setFriction(0.8));
+    },
+    addBoundary(t) {
+      // four tall walls just inside the terrain edge so the car can't drive off the map
+      const size = (t.size - 1) * t.squareSize;
+      const x0 = t.origin[0], y0 = t.origin[1], h = 40, th = 1;
+      const cx = x0 + size / 2, cy = y0 + size / 2;
+      const walls: [number, number, number, number][] = [
+        [cx, y0 + 1, size / 2, th], [cx, y0 + size - 1, size / 2, th],
+        [x0 + 1, cy, th, size / 2], [x0 + size - 1, cy, th, size / 2],
+      ];
+      for (const [x, y, hx, hy] of walls) world.createCollider(R.ColliderDesc.cuboid(hx, h, hy).setTranslation(x, 0, -y));
+    },
+    addBox(x, y, z, yaw, [hx, hy, hz]) {
+      // world (x east, y north, z up) → three (x, z, −y); yaw about the vertical axis
+      const q = { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) };
+      world.createCollider(R.ColliderDesc.cuboid(hx, hz, hy).setTranslation(x, z + hz, -y).setRotation(q));
     },
     step(dt) {
       world.timestep = dt;

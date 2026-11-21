@@ -223,7 +223,10 @@ say(
 write('route.json', JSON.stringify(route));
 
 // ---------- objects ----------
-const yawOf = (m?: number[]) => (m ? Math.atan2(m[3], m[0]) : 0);
+// BeamNG stores rotationMatrix so that element 3 is −sin(heading) in our x-east/y-north
+// frame (checked against the data: wall segments line up with their neighbours and
+// signs face their road only with this sign).
+const yawOf = (m?: number[]) => (m ? Math.atan2(-m[3], m[0]) : 0);
 const mg = (p: string) => `main/MissionGroup/${p}/items.level.json`;
 const drop = readJsonLines(mg('PlayerDropPoints')).find((o) => o.class === 'SpawnSphere');
 mark(mg('PlayerDropPoints'), { status: 'converted', kind: 'spawn point', output: 'objects.json' });

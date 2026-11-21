@@ -42,3 +42,43 @@ export function buildTerrain(t: Terrain, textureUrl: string, step = 2): THREE.Me
   mesh.name = 'terrain';
   return mesh;
 }
+
+/**
+ * Plain ground running 1.5 km out from every map edge at the edge height, so the
+ * horizon is land under the fog instead of empty sky. Not drivable (the map edge is walled).
+ */
+export function buildSkirt(t: Terrain, out = 1500, step = 16): THREE.Mesh {
+  const n = t.size;
+  const size = (n - 1) * t.squareSize;
+  const x0 = t.origin[0], y0 = t.origin[1];
+  const h = (i: number, j: number) => t.heights[Math.min(n - 1, j) * n + Math.min(n - 1, i)] - 0.15;
+  // walk the border anticlockwise: (i, j) samples and outward normals
+  const ring: { x: number; y: number; z: number; nx: number; ny: number }[] = [];
+  for (let i = 0; i < n - 1; i += step) ring.push({ x: x0 + i, y: y0, z: h(i, 0), nx: 0, ny: -1 });
+  for (let j = 0; j < n - 1; j += step) ring.push({ x: x0 + size, y: y0 + j, z: h(n - 1, j), nx: 1, ny: 0 });
+  for (let i = n - 1; i > 0; i -= step) ring.push({ x: x0 + i, y: y0 + size, z: h(i, n - 1), nx: 0, ny: 1 });
+  for (let j = n - 1; j > 0; j -= step) ring.push({ x: x0, y: y0 + j, z: h(0, j), nx: -1, ny: 0 });
+  const pos: number[] = [];
+  const inset = 3; // start under the terrain edge so no sky shows through the seam
+  for (const p of ring) {
+    pos.push(p.x - p.nx * inset, p.z, -(p.y - p.ny * inset));
+    // corners fan out diagonally so neighbouring quads don't overlap
+    const ox = p.x + p.nx * out + (p.nx ? 0 : (p.x - (x0 + size / 2)) / (size / 2)) * out;
+    const oy = p.y + p.ny * out + (p.ny ? 0 : (p.y - (y0 + size / 2)) / (size / 2)) * out;
+    pos.push(ox, p.z - 1, -oy);
+  }
+  const idx: number[] = [];
+  const m = ring.length;
+  for (let k = 0; k < m; k++) {
+    const a = k * 2, b = a + 1, c = ((k + 1) % m) * 2, d = c + 1;
+    idx.push(a, b, c, c, b, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x6d7150, roughness: 1, side: THREE.DoubleSide }));
+  mesh.receiveShadow = true;
+  mesh.name = 'terrain-skirt';
+  return mesh;
+}

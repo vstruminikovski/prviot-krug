@@ -12,10 +12,10 @@ import { loadModel } from './render/models';
 import { buildProps, buildSignals } from './render/props';
 import { buildRoads, buildRouteGuide } from './render/roads';
 import { createScene, followSun } from './render/scene';
-import { buildTerrain } from './render/terrain';
+import { buildSkirt, buildTerrain } from './render/terrain';
 import { SignalSystem } from './traffic/signals';
 import { Traffic } from './traffic/traffic';
-import type { Vec3 } from './import/types';
+import type { PropInstance, Vec3 } from './import/types';
 import { convertSurvey, frameOf, mergeSurvey, surveyPath, type SurveyCollection } from './import/manualSurvey';
 
 const LEVEL_BASE = `${import.meta.env.BASE_URL}mapng/prviot_krug`.replace(/\/+/g, '/');
@@ -49,27 +49,25 @@ async function boot() {
   status('Starting physics…');
   const R = await initRapier();
   const physics = createWorld(R, level.terrain);
+  physics.addBoundary(level.terrain); // invisible walls at the map edge
   const kit = createScene(app);
   const { scene, camera, renderer, sun } = kit;
 
   const route = level.route;
-  const mid = route.points[Math.floor(route.points.length / 2)];
-  const center: [number, number] = [mid[0], mid[1]];
 
   status('Building terrain and roads…');
   scene.add(buildTerrain(level.terrain, `${LEVEL_BASE}/${level.index.terrain.baseTexture}`));
+  scene.add(buildSkirt(level.terrain));
   scene.add(buildRoads(level.roads));
   const guide = buildRouteGuide(route.points, route.end.p);
   orientGate(guide.userData.gate, route.points, route.end.p);
   scene.add(guide);
-  scene.add(buildProps(level.objects, center, 420));
-  const signalMeshes = buildSignals(level.objects, darkLights);
+  const drivable = level.roads.filter((r) => r.kind === 'carriageway' || r.kind === 'service');
+  const signalMeshes = buildSignals(level.objects, darkLights, (p, d) => curbside(drivable, p, d, level.terrain.heightAt));
   scene.add(signalMeshes.group);
 
-  // Buildings + sidewalks near the route: visuals and Rapier trimeshes.
-  const near = level.index.models.filter(
-    (m) => (m.role === 'buildings' || m.role === 'sidewalks') && Math.hypot(m.position[0] - center[0], m.position[1] - center[1]) < 420,
-  );
+  // Every building and sidewalk tile of the 1×1 km map: visuals and Rapier trimeshes.
+  const near = level.index.models.filter((m) => m.role === 'buildings' || m.role === 'sidewalks');
   let done = 0;
   const failed: string[] = [];
   await Promise.all(
@@ -87,6 +85,16 @@ async function boot() {
     ),
   );
 
+  // Props for the whole map, minus those that would stand inside a building or on a road.
+  const buildingMeshes: THREE.Mesh[] = [];
+  scene.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh && /^bld/.test(o.name)) buildingMeshes.push(o as THREE.Mesh);
+  });
+  const props = buildProps(level.objects, insideOrOnRoad(buildingMeshes, drivable));
+  scene.add(props);
+  console.info('Props dropped (inside a building or on a road):', props.userData.dropped);
+  for (const w of props.userData.walls as PropInstance[]) physics.addBox(w.pos[0], w.pos[1], w.pos[2], w.yaw, [1.55, 0.15, 0.6]);
+
   // Player car at the route start, facing along the parking aisle.
   const start = route.start;
   const startPos = () => ({ x: start.p[0], y: level.terrain.heightAt(start.p[0], start.p[1]) + 0.9, z: -start.p[1] });
@@ -95,7 +103,7 @@ async function boot() {
   scene.add(car);
 
   const signals = new SignalSystem(level.objects.signals);
-  const traffic = new Traffic(level.network, level.roads, signals, { center, radius: 300, cars: 22, pedestrians: 26 });
+  const traffic = new Traffic(level.network, level.roads, signals, { center: [0, 0], radius: 800, cars: 70, pedestrians: 80 });
   const aiMeshes = traffic.cars.map((c) => {
     const m = carMesh(c.color, false);
     scene.add(m);
@@ -203,7 +211,51 @@ async function boot() {
     elapsed = 0;
   };
   // test hook
-  (window as unknown as Record<string, unknown>).__mapng = { level, vehicle, traffic, failed, scene, survey: merged };
+  (window as unknown as Record<string, unknown>).__mapng = { level, vehicle, traffic, failed, scene, camera, renderer, survey: merged };
+}
+
+/** Distance from (x, y) to the nearest drivable road edge (negative = on the road), with that road's direction. */
+function nearestRoad(roads: LevelData['roads'], x: number, y: number) {
+  let best = { edge: Infinity, centre: Infinity, ux: 1, uy: 0, hw: 0 };
+  for (const r of roads)
+    for (let i = 0; i < r.points.length - 1; i++) {
+      const a = r.points[i], b = r.points[i + 1];
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const L = Math.hypot(dx, dy) || 1e-6;
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (L * L)));
+      const d = Math.hypot(x - a[0] - dx * t, y - a[1] - dy * t);
+      const hw = Math.min(a[3], b[3]) / 2;
+      if (d - hw < best.edge) best = { edge: d - hw, centre: d, ux: dx / L, uy: dy / L, hw };
+    }
+  return best;
+}
+
+/** Drop props inside building volumes (roof hit well above the prop) or on a carriageway. */
+function insideOrOnRoad(buildings: THREE.Mesh[], roads: LevelData['roads']) {
+  const rc = new THREE.Raycaster();
+  const down = new THREE.Vector3(0, -1, 0);
+  const from = new THREE.Vector3();
+  return (x: number, y: number, z: number) => {
+    if (nearestRoad(roads, x, y).edge < -0.5) return true;
+    rc.set(from.set(x, z + 80, -y), down);
+    const hit = rc.intersectObjects(buildings, false)[0];
+    return !!hit && hit.point.y > z + 2;
+  };
+}
+
+/**
+ * MapNG puts a traffic-light point on the road centre at the stop position. Stand the
+ * pole at the right-hand kerb of the drivers it faces (right-hand traffic) instead of
+ * in the middle of the carriageway.
+ */
+function curbside(roads: LevelData['roads'], p: number[], dir: number[], heightAt: (x: number, y: number) => number) {
+  const r = nearestRoad(roads, p[0], p[1]);
+  if (r.edge > 0) return p; // already off the road
+  // drivers travel against dir; their right is (vy, −vx) with v = −dir
+  const rx = -dir[1], ry = dir[0];
+  const k = r.hw + 0.6;
+  const x = p[0] + rx * k, y = p[1] + ry * k;
+  return [x, y, heightAt(x, y)];
 }
 
 function orientGate(gate: THREE.Object3D, pts: Vec3[], end: Vec3) {
